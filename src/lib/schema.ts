@@ -24,6 +24,10 @@ export const ChatCta = z.object({
 
 export const LinkCta = z.object({ label: z.string(), href: z.string() });
 
+/** A tenant file (photo, cover, logo...). Either a key inside the tenant's asset folder or an absolute URL. */
+const ImageRef = z.string().min(1).meta({ widget: "image" });
+const OptionalImageRef = z.string().meta({ widget: "image" });
+
 const SectionHead = {
   eyebrow: z.string(),
   title: RichText,
@@ -78,7 +82,7 @@ const Schedule = z.object({
     stage: z.string(),
     days: z.array(DayKey),
     /** 24h "HH:MM", or null when the time isn't announced yet. */
-    time: z.string().regex(/^\d{2}:\d{2}$/).nullable(),
+    time: z.string().regex(/^\d{2}:\d{2}$/, { error: "اختر الساعة" }).nullable(),
     mode: z.string().optional(),
   })),
   messages: z.object({ book: z.string(), ask: z.string() }),
@@ -96,8 +100,8 @@ const Method = z.object({
 const Book = z.object({
   ...SectionHead,
   seriesName: z.string().optional(),
-  cover: z.string(),
-  backCover: z.string().optional(),
+  cover: ImageRef,
+  backCover: OptionalImageRef.optional(),
   coverAlt: z.string(),
   features: z.array(z.object({ value: z.string(), label: z.string() })),
   order: z.object({
@@ -122,7 +126,7 @@ const Students = z.object({
   prefix: z.string().optional(),
   title: RichText,
   text: z.string(),
-  photo: z.string().nullable(),
+  photo: OptionalImageRef.nullable(),
   cta: ChatCta,
 });
 
@@ -149,7 +153,7 @@ const Exams = z.object({
     id: z.string(),
     title: z.string(),
     /** ISO date (YYYY-MM-DD) or datetime with offset. */
-    date: z.string(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)?)?$/, { error: "اختر تاريخ الامتحان" }),
     featured: z.boolean().optional(),
     place: z.string().optional(),
     fee: z.string().optional(),
@@ -180,14 +184,14 @@ const Final = z.object({ title: RichText, text: z.string(), cta: ChatCta });
 
 export const ContentSchema = z.object({
   $schema: z.string().optional(),
-  slug: z.string().regex(/^[a-z0-9-]+$/),
+  slug: z.string().regex(/^[a-z0-9-]+$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة فقط" }),
   locale: z.string(),
   dir: z.enum(["rtl", "ltr"]),
-  seo: z.object({ title: z.string(), description: z.string(), ogImage: z.string().optional() }),
+  seo: z.object({ title: z.string(), description: z.string(), ogImage: OptionalImageRef.optional() }),
   contact: z.object({
     primary: z.enum(["whatsapp", "telegram", "messenger"]).default("whatsapp"),
     /** International format, digits only (e.g. 201001234567). */
-    whatsapp: z.string().regex(/^\d{8,15}$/),
+    whatsapp: z.string().regex(/^\d{8,15}$/, { error: "اكتب الرقم بالصيغة الدولية بأرقام فقط بدون + أو مسافات، مثل 201009719950" }),
     telegram: z.string().optional(),
     messenger: z.string().optional(),
     phones: z.array(z.string()).default([]),
@@ -201,9 +205,9 @@ export const ContentSchema = z.object({
     fullTitle: z.string(),
     latinName: z.string().optional(),
     role: z.string(),
-    photo: z.string(),
-    avatar: z.string().optional(),
-    logo: z.string().optional(),
+    photo: ImageRef,
+    avatar: OptionalImageRef.optional(),
+    logo: OptionalImageRef.optional(),
     photoBadge: z.string().optional(),
     replyNote: z.string().optional(),
   }),
@@ -234,14 +238,14 @@ export const ContentSchema = z.object({
 }).superRefine((c, ctx) => {
   for (const key of c.sections) {
     if (key !== "hero" && !c[key]) {
-      ctx.addIssue({ code: "custom", path: ["sections"], message: `Section "${key}" is listed but has no data.` });
+      ctx.addIssue({ code: "custom", path: ["sections"], message: `القسم "${key}" ظاهر في ترتيب الأقسام لكن بياناته غير موجودة. أضف بياناته أو أخفِه.` });
     }
   }
 });
 
 /* ---------- theme.json ---------- */
 
-const Color = z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+const Color = z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, { error: "لون غير صالح، مثل #e3171f" });
 
 export const ThemeSchema = z.object({
   $schema: z.string().optional(),
@@ -273,11 +277,10 @@ export const ThemeSchema = z.object({
 
 export const DeploySchema = z.object({
   $schema: z.string().optional(),
+  /** Imported into the database by the platform console when true. */
   enabled: z.boolean(),
-  /** Sub-path on the shared GitHub Pages site: <owner>.github.io/<repo>/<path>/ */
-  githubPages: z.object({ path: z.string().regex(/^[a-z0-9-]+$/) }).nullable(),
-  /** Custom domain for a dedicated host (Cloudflare etc.). Not used on GitHub Pages. */
-  domain: z.string().nullable(),
+  /** Custom domains that serve this teacher (e.g. "mohamedali.com", "www.mohamedali.com"). First one is primary. */
+  domains: z.array(z.string().regex(/^[a-z0-9.-]+$/)).default([]),
 });
 
 export type Content = z.infer<typeof ContentSchema>;
