@@ -1,0 +1,33 @@
+/** The admin editor's pages. Each edits some top-level keys of content.json, or the whole theme. */
+export type SectionDef = {
+  id: string;
+  title: string;
+  description: string;
+  /** Top-level content keys edited on this page. */
+  keys?: string[];
+  /** Edits theme.json instead of content.json (super admin only). */
+  theme?: boolean;
+  superOnly?: boolean;
+};
+
+export const SECTIONS: SectionDef[] = [
+  { id: "exams", title: "الامتحانات والجوائز", description: "إضافة امتحان، التاريخ، الجائزة، والشريط الأحمر.", keys: ["exams"] },
+  { id: "schedule", title: "جدول المواعيد", description: "المجموعات، الأيام، الساعات، ورسائل الحجز.", keys: ["schedule"] },
+  { id: "book", title: "الكتاب", description: "الغلاف، المميزات، ونموذج الطلب.", keys: ["book"] },
+  { id: "youtube", title: "قناة اليوتيوب", description: "رابط القناة والفيديوهات المعروضة.", keys: ["youtube"] },
+  { id: "profile", title: "الملف الشخصي", description: "الاسم، اللقب، الصورة، واللوجو.", keys: ["profile"] },
+  { id: "contact", title: "التواصل", description: "رقم الواتساب، أرقام الهاتف، وكود التتبع.", keys: ["contact"] },
+  { id: "socials", title: "السوشيال ميديا", description: "روابط يوتيوب، تيك توك، فيسبوك...", keys: ["socials"] },
+  { id: "hero", title: "الواجهة الرئيسية", description: "العنوان الكبير، الفقرة، الأزرار، والأرقام.", keys: ["hero"] },
+  { id: "grades", title: "الصفوف والمواد", description: "المراحل والصفوف التي تدرّسها.", keys: ["grades"] },
+  { id: "method", title: "طريقة الشرح", description: "النقاط التي تميزك.", keys: ["method"] },
+  { id: "students", title: "الطلاب", description: "عدد الطلاب وصورة المجموعة.", keys: ["students"] },
+  { id: "challenge", title: "تحدي الأسئلة", description: "أسئلة صعبة يجاوب عليها الطالب على واتساب.", keys: ["challenge"] },
+  { id: "final", title: "الدعوة الأخيرة", description: "آخر قسم قبل الفوتر.", keys: ["final"] },
+  { id: "layout", title: "ترتيب الأقسام والقوائم", description: "الأقسام الظاهرة، القائمة العلوية، الشريط السفلي، والفوتر.", keys: ["sections", "nav", "navCta", "sticky", "footer"] },
+  { id: "seo", title: "جوجل والمشاركة", description: "عنوان ووصف الموقع في جوجل وصورة المشاركة.", keys: ["seo"] },
+  { id: "general", title: "اللغة والنصوص العامة", description: "اللغة، الاتجاه، وأسماء الأيام.", keys: ["locale", "dir", "labels"] },
+  { id: "theme", title: "الهوية البصرية", description: "الألوان والخطوط وشكل الصور.", theme: true, superOnly: true },
+];
+
+export const sectionById = (id: string) => SECTIONS.find((s) => s.id === id);
