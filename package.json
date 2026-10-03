@@ -1,0 +1,32 @@
+{
+  "name": "portfolioio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant teacher portfolio sites. One template, one folder per teacher.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/prepare-tenant.mjs && next dev",
+    "build": "node scripts/prepare-tenant.mjs && next build",
+    "build:all": "node scripts/build-all.mjs",
+    "validate": "node --experimental-strip-types scripts/validate.ts",
+    "schema": "node --experimental-strip-types scripts/generate-schema.ts",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node --experimental-strip-types scripts/generate-schema.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}
