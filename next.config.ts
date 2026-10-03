@@ -1,19 +1,21 @@
 import type { NextConfig } from "next";
 
 /**
- * One template, many teachers. Each build targets a single tenant:
- *   TENANT=<folder in /tenants>  BASE_PATH=/<sub-path or empty>  SITE_URL=https://...
- * scripts/build-all.mjs sets these for every enabled tenant.
+ * One deployment serves every teacher. proxy.ts maps each request's domain to
+ * /sites/<site>/..., pages read the teacher's data from Supabase, and saving in
+ * /admin invalidates that teacher's cached pages. No rebuilds on content changes.
  */
-const basePath = (process.env.BASE_PATH ?? "").replace(/\/$/, "");
-
 const config: NextConfig = {
-  output: "export",
-  trailingSlash: true,
-  basePath: basePath || undefined,
-  images: { unoptimized: true },
-  env: { NEXT_PUBLIC_BASE_PATH: basePath },
   reactStrictMode: true,
+  cacheComponents: true,
+  partialPrefetching: true,
+  images: { unoptimized: true },
+  // The platform console's "Import" reads tenants/* at runtime.
+  outputFileTracingIncludes: { "/sites/[site]/admin": ["./tenants/**/*"] },
+  experimental: {
+    // Image uploads go through a server action; Vercel caps request bodies at 4.5 MB.
+    serverActions: { bodySizeLimit: "4mb" },
+  },
 };
 
 export default config;
