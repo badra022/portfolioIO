@@ -1,0 +1,265 @@
+{
+  "$schema": "../../schema/content.schema.json",
+  "slug": "mohamed-ali",
+  "locale": "ar-EG",
+  "dir": "rtl",
+
+  "seo": {
+    "title": "مستر محمد علي | علوم وفيزياء إعدادي وثانوي",
+    "description": "علوم لكل مراحل إعدادي، علوم متكاملة لأولى ثانوي، وفيزياء لتانية ثانوي. احجز مكانك في سنتر الأوائل على واتساب.",
+    "ogImage": "og.jpg"
+  },
+
+  "contact": {
+    "primary": "whatsapp",
+    "whatsapp": "201009719950",
+    "phones": ["01009719950", "01558816247"],
+    "phoneHighlights": { "01009719950": [4, 5, 10], "01558816247": [4, 5, 9] },
+    "refCodes": true,
+    "refLabel": "كود"
+  },
+
+  "profile": {
+    "name": "محمد علي",
+    "fullTitle": "أ. محمد علي",
+    "latinName": "Mr.Mohamed Ali",
+    "role": "مدرس العلوم والفيزياء",
+    "photo": "teacher.webp",
+    "avatar": "avatar.webp",
+    "logo": "logo.webp",
+    "photoBadge": "#امتحانك_في_جيبك",
+    "replyNote": "بيرد على واتساب"
+  },
+
+  "socials": [
+    { "type": "youtube", "label": "يوتيوب", "url": "https://www.youtube.com/@MohamedAli-cq1xr" },
+    { "type": "tiktok", "label": "تيك توك", "url": "https://www.tiktok.com/@mohammedali5337" },
+    { "type": "facebook", "label": "فيسبوك", "url": "https://www.facebook.com/share/19UFbCkj3b/" },
+    { "type": "whatsappChannel", "label": "قناة الواتساب", "url": "https://whatsapp.com/channel/0029VbAnZ7s6BIEneA7CCn12" }
+  ],
+
+  "nav": [
+    { "label": "المواعيد", "href": "#schedule" },
+    { "label": "نظامنا", "href": "#method" },
+    { "label": "الكتاب", "href": "#book" },
+    { "label": "الامتحانات", "href": "#exams" },
+    { "label": "يوتيوب", "href": "#youtube" }
+  ],
+  "navCta": { "label": "كلمنا واتساب", "message": "السلام عليكم مستر محمد، عندي استفسار عن الحصص.", "ref": "NAV" },
+
+  "sections": ["hero", "grades", "schedule", "method", "book", "students", "challenge", "exams", "youtube", "final"],
+
+  "hero": {
+    "kicker": "مستر محمد علي · مدرس العلوم والفيزياء",
+    "headline": [
+      [{ "text": "لو " }, { "text": "العلوم", "style": "accent" }, { "text": " مزعلك" }],
+      [{ "text": "محمد علي " }, { "text": "هيدلعك", "style": "tag" }]
+    ],
+    "lede": [
+      { "text": "علوم لـ" }, { "text": "كل مراحل إعدادي", "style": "strong" },
+      { "text": "، علوم متكاملة لـ" }, { "text": "أولى ثانوي", "style": "strong" },
+      { "text": "، وفيزياء لـ" }, { "text": "تانية ثانوي", "style": "strong" },
+      { "text": ". شرح بأبسط طريقة، و2000 سؤال في الترم من كتابنا الخاص." }
+    ],
+    "primaryCta": { "label": "احجز مكانك على واتساب", "message": "السلام عليكم مستر محمد، عايز أحجز مكان في الحصص. أنا في سنة: ", "ref": "HERO" },
+    "secondaryCta": { "label": "شوف المواعيد", "href": "#schedule" },
+    "stats": [
+      { "value": "100", "prefix": "+", "label": "طالب معانا" },
+      { "value": "2000", "prefix": "+", "label": "سؤال في الترم" },
+      { "value": "كل شهر", "label": "امتحان عليه جوايز" }
+    ]
+  },
+
+  "grades": {
+    "eyebrow": "بندرّس لمين؟",
+    "title": [{ "text": "المراحل " }, { "text": "والمواد", "style": "accent" }],
+    "stages": [
+      {
+        "id": "prep",
+        "name": "إعدادي",
+        "note": "علوم · كل السنين",
+        "items": [
+          { "name": "أولى إعدادي", "subject": "علوم" },
+          { "name": "تانية إعدادي", "subject": "علوم" },
+          { "name": "تالتة إعدادي", "subject": "علوم" }
+        ]
+      },
+      {
+        "id": "sec",
+        "name": "ثانوي",
+        "items": [
+          { "name": "أولى ثانوي", "subject": "علوم متكاملة" },
+          { "name": "تانية ثانوي", "subject": "فيزياء" }
+        ]
+      }
+    ]
+  },
+
+  "schedule": {
+    "eyebrow": "المواعيد",
+    "title": [{ "text": "اختار " }, { "text": "مجموعتك", "style": "accent" }, { "text": " واحجز" }],
+    "intro": "كل الحصص في سنتر الأوائل. اختار سنتك وابعتلنا، والمكان يتحجزلك على واتساب.",
+    "location": "سنتر الأوائل",
+    "filters": { "stage": true, "day": true },
+    "labels": {
+      "all": "الكل",
+      "stage": "المرحلة",
+      "day": "اليوم",
+      "pm": "م",
+      "am": "ص",
+      "tbd": "الموعد هيتعلن قريب",
+      "empty": "مفيش مجموعات في اليوم ده للمرحلة دي. ابعتلنا على واتساب ونشوفلك أقرب موعد.",
+      "book": "احجز المجموعة دي",
+      "ask": "اسأل عن الموعد"
+    },
+    "slots": [
+      { "id": "P3", "grade": "تالتة إعدادي", "subject": "علوم", "stage": "prep", "days": ["sun", "wed"], "time": "14:30", "mode": "في السنتر" },
+      { "id": "P2", "grade": "تانية إعدادي", "subject": "علوم", "stage": "prep", "days": ["sun", "wed"], "time": "16:00", "mode": "في السنتر" },
+      { "id": "P1", "grade": "أولى إعدادي", "subject": "علوم", "stage": "prep", "days": ["sun", "wed"], "time": "17:00", "mode": "في السنتر" },
+      { "id": "S1", "grade": "أولى ثانوي", "subject": "علوم متكاملة", "stage": "sec", "days": ["wed"], "time": "19:00", "mode": "في السنتر" },
+      { "id": "S2", "grade": "تانية ثانوي", "subject": "فيزياء", "stage": "sec", "days": [], "time": null, "mode": "في السنتر" }
+    ],
+    "messages": {
+      "book": "السلام عليكم، عايز أحجز في مجموعة {grade} ({subject}) يوم {days} الساعة {time} في {location}.",
+      "ask": "السلام عليكم، أنا في {grade} وعايز أعرف مواعيد {subject} وأحجز مكان."
+    }
+  },
+
+  "method": {
+    "eyebrow": "نظامنا",
+    "title": [{ "text": "إزاي بنذاكر " }, { "text": "معاك؟", "style": "accent" }],
+    "intro": "الشرح في الحصة بأبسط طريقة، والتركيز على حل أسئلة كتير، لأن ده اللي بيفرق معاك في الامتحان.",
+    "items": [
+      { "icon": "book", "title": "كتابنا الخاص", "text": "بنشتغل من كتابنا لأنه فيه أكبر عدد أسئلة، حوالي 2000 سؤال في الترم." },
+      { "icon": "chat", "title": "بنسمعك بعد كل حصة", "text": "عندك سؤال أو مشكلة؟ بنقعد معاك بعد الحصة ونحلها." },
+      { "icon": "check", "title": "متابعة الواجب", "text": "متابعة واجب كل حصة، وبنبلغ ولي الأمر لو في أي تقصير." },
+      { "icon": "loop", "title": "مراجعات شهرية", "text": "مراجعة مستمرة كل شهر عشان المنهج يفضل في دماغك طول الترم." },
+      { "icon": "trophy", "title": "امتحان شهري بجوايز", "text": "امتحانات شهرية عليها جوايز قيّمة وتفيدك فعلًا." },
+      { "icon": "bolt", "title": "مسابقات في الحصة", "text": "مسابقات تفاعلية بين الطلبة عشان الحماس ما يقفش." }
+    ]
+  },
+
+  "book": {
+    "eyebrow": "الكتاب",
+    "title": [{ "text": "كأن المستر " }, { "text": "قاعد معاك", "style": "accent" }],
+    "seriesName": "فعلمي",
+    "intro": "سلسلة «فعلمي» في العلوم والفيزياء والعلوم المتكاملة. شرح المنهج كامل بأبسط طريقة، تقرأه كأن المستر جنبك بالظبط، وبعد كل درس امتحان شامل على كل اللي فات.",
+    "cover": "book-front.webp",
+    "coverAlt": "غلاف سلسلة فعلمي إعداد الأستاذ محمد علي",
+    "features": [
+      { "value": "2000", "label": "سؤال تقريبًا في الترم" },
+      { "value": "شرح كامل", "label": "للمنهج بأبسط طريقة" },
+      { "value": "امتحان", "label": "شامل بعد كل درس" }
+    ],
+    "order": {
+      "title": "اطلب كتابك",
+      "gradeLabel": "سنتك",
+      "deliveryLabel": "هتستلمه إزاي؟",
+      "grades": ["أولى إعدادي", "تانية إعدادي", "تالتة إعدادي", "أولى ثانوي", "تانية ثانوي"],
+      "delivery": [
+        { "id": "center", "label": "من السنتر", "value": "استلام من السنتر" },
+        { "id": "ship", "label": "شحن (أونلاين)", "value": "شحن للبيت" }
+      ],
+      "cta": "اطلب الكتاب على واتساب",
+      "message": "السلام عليكم، عايز أطلب كتاب فعلمي لـ {grade}. طريقة الاستلام: {delivery}.",
+      "ref": "BOOK",
+      "whatsapp": "201009719950",
+      "note": "الطلب بيروح لرقم الكتب {phone}",
+      "notePhone": "01009719950"
+    }
+  },
+
+  "students": {
+    "eyebrow": "طلابنا",
+    "count": "100",
+    "prefix": "+",
+    "title": [{ "text": "طالب بيذاكروا معانا. " }, { "text": "انضم لهم", "style": "accent" }],
+    "text": "في السنتر أو أونلاين، مكانك محجوز معانا.",
+    "photo": null,
+    "cta": { "label": "انضم دلوقتي", "message": "السلام عليكم، عايز أنضم للطلبة وأحجز مكان. أنا في سنة: ", "ref": "STUDENTS" }
+  },
+
+  "challenge": {
+    "eyebrow": "التحدي",
+    "title": [{ "text": "تقدر " }, { "text": "تحلها؟", "style": "accent" }],
+    "intro": "نوع الأسئلة اللي بنحلها في كل حصة. اختار إجابتك وابعتها، والمستر يرد عليك.",
+    "sendLabel": "ابعت إجابتك",
+    "message": "حليت سؤال التحدي رقم {n} من الموقع، وإجابتي: {answer}",
+    "questions": [
+      {
+        "level": "تحدي إعدادي",
+        "question": "مكعب من الحديد طول ضلعه 2 سم وكتلته 63.2 جم. كثافة الحديد تساوي:",
+        "options": ["7.9 جم/سم³", "15.8 جم/سم³", "31.6 جم/سم³", "126.4 جم/سم³"],
+        "draft": true
+      },
+      {
+        "level": "تحدي ثانوي",
+        "question": "جسم بيسقط سقوط حر من ارتفاع 20 متر. سرعته لحظة ما يوصل الأرض تساوي: (عجلة الجاذبية = 10 م/ث²)",
+        "options": ["10 م/ث", "20 م/ث", "40 م/ث", "200 م/ث"],
+        "draft": true
+      }
+    ]
+  },
+
+  "exams": {
+    "eyebrow": "الامتحانات والجوايز",
+    "title": [{ "text": "امتحن مع " }, { "text": "مئات الطلبة", "style": "accent" }, { "text": " وكسب" }],
+    "intro": "امتحانات عامة عليها جوايز للأوائل. احجز مكانك بدري.",
+    "labels": {
+      "scope": "على",
+      "prize": "الجايزة",
+      "trackLabel": "اختار مرحلتك",
+      "countdown": "باقي",
+      "days": "يوم",
+      "hours": "ساعة",
+      "minutes": "دقيقة",
+      "today": "النهارده!"
+    },
+    "items": [
+      {
+        "id": "OCT-U1",
+        "title": "امتحان الجمعة",
+        "date": "2026-10-09",
+        "featured": true,
+        "prize": "جوايز بالدولار للأوائل",
+        "tracks": [
+          { "id": "prep", "label": "إعدادي (كل السنين)", "scope": "الوحدة الأولى" },
+          { "id": "sec1", "label": "أولى ثانوي", "scope": "أول 3 دروس" }
+        ],
+        "cta": "احجز في الامتحان",
+        "message": "السلام عليكم، عايز أحجز في امتحان الجمعة {date}. مرحلتي: {track} (على {scope})."
+      }
+    ],
+    "announcement": "امتحان الجمعة {date} والجايزة بالدولار. احجز مكانك"
+  },
+
+  "youtube": {
+    "eyebrow": "يوتيوب",
+    "title": [{ "text": "ذاكر معانا " }, { "text": "من البيت", "style": "accent" }],
+    "intro": "شروحات ومراجعات على قناتنا. اشترك عشان يوصلك كل جديد.",
+    "channelName": "أ.محمد علي - Mr.Mohamed Ali",
+    "channelUrl": "https://www.youtube.com/@MohamedAli-cq1xr",
+    "subscribeLabel": "اشترك في القناة",
+    "videos": []
+  },
+
+  "final": {
+    "title": [{ "text": "إحنا " }, { "text": "معاك", "style": "accent" }, { "text": " في كل وقت" }],
+    "text": "ابعت سؤالك أو احجز مكانك، وهنرد عليك على طول.",
+    "cta": { "label": "ابعت رسالة على واتساب", "message": "السلام عليكم مستر محمد، عندي سؤال: ", "ref": "FINAL" }
+  },
+
+  "footer": {
+    "hashtags": ["#امتحانك_في_جيبك", "#معلمي"]
+  },
+
+  "sticky": {
+    "secondary": { "label": "المواعيد", "href": "#schedule" },
+    "cta": { "label": "واتساب", "message": "السلام عليكم مستر محمد، عايز أستفسر عن الحصص.", "ref": "STICKY" }
+  },
+
+  "labels": {
+    "days": { "sat": "السبت", "sun": "الأحد", "mon": "الاتنين", "tue": "التلات", "wed": "الأربعاء", "thu": "الخميس", "fri": "الجمعة" },
+    "daysJoiner": " و"
+  }
+}
