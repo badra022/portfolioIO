@@ -48,7 +48,7 @@ The template never contains teacher data. At build time `TENANT=<folder>` picks 
 
 1. Copy `tenants/mohamed-ali` to `tenants/<new-id>` (lowercase, dashes).
 2. Set `"slug": "<new-id>"` in `content.json` and replace the content.
-3. Put their files in `assets/` and update the file names in `content.json`. Images and PDFs can be committed as normal files. If you upload through a tool that only accepts text, store the file as base64 next to its name (`photo.webp.b64`); the build decodes it.
+3. Put their files in `assets/` and update the file names in `content.json`. Images and PDFs can be committed as normal files. If you upload through a tool that only accepts text, store the file as base64 next to its name (`photo.webp.b64`, or split into `photo.webp.b64.001`, `.002`, ...); the build decodes it.
 4. Adjust `theme.json` to their identity.
 5. In `deploy.json`, set `"githubPages": { "path": "<new-id>" }`.
 6. `npm run validate`, then push. The workflow builds and publishes everyone.

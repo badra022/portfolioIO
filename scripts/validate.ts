@@ -28,7 +28,7 @@ for (const slug of tenants) {
       .filter((f): f is string => typeof f === "string" && !/^https?:/.test(f));
     for (const f of files) {
       const base = path.join(dir, slug, "assets", f);
-      if (!fs.existsSync(base) && !fs.existsSync(`${base}.b64`)) errors.push(`missing asset: assets/${f}`);
+      if (!fs.existsSync(base) && !fs.existsSync(`${base}.b64`) && !fs.existsSync(`${base}.b64.001`)) errors.push(`missing asset: assets/${f}`);
     }
   }
   if (errors.length) { failed = true; console.error(`✗ ${slug}\n  ${errors.join("\n  ")}`); }
