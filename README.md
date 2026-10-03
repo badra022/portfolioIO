@@ -66,14 +66,14 @@ npm run build:all                     # every tenant into dist/
 
 ## Deploy
 
+**One-time setup.** The workflow file is stored at `ci/deploy.yml` because the tool that created this repo isn't allowed to write into `.github/workflows/`. On GitHub, open `ci/deploy.yml`, click the pencil (Edit), change the file name at the top to `.github/workflows/deploy.yml`, and commit. Then go to Settings → Pages and set Source to **GitHub Actions**.
+
 **GitHub Pages (now).** `.github/workflows/deploy.yml` runs on every push to `main`, on demand, and once a day. It validates the data, builds every enabled tenant with `TARGET=pages`, and publishes one Pages site:
 
 ```
 https://<owner>.github.io/portfolioIO/                 index of teachers
 https://<owner>.github.io/portfolioIO/mohamed-ali/     a teacher's site
 ```
-
-If the first run fails at "Configure Pages", open the repo's Settings → Pages and set Source to **GitHub Actions**, then re-run.
 
 **Own domain per teacher (later, e.g. Cloudflare Pages).** Set `"domain"` in the teacher's `deploy.json`, then build with `TARGET=domain`. Each tenant is built for the root of its own domain into `dist/<slug>/`, which can be uploaded to that teacher's Cloudflare Pages project. `TENANTS=a,b` limits a build to some teachers.
 
