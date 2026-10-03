@@ -7,11 +7,9 @@ import { SectionHead } from "./SectionHead";
 
 type Data = NonNullable<Content["exams"]>;
 
-/** Exams whose day has passed are dropped at build time. A scheduled rebuild keeps this fresh. */
-export function upcomingExams(data: Data, now = new Date()) {
-  const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
-  return data.items
-    .filter((e) => parseDate(e.date) >= startOfToday)
+/** Past exams are already removed on the server (lib/content-utils.ts); this only orders them. */
+export function upcomingExams(data: Data) {
+  return [...data.items]
     .sort((a, b) => Number(!!b.featured) - Number(!!a.featured) || parseDate(a.date).getTime() - parseDate(b.date).getTime());
 }
 
