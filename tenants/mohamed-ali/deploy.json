@@ -1,6 +1,5 @@
 {
   "$schema": "../../schema/deploy.schema.json",
   "enabled": true,
-  "githubPages": { "path": "mohamed-ali" },
-  "domain": null
+  "domains": []
 }

@@ -9,3 +9,5 @@ next-env.d.ts
 .env*
 schema/
 package-lock.json
+.local-storage/
+!.env.example

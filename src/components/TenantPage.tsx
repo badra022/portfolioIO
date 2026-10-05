@@ -1,28 +1,26 @@
-import { getTenant } from "@/lib/tenant";
 import type { ChatConfig } from "@/lib/chat";
 import type { Content } from "@/lib/schema";
-import { Nav } from "@/components/Nav";
-import { Hero } from "@/components/Hero";
-import { Grades } from "@/components/Grades";
-import { Schedule } from "@/components/Schedule";
-import { Method } from "@/components/Method";
-import { Book } from "@/components/Book";
-import { Students } from "@/components/Students";
-import { Challenge } from "@/components/Challenge";
-import { Announcement, Exams } from "@/components/Exams";
-import { Youtube } from "@/components/Youtube";
-import { Final } from "@/components/Final";
-import { Footer, StickyBar } from "@/components/Footer";
+import { Nav } from "./Nav";
+import { Hero } from "./Hero";
+import { Grades } from "./Grades";
+import { Schedule } from "./Schedule";
+import { Method } from "./Method";
+import { Book } from "./Book";
+import { Students } from "./Students";
+import { Challenge } from "./Challenge";
+import { Announcement, Exams } from "./Exams";
+import { Youtube } from "./Youtube";
+import { Final } from "./Final";
+import { Footer, StickyBar } from "./Footer";
 
 function chatConfig(c: Content): ChatConfig {
   const { primary, whatsapp, telegram, messenger, refCodes, refLabel } = c.contact;
   return { primary, whatsapp, telegram, messenger, refCodes, refLabel };
 }
 
-export default function Page() {
-  const { content: c } = getTenant();
+/** The public teacher page. Content arrives with image URLs resolved and past exams removed. */
+export function TenantPage({ c }: { c: Content }) {
   const chat = chatConfig(c);
-
   const render: Record<Content["sections"][number], () => React.ReactNode> = {
     hero: () => <Hero c={c} chat={chat} />,
     grades: () => <Grades data={c.grades!} />,

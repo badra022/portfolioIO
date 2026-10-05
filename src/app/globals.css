@@ -1,6 +1,6 @@
 /*
  * Site template styles. Every color, font and radius comes from the tenant's
- * theme.json (injected as CSS variables in layout.tsx), so a new teacher gets
+ * theme (injected as CSS variables by app/sites/[site]/layout.tsx), so a new teacher gets
  * their own identity without touching this file.
  *
  * Defaults below only apply if a theme forgets a token.
@@ -26,13 +26,13 @@ body {
   font-size: 16px;
   line-height: 1.75;
   -webkit-font-smoothing: antialiased;
-  padding-bottom: 72px; /* room for the sticky bar */
 }
-html[data-glow="true"] body {
+.site { min-height: 100vh; padding-bottom: 72px; /* room for the sticky bar */ }
+.site[data-glow="true"] {
   background-image: radial-gradient(900px 600px at 82% 6%, var(--accent-12), transparent 60%);
   background-repeat: no-repeat;
 }
-html[data-texture="grain"] body::before {
+.site[data-texture="grain"]::before {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .5;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
@@ -58,7 +58,7 @@ p { margin: 0; }
 }
 .btn svg { width: 20px; height: 20px; flex: none; }
 .btn-wa { background: var(--accent); color: var(--on-accent); }
-html[data-button-glow="true"] .btn-wa { box-shadow: 0 8px 28px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+.site[data-button-glow="true"] .btn-wa { box-shadow: 0 8px 28px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
 .btn-wa:hover { background: var(--accent-hot); transform: translateY(-2px); }
 .btn-ghost { border-color: var(--line); color: var(--text); background: color-mix(in srgb, var(--text) 2%, transparent); }
 .btn-ghost:hover { border-color: var(--subtle); }
@@ -108,9 +108,9 @@ html[data-button-glow="true"] .btn-wa { box-shadow: 0 8px 28px -8px color-mix(in
   width: 100%; height: auto;
   -webkit-mask-image: linear-gradient(to top, transparent 0, #000 18%); mask-image: linear-gradient(to top, transparent 0, #000 18%);
 }
-html[data-photo="blob"] .hero-photo img { border-radius: 28px 28px 28px 140px; }
-html[data-photo="rounded"] .hero-photo img { border-radius: 28px; }
-html[data-photo="circle"] .hero-photo img { border-radius: 50%; -webkit-mask-image: none; mask-image: none; }
+.site[data-photo="blob"] .hero-photo img { border-radius: 28px 28px 28px 140px; }
+.site[data-photo="rounded"] .hero-photo img { border-radius: 28px; }
+.site[data-photo="circle"] .hero-photo img { border-radius: 50%; -webkit-mask-image: none; mask-image: none; }
 .hero-photo .badge {
   position: absolute; bottom: 34px; inset-inline-end: -6px; background: var(--text); color: var(--bg);
   font-family: var(--f-display); font-size: 22px; padding: 6px 16px; border-radius: 12px; transform: rotate(3deg);
@@ -321,3 +321,8 @@ select { font: 15px var(--f-body); color: var(--text); background: var(--surface
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; }
 }
+
+/* platform home / 404 outside a teacher site */
+.platform-home { max-width: 640px; margin: 15vh auto; padding: 0 20px; text-align: center; font-family: system-ui, sans-serif; }
+.plain { min-height: 100vh; }
+.site:has(> .admin) { padding-bottom: 0; }

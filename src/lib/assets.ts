@@ -1,7 +1,7 @@
-/** Tenant assets are copied to /public/tenant at build time (see scripts/prepare-tenant.mjs). */
-const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-
+/**
+ * Image fields are resolved to absolute URLs on the server before rendering
+ * (see lib/server/assets.ts), so components can use the value directly.
+ */
 export function asset(file: string): string {
-  if (/^https?:\/\//.test(file)) return file;
-  return `${BASE}/tenant/${file.replace(/^\/+/, "")}`;
+  return file;
 }
