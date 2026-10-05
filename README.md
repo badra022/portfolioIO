@@ -33,7 +33,8 @@ src/components/admin/                SchemaForm (form generator), SectionEditor,
 src/lib/schema.ts                    Zod schemas: content.json / theme.json / deploy.json
 src/lib/db/schema.ts                 Drizzle tables: tenants, tenant_domains, admin_users, tenant_revisions
 src/lib/server/                      repo (DB access), auth, site (cached reads), storage, assets
-db/migrations/                       SQL to create the tables (run once)
+db/supabase-setup.sql                one paste-ready SQL file that creates everything (run once)
+db/migrations/                       the same SQL as Drizzle migrations
 tenants/<slug>/                      seed data for each teacher (imported from the console)
 ```
 
@@ -44,7 +45,7 @@ Without `DATABASE_URL` the app reads `tenants/*` directly in read-only mode. Thi
 ### 1. Supabase (database + images)
 
 1. Create a project at [supabase.com](https://supabase.com). Pick the **Frankfurt (eu-central-1)** region, the closest to Egypt, and save the database password it asks for.
-2. **Create the tables:** open **SQL Editor** and run `db/migrations/0000_init.sql`, then `db/migrations/0001_lock_down_data_api.sql` (paste each file, then Run). The second one blocks Supabase's public Data API from these tables.
+2. **Create the tables:** open **SQL Editor → New query**, open `db/supabase-setup.sql` in GitHub, copy **everything inside the file** (use the Copy raw file button), paste it into the editor, and click **Run**. Paste the SQL text, not the file name or path: typing `db/...` into the editor gives a `syntax error at or near "db"`. This one file creates the tables and blocks Supabase's public Data API from them.
    *Or from your machine: `DATABASE_URL=... npm run db:migrate`.*
 3. Collect three values:
    - **DATABASE_URL:** click **Connect** at the top, choose **Transaction pooler** (port **6543**), copy the URI, and put your DB password in it.
