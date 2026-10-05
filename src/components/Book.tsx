@@ -3,6 +3,7 @@ import type { ChatConfig } from "@/lib/chat";
 import { asset } from "@/lib/assets";
 import { BookOrder } from "./BookOrder";
 import { SectionHead } from "./SectionHead";
+import { PhotoViewer } from "./PhotoViewer";
 
 export function Book({ data, chat }: { data: NonNullable<Content["book"]>; chat: ChatConfig }) {
   return (
@@ -21,6 +22,16 @@ export function Book({ data, chat }: { data: NonNullable<Content["book"]>; chat:
           <BookOrder order={data.order} chat={chat} />
         </div>
       </div>
+      {data.pages.length > 0 && (
+        <div className="wrap book-pages">
+          {data.pagesTitle && <h3>{data.pagesTitle}</h3>}
+          <PhotoViewer
+            className="pages"
+            closeLabel="إغلاق"
+            photos={data.pages.map((p) => ({ src: asset(p.image), alt: p.alt }))}
+          />
+        </div>
+      )}
     </section>
   );
 }

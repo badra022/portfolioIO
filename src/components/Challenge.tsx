@@ -9,7 +9,7 @@ type Data = NonNullable<Content["challenge"]>;
 
 function Question({ q, n, data, chat }: { q: Data["questions"][number]; n: number; data: Data; chat: ChatConfig }) {
   const [answer, setAnswer] = useState<string | null>(null);
-  const href = chatUrl(chat, fill(data.message, { n, answer: answer ?? "..." }), `CHALLENGE-${n}`);
+  const href = chatUrl(chat, fill(data.message, { n, answer: answer ?? "...", prize: data.prize ?? "" }), `CHALLENGE-${n}`);
   return (
     <div className="q">
       <span className="q-lvl">{q.level}</span>
@@ -37,6 +37,7 @@ export function Challenge({ data, chat }: { data: Data; chat: ChatConfig }) {
           <span className="eyebrow">{data.eyebrow}</span>
           <h2><Rich value={data.title} /></h2>
           {data.intro && <p>{data.intro}</p>}
+          {data.prize && <p className="prize-line"><Icon name="trophy" />{data.prize}</p>}
         </div>
         <div className="challenges">
           {data.questions.map((q, i) => <Question key={i} q={q} n={i + 1} data={data} chat={chat} />)}

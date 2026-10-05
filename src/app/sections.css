@@ -1,0 +1,36 @@
+/* Styles for the students gallery, book pages, challenge prize, inline videos
+   and per-group places. Loaded right after globals.css. */
+
+/* students gallery, book pages, photo viewer */
+.gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 32px; }
+.gallery figure, .pages figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.gallery a, .pages a { display: block; border-radius: var(--r-card); overflow: hidden; border: 1px solid var(--line); background: var(--raised); }
+.gallery img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; transition: transform .3s; }
+.gallery a:hover img, .pages a:hover img { transform: scale(1.03); }
+.gallery figcaption { font-size: 14px; color: var(--muted); }
+.book-pages { margin-top: 40px; display: flex; flex-direction: column; gap: 16px; }
+.book-pages h3 { font-size: 22px; }
+.pages { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 280px)); gap: 16px; }
+.pages img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; object-position: top; display: block; transition: transform .3s; }
+.viewer { border: 0; padding: 0; background: transparent; max-width: min(96vw, 1100px); max-height: 94vh; overflow: visible; }
+.viewer::backdrop { background: rgb(0 0 0 / .85); }
+.viewer figure { margin: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.viewer img { max-width: min(96vw, 1100px); max-height: 86vh; object-fit: contain; border-radius: 10px; cursor: zoom-out; }
+.viewer figcaption { color: #fff; font-size: 15px; }
+.viewer-close { position: fixed; top: 14px; inset-inline-end: 14px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgb(255 255 255 / .15); color: #fff; font-size: 28px; line-height: 1; cursor: pointer; }
+
+/* challenge prize, schedule place, inline video */
+.sec-head .prize-line { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; margin-top: 4px; padding: 10px 16px; border-radius: var(--r-card); background: color-mix(in srgb, var(--accent) 14%, transparent); border: 1px solid var(--accent); color: var(--text); font-weight: 700; }
+.prize-line svg { width: 22px; height: 22px; flex: none; color: var(--accent-hot); }
+.slot-place { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+.slot-place svg { width: 15px; height: 15px; flex: none; color: var(--accent); }
+a.thumb { display: block; }
+.thumb iframe { width: 100%; height: 100%; border: 0; display: block; }
+.vid-title { text-decoration: none; }
+
+@media (max-width: 900px) {
+  .gallery { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .pages { grid-template-columns: 1fr 1fr; }
+}

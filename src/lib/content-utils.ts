@@ -7,7 +7,13 @@ type JsonSchema = Record<string, unknown> & { properties?: Record<string, JsonSc
 export const contentJsonSchema = z.toJSONSchema(ContentSchema, { io: "input", unrepresentable: "any" }) as JsonSchema;
 export const themeJsonSchema = z.toJSONSchema(ThemeSchema, { io: "input", unrepresentable: "any" }) as JsonSchema;
 
-/** Paths of every image field (marked with meta({ widget: "image" }) in schema.ts), e.g. ["profile","photo"]. */
+/** Marks "every item of this list" in an image path. */
+const EACH = "[]";
+
+/**
+ * Paths of every image field (marked with meta({ widget: "image" }) in schema.ts),
+ * e.g. ["profile","photo"] or ["students","gallery","[]","image"] for images inside lists.
+ */
 export const IMAGE_PATHS: string[][] = (() => {
   const out: string[][] = [];
   const walk = (s: JsonSchema | undefined, path: string[]) => {
@@ -15,21 +21,32 @@ export const IMAGE_PATHS: string[][] = (() => {
     if (s.widget === "image") { out.push(path); return; }
     for (const branch of s.anyOf ?? []) walk(branch, path);
     for (const [k, v] of Object.entries(s.properties ?? {})) walk(v, [...path, k]);
+    if (s.items) walk(s.items, [...path, EACH]);
   };
   walk(contentJsonSchema, []);
   return out;
 })();
 
+function mapAt(node: unknown, path: string[], fn: (value: string) => string): void {
+  if (node === null || typeof node !== "object") return;
+  const [key, ...rest] = path;
+  if (key === EACH) {
+    if (Array.isArray(node)) for (const item of node) mapAt(item, rest, fn);
+    return;
+  }
+  const obj = node as Record<string, unknown>;
+  if (rest.length === 0) {
+    if (typeof obj[key] === "string" && obj[key]) obj[key] = fn(obj[key] as string);
+    return;
+  }
+  mapAt(obj[key], rest, fn);
+}
+
 /** Returns a copy of content with every image field passed through fn. */
 export function mapImages(content: Content, fn: (value: string) => string): Content {
-  const copy = structuredClone(content) as Record<string, unknown>;
-  for (const path of IMAGE_PATHS) {
-    let node = copy as Record<string, unknown> | undefined;
-    for (const key of path.slice(0, -1)) node = node?.[key] as Record<string, unknown> | undefined;
-    const last = path[path.length - 1];
-    if (node && typeof node[last] === "string" && node[last]) node[last] = fn(node[last] as string);
-  }
-  return copy as Content;
+  const copy = structuredClone(content);
+  for (const path of IMAGE_PATHS) mapAt(copy, path, fn);
+  return copy;
 }
 
 const parseDate = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : new Date(iso));

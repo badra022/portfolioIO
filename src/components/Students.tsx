@@ -3,6 +3,7 @@ import type { ChatConfig } from "@/lib/chat";
 import { asset } from "@/lib/assets";
 import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
+import { PhotoViewer } from "./PhotoViewer";
 
 export function Students({ data, chat }: { data: NonNullable<Content["students"]>; chat: ChatConfig }) {
   return (
@@ -19,6 +20,15 @@ export function Students({ data, chat }: { data: NonNullable<Content["students"]
         </div>
         {data.photo && <img className="students-photo" src={asset(data.photo)} alt="" loading="lazy" />}
       </div>
+      {data.gallery.length > 0 && (
+        <div className="wrap">
+          <PhotoViewer
+            className="gallery"
+            closeLabel="إغلاق"
+            photos={data.gallery.map((g) => ({ src: asset(g.image), alt: g.caption ?? "", caption: g.caption }))}
+          />
+        </div>
+      )}
     </section>
   );
 }

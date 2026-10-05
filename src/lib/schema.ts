@@ -34,6 +34,9 @@ const SectionHead = {
   intro: z.string().optional(),
 };
 
+/** YouTube video id (11 chars) or any common YouTube link to one video. */
+export const YOUTUBE_RE = /^(?:[\w\-]{11}|https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)[\w\-]{11}(?:[?&#][^\s]*)?)$/;
+
 export const DayKey = z.enum(["sat", "sun", "mon", "tue", "wed", "thu", "fri"]);
 
 /* ---------- sections ---------- */
@@ -69,9 +72,15 @@ const Grades = z.object({
 const Schedule = z.object({
   ...SectionHead,
   location: z.string(),
-  filters: z.object({ stage: z.boolean().default(true), day: z.boolean().default(true) }),
+  filters: z.object({
+    stage: z.boolean().default(true),
+    day: z.boolean().default(true),
+    /** Filter by area. Only shows when groups are in more than one area. */
+    area: z.boolean().default(false),
+  }),
   labels: z.object({
     all: z.string(), stage: z.string(), day: z.string(),
+    area: z.string().optional(),
     pm: z.string(), am: z.string(), tbd: z.string(), empty: z.string(),
     book: z.string(), ask: z.string(),
   }),
@@ -84,6 +93,9 @@ const Schedule = z.object({
     /** 24h "HH:MM", or null when the time isn't announced yet. */
     time: z.string().regex(/^\d{2}:\d{2}$/, { error: "اختر الساعة" }).nullable(),
     mode: z.string().optional(),
+    /** Where this group meets. Empty = the section's default location. */
+    area: z.string().optional(),
+    center: z.string().optional(),
   })),
   messages: z.object({ book: z.string(), ask: z.string() }),
 });
@@ -103,6 +115,9 @@ const Book = z.object({
   cover: ImageRef,
   backCover: OptionalImageRef.optional(),
   coverAlt: z.string(),
+  /** Inside pages shown under the cover, so students see the style of the book. */
+  pagesTitle: z.string().optional(),
+  pages: z.array(z.object({ image: ImageRef, alt: z.string() })).default([]),
   features: z.array(z.object({ value: z.string(), label: z.string() })),
   order: z.object({
     title: z.string(),
@@ -127,12 +142,16 @@ const Students = z.object({
   title: RichText,
   text: z.string(),
   photo: OptionalImageRef.nullable(),
+  /** Photos of the teacher with students (classes, trips, matches). */
+  gallery: z.array(z.object({ image: ImageRef, caption: z.string().optional() })).default([]),
   cta: ChatCta,
 });
 
 const Challenge = z.object({
   ...SectionHead,
   sendLabel: z.string(),
+  /** Highlighted prize line, e.g. what a correct answer on WhatsApp wins. Also available as {prize} in the message. */
+  prize: z.string().optional(),
   message: z.string(),
   questions: z.array(z.object({
     level: z.string(),
@@ -172,7 +191,8 @@ const Youtube = z.object({
   channelUrl: z.string().url(),
   subscribeLabel: z.string(),
   videos: z.array(z.object({
-    id: z.string(),
+    /** Video id or full YouTube link. */
+    id: z.string().regex(YOUTUBE_RE, { error: "الصق رابط فيديو يوتيوب، مثل https://www.youtube.com/watch?v=..." }),
     title: z.string(),
     caption: z.string().optional(),
   })).default([]),

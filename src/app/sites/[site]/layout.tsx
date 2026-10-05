@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getSiteData } from "@/lib/server/site";
 import { themeAttrs, themeCss } from "@/lib/theme";
 import "../../globals.css";
+import "../../sections.css";
 
 /** The platform host is known at build time; every teacher site is rendered on first visit, then cached. */
 export function generateStaticParams() {

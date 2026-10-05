@@ -1,25 +1,22 @@
 import type { Content } from "@/lib/schema";
 import { asset } from "@/lib/assets";
 import { Icon } from "./Icon";
+import { YoutubeVideo } from "./YoutubeVideo";
+import { youtubeId } from "@/lib/youtube";
 import { SectionHead } from "./SectionHead";
 
 export function Youtube({ data, avatar }: { data: NonNullable<Content["youtube"]>; avatar?: string }) {
+  const videos = data.videos.flatMap((v) => {
+    const id = youtubeId(v.id);
+    return id ? [{ ...v, id }] : [];
+  });
   return (
     <section className="block" id="youtube">
       <div className="wrap">
         <SectionHead eyebrow={data.eyebrow} title={data.title} intro={data.intro} />
-        {data.videos.length > 0 && (
+        {videos.length > 0 && (
           <div className="vids">
-            {data.videos.map((v) => (
-              <a className="vid" key={v.id} href={`https://www.youtube.com/watch?v=${v.id}`} target="_blank" rel="noopener noreferrer">
-                <span className="thumb">
-                  <img src={`https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`} alt="" loading="lazy" />
-                  <span className="play"><Icon name="play" /></span>
-                </span>
-                <b>{v.title}</b>
-                {v.caption && <span>{v.caption}</span>}
-              </a>
-            ))}
+            {videos.map((v) => <YoutubeVideo key={v.id} id={v.id} title={v.title} caption={v.caption} />)}
           </div>
         )}
         <a className="yt-card" href={data.channelUrl} target="_blank" rel="noopener noreferrer">
