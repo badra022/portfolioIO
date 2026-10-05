@@ -27,6 +27,19 @@ export class ReadOnlyError extends Error {
 }
 const requireDb = () => { if (!hasDb()) throw new ReadOnlyError(); return db(); };
 
+/**
+ * Stored content was valid when it was saved, but fields added to the schema
+ * later (with defaults, e.g. students.gallery) are missing from older rows.
+ * Parsing on read fills them in. If a row no longer passes (a rule got
+ * stricter), it is served as stored rather than taking the site down.
+ */
+function withDefaults<T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, value: unknown, what: string): T {
+  const r = schema.safeParse(value);
+  if (r.success) return r.data;
+  console.warn(`Stored ${what} does not match the current schema; serving it as stored.`);
+  return value as T;
+}
+
 /* ------------------------------------------------------------------ */
 /* Reads                                                               */
 /* ------------------------------------------------------------------ */
@@ -69,7 +82,9 @@ export async function getTenant(slug: string): Promise<TenantRecord | null> {
     .orderBy(desc(tenantDomains.isPrimary), tenantDomains.domain);
   return {
     id: row.id, slug: row.slug, name: row.name, status: row.status,
-    content: row.content as Content, theme: row.theme as Theme, version: row.version,
+    content: withDefaults<Content>(ContentSchema, row.content, `content for ${slug}`),
+    theme: withDefaults<Theme>(ThemeSchema, row.theme, `theme for ${slug}`),
+    version: row.version,
     domains, updatedAt: row.updatedAt.toISOString(), updatedBy: row.updatedBy,
   };
 }
