@@ -98,7 +98,8 @@ export async function listTenants(): Promise<TenantSummary[]> {
   const d = db();
   const rows = await d.select({
     id: tenants.id, slug: tenants.slug, name: tenants.name, status: tenants.status, updatedAt: tenants.updatedAt,
-    users: sql<number>`(select count(*)::int from ${adminUsers} where ${adminUsers.tenantId} = ${tenants.id})`,
+    // Columns spelled out with their tables: unqualified, "id" would resolve to admin_users.id inside the subquery.
+    users: sql<number>`(select count(*)::int from "admin_users" where "admin_users"."tenant_id" = "tenants"."id")`,
   }).from(tenants).orderBy(tenants.name);
   const domains = await d.select().from(tenantDomains);
   return rows.map((r) => ({

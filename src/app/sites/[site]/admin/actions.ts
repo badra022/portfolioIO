@@ -1,6 +1,5 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { env } from "@/lib/env";
@@ -12,6 +11,7 @@ import { DOMAINS_TAG, slugForSite, tenantTag } from "@/lib/server/site";
 import { assetUrl } from "@/lib/server/assets";
 import { listBundled, readBundledAssets } from "@/lib/server/bundled";
 import { ensureBucket, putObject } from "@/lib/server/storage";
+import { ImageError, SLUG_RE, USERNAME_RE, loginUrlFor, normalizeDomain, storeImage } from "@/lib/server/admin-ops";
 import { generatePassword, hashPassword } from "@/lib/server/passwords";
 import { mapImages } from "@/lib/content-utils";
 import * as repo from "@/lib/server/repo";
@@ -64,33 +64,18 @@ export async function saveSectionAction(site: string, sectionId: string, value: 
   }
 }
 
-const IMAGE_TYPES: Record<string, { ext: string; magic: (b: Uint8Array) => boolean }> = {
-  "image/jpeg": { ext: "jpg", magic: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
-  "image/png": { ext: "png", magic: (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
-  "image/webp": { ext: "webp", magic: (b) => String.fromCharCode(...b.slice(0, 4)) === "RIFF" && String.fromCharCode(...b.slice(8, 12)) === "WEBP" },
-  "image/gif": { ext: "gif", magic: (b) => String.fromCharCode(...b.slice(0, 4)) === "GIF8" },
-  "image/avif": { ext: "avif", magic: (b) => String.fromCharCode(...b.slice(4, 8)) === "ftyp" },
-};
-const MAX_UPLOAD = 4 * 1024 * 1024;
-
 export async function uploadImageAction(site: string, form: FormData): Promise<{ ok: true; key: string; url: string } | { ok: false; error: string }> {
   const ctx = await teacherContext(site);
   if ("ok" in ctx) return { ok: false, error: "غير مصرح." };
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false, error: "لم يتم اختيار ملف." };
-  const type = IMAGE_TYPES[file.type];
-  if (!type) return { ok: false, error: "الصيغ المسموحة: JPG, PNG, WEBP, GIF, AVIF." };
-  if (file.size > MAX_UPLOAD) return { ok: false, error: "الحد الأقصى لحجم الصورة 4 ميجابايت." };
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!type.magic(bytes)) return { ok: false, error: "الملف ليس صورة صالحة." };
-  const key = `uploads/${Date.now().toString(36)}-${randomBytes(4).toString("hex")}.${type.ext}`;
   try {
-    await putObject(ctx.slug, key, bytes, file.type);
+    return { ok: true, ...(await storeImage(ctx.slug, new Uint8Array(await file.arrayBuffer()), file.type)) };
   } catch (e) {
+    if (e instanceof ImageError) return { ok: false, error: e.message };
     console.error(e);
     return { ok: false, error: "تعذّر رفع الصورة." };
   }
-  return { ok: true, key, url: assetUrl(ctx.slug, key) };
 }
 
 export async function restoreRevisionAction(site: string, revisionId: number): Promise<void> {
@@ -106,7 +91,6 @@ export async function restoreRevisionAction(site: string, revisionId: number): P
 /* ------------------------------------------------------------------ */
 
 const PLATFORM = "_platform";
-const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/;
 
 export type ConsoleState = { ok: boolean; message: string; lines?: string[]; secret?: { username: string; password: string; loginUrl?: string } } | null;
 
@@ -157,10 +141,6 @@ export async function createTenantAction(_prev: ConsoleState, form: FormData): P
   redirect(`/admin/tenants/${slug}`);
 }
 
-function normalizeDomain(input: string): string {
-  return input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/:\d+$/, "").replace(/\.$/, "");
-}
-
 export async function addDomainAction(slug: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {
   await requireSuper(PLATFORM);
   const domain = normalizeDomain(String(form.get("domain") ?? ""));
@@ -197,17 +177,6 @@ export async function setStatusAction(slug: string, status: "active" | "disabled
   await repo.setTenantStatus(slug, status);
   updateTag(tenantTag(slug));
   refresh();
-}
-
-const USERNAME_RE = /^[a-z0-9._-]{3,32}$/;
-
-/** Where this teacher logs in: their main domain, else <slug>.<ROOT_DOMAIN>, else the preview path on this host. */
-async function loginUrlFor(slug: string): Promise<string> {
-  const t = await repo.getTenant(slug);
-  const primary = t?.domains.find((d) => d.isPrimary)?.domain ?? t?.domains[0]?.domain;
-  if (primary) return `https://${primary}/admin`;
-  if (env.rootDomain) return `https://${slug}.${env.rootDomain}/admin`;
-  return `/t/${slug}/admin`;
 }
 
 export async function createUserAction(slug: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {

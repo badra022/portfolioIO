@@ -47,3 +47,43 @@ export async function putObject(slug: string, key: string, bytes: Uint8Array, co
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, bytes);
 }
+
+export type StoredFile = { key: string; size: number | null; contentType: string | null; createdAt: string | null };
+
+/** Files in a teacher's folder under `prefix` (e.g. "uploads"), newest first. */
+export async function listObjects(slug: string, prefix = ""): Promise<StoredFile[]> {
+  const folder = [slug, prefix].filter(Boolean).join("/");
+  if (hasSupabaseStorage()) {
+    const res = await fetch(`${env.supabaseUrl}/storage/v1/object/list/${env.storageBucket}`, {
+      method: "POST",
+      headers: supabaseHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ prefix: folder, limit: 1000, sortBy: { column: "created_at", order: "desc" } }),
+    });
+    if (!res.ok) throw new Error(`Listing failed: ${res.status} ${await res.text()}`);
+    const rows = (await res.json()) as { name: string; id: string | null; created_at?: string; metadata?: { size?: number; mimetype?: string } }[];
+    return rows
+      .filter((r) => r.id) // folders have no id
+      .map((r) => ({ key: [prefix, r.name].filter(Boolean).join("/"), size: r.metadata?.size ?? null, contentType: r.metadata?.mimetype ?? null, createdAt: r.created_at ?? null }));
+  }
+  const dir = path.join(LOCAL_STORAGE_DIR, folder);
+  if (!dir.startsWith(LOCAL_STORAGE_DIR + path.sep)) throw new Error("Invalid path.");
+  const names = await fs.readdir(dir).catch(() => [] as string[]);
+  const out: StoredFile[] = [];
+  for (const name of names) {
+    const st = await fs.stat(path.join(dir, name));
+    if (st.isFile()) out.push({ key: [prefix, name].filter(Boolean).join("/"), size: st.size, contentType: null, createdAt: st.mtime.toISOString() });
+  }
+  return out.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+}
+
+/** Reads a file from a teacher's folder. */
+export async function getObject(slug: string, key: string): Promise<Uint8Array | null> {
+  const objectPath = `${slug}/${key}`;
+  if (hasSupabaseStorage()) {
+    const res = await fetch(`${env.supabaseUrl}/storage/v1/object/${env.storageBucket}/${objectPath.split("/").map(encodeURIComponent).join("/")}`, { headers: supabaseHeaders() });
+    return res.ok ? new Uint8Array(await res.arrayBuffer()) : null;
+  }
+  const file = path.join(LOCAL_STORAGE_DIR, objectPath);
+  if (!file.startsWith(LOCAL_STORAGE_DIR + path.sep)) return null;
+  return fs.readFile(file).then((b) => new Uint8Array(b)).catch(() => null);
+}
