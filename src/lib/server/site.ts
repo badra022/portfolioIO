@@ -2,7 +2,7 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { env } from "@/lib/env";
 import { baseForSite } from "@/lib/routing";
-import { withUpcomingExams } from "@/lib/content-utils";
+import { withLiveContent } from "@/lib/content-utils";
 import type { Content, Theme } from "@/lib/schema";
 import { findSlugByDomain, getTenant } from "./repo";
 import { resolveImages } from "./assets";
@@ -28,7 +28,12 @@ export type SiteData =
 
 /** Resolves a site key (from routing.ts) to the slug it serves, or null. */
 export async function slugForSite(site: string): Promise<string | null> {
-  if (site.startsWith("d.")) return findSlugByDomain(site.slice(2));
+  if (site.startsWith("d.")) {
+    // www.example.com and example.com serve the same teacher even if only one was added.
+    const domain = site.slice(2);
+    const twin = domain.startsWith("www.") ? domain.slice(4) : `www.${domain}`;
+    return (await findSlugByDomain(domain)) ?? (await findSlugByDomain(twin));
+  }
   if (site.startsWith("s.") || site.startsWith("p.")) return site.slice(2);
   return null;
 }
@@ -55,7 +60,7 @@ export async function getSiteData(site: string): Promise<SiteData> {
   return {
     kind: "tenant",
     slug,
-    content: resolveImages(withUpcomingExams(t.content, new Date()), slug),
+    content: resolveImages(withLiveContent(t.content, new Date()), slug),
     theme: t.theme,
     canonical: canonicalHost ? `https://${canonicalHost}` : null,
     indexable: Boolean(canonicalHost && servedHost === canonicalHost),

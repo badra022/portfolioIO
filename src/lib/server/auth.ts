@@ -45,13 +45,12 @@ export async function authenticate(header: string | null, site: string): Promise
   if (hit && hit.exp > Date.now()) return hit.p;
 
   let p: Principal | null = null;
-  if (env.adminUser && env.adminPassword && safeEqual(creds.user, env.adminUser) && safeEqual(creds.pass, env.adminPassword)) {
+  if (env.adminUser && env.adminPassword && safeEqual(creds.user.trim(), env.adminUser) && safeEqual(creds.pass, env.adminPassword)) {
     p = { kind: "super", name: env.adminUser };
   } else if (site !== "_platform") {
-    const [login, slug] = await Promise.all([findLogin(creds.user), slugForSite(site)]);
-    const ok = await verifyPassword(creds.pass, login?.hash ?? DUMMY_HASH);
-    if (ok && login && !login.disabled && slug && login.slug === slug) {
-      p = { kind: "teacher", id: login.id, username: creds.user, slug };
+    const [login, slug] = await Promise.all([checkTeacher(creds), slugForSite(site)]);
+    if (login && slug && login.slug === slug) {
+      p = { kind: "teacher", id: login.id, username: login.username, slug };
       await touchLogin(login.id).catch(() => {});
     }
   }
@@ -60,6 +59,25 @@ export async function authenticate(header: string | null, site: string): Promise
     memo.set(key, { p, exp: Date.now() + MEMO_MS });
   }
   return p;
+}
+
+/**
+ * Verifies teacher credentials regardless of site. Usernames are stored lowercase,
+ * and phones capitalize the first letter of the login box, so the username is
+ * matched case-insensitively. Copy-pasted credentials often carry stray spaces;
+ * generated passwords never contain spaces, so trimming is safe.
+ */
+async function checkTeacher(creds: { user: string; pass: string }): Promise<{ id: string; username: string; slug: string } | null> {
+  const username = creds.user.trim().toLowerCase();
+  const login = username ? await findLogin(username) : null;
+  const ok = await verifyPassword(creds.pass.trim(), login?.hash ?? DUMMY_HASH);
+  return ok && login && !login.disabled ? { id: login.id, username, slug: login.slug } : null;
+}
+
+/** For the platform host: whose site do these (teacher) credentials belong to? */
+export async function teacherSlugFor(header: string | null): Promise<string | null> {
+  const creds = parseBasic(header);
+  return creds ? (await checkTeacher(creds))?.slug ?? null : null;
 }
 
 export class ForbiddenError extends Error {

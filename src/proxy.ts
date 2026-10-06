@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { isAdminPath, route } from "@/lib/routing";
-import { authenticate } from "@/lib/server/auth";
+import { authenticate, teacherSlugFor } from "@/lib/server/auth";
 
 /**
  * Every request is mapped by its host name to /sites/<site>/... (see lib/routing.ts).
@@ -14,12 +14,21 @@ export async function proxy(request: NextRequest) {
   const r = route(host, pathname, env.rootDomain, env.platformHosts);
 
   if (isAdminPath(r.rest)) {
-    const principal = await authenticate(request.headers.get("authorization"), r.site);
+    const header = request.headers.get("authorization");
+    const principal = await authenticate(header, r.site);
     if (!principal) {
+      // A teacher who logs in on the platform console is sent to their own site's admin.
+      const teacherSlug = r.site === "_platform" ? await teacherSlugFor(header) : null;
+      if (teacherSlug) {
+        const to = request.nextUrl.clone();
+        to.pathname = `/t/${teacherSlug}${r.rest}`;
+        return NextResponse.redirect(to, 307);
+      }
       return new NextResponse("Authentication required", {
         status: 401,
         headers: {
-          "WWW-Authenticate": `Basic realm="portfolioIO ${r.site}", charset="UTF-8"`,
+          // One realm per host, so a login entered on one admin page is reused on the next.
+          "WWW-Authenticate": `Basic realm="portfolioIO admin", charset="UTF-8"`,
           "Cache-Control": "no-store",
         },
       });
