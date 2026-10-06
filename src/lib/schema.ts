@@ -24,6 +24,40 @@ export const ChatCta = z.object({
 
 export const LinkCta = z.object({ label: z.string(), href: z.string() });
 
+/**
+ * A button that can go anywhere, not only the teacher's main WhatsApp:
+ * another WhatsApp number, Telegram, Messenger, a phone call or a web page.
+ */
+export const Action = z.object({
+  label: z.string(),
+  type: z.enum(["whatsapp", "telegram", "messenger", "phone", "link"]).default("whatsapp"),
+  /** WhatsApp number (empty = the site's number), Telegram/Messenger username, phone number, or https link. */
+  to: z.string().optional(),
+  /** Pre-written message (WhatsApp and Telegram only). */
+  message: z.string().optional(),
+  ref: z.string().optional(),
+}).superRefine((a, ctx) => {
+  const to = (a.to ?? "").trim();
+  const bad = (message: string) => ctx.addIssue({ code: "custom", path: ["to"], message });
+  if (a.type === "link" && !/^https?:\/\//.test(to)) bad("اكتب رابط كامل يبدأ بـ https://");
+  if (a.type === "whatsapp" && to && !/^\d{8,15}$/.test(to)) bad("رقم واتساب دولي بأرقام فقط، مثل 201009719950. اتركه فارغاً لاستخدام رقم الموقع.");
+  if ((a.type === "telegram" || a.type === "messenger") && !/^@?[\w.]{3,64}$/.test(to)) bad("اكتب اسم المستخدم فقط، بدون رابط.");
+  if (a.type === "phone" && !/^\+?[\d\s-]{6,20}$/.test(to)) bad("اكتب رقم الهاتف.");
+});
+
+/** "2026-10-10" (the whole day, Cairo time) or "2026-10-10T18:00". */
+const EndDate = z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)?)?$/, { error: "اختر التاريخ" }).meta({ widget: "date" });
+
+export const Social = z.object({
+  type: z.enum(["youtube", "tiktok", "facebook", "instagram", "whatsappChannel", "telegram", "x"]),
+  label: z.string(),
+  url: z.string().url(),
+  /** e.g. "+5,000". Shown in the YouTube section. */
+  followers: z.string().optional(),
+  /** One line on what students get there, e.g. "Revisions before every exam". */
+  note: z.string().optional(),
+});
+
 /** A tenant file (photo, cover, logo...). Either a key inside the tenant's asset folder or an absolute URL. */
 const ImageRef = z.string().min(1).meta({ widget: "image" });
 const OptionalImageRef = z.string().meta({ widget: "image" });
@@ -43,7 +77,7 @@ export const DayKey = z.enum(["sat", "sun", "mon", "tue", "wed", "thu", "fri"]);
 
 export const SectionKey = z.enum([
   "hero", "grades", "schedule", "method", "book",
-  "students", "challenge", "exams", "youtube", "final",
+  "students", "reviews", "challenge", "exams", "youtube", "services", "final",
 ]);
 
 const Hero = z.object({
@@ -183,6 +217,8 @@ const Exams = z.object({
   })),
   /** Top announcement bar for the featured exam. {date} is filled in. */
   announcement: z.string().optional(),
+  /** The bar stops showing after this date (it also goes once the featured exam's day is over). */
+  announcementEnds: EndDate.optional(),
 });
 
 const Youtube = z.object({
@@ -190,6 +226,12 @@ const Youtube = z.object({
   channelName: z.string(),
   channelUrl: z.string().url(),
   subscribeLabel: z.string(),
+  /** Social links (from the site's social list) shown as cards with followers and a one-liner. */
+  showSocials: z.boolean().default(true),
+  socialsTitle: z.string().optional(),
+  /** Headline number across all platforms, e.g. "+5,000". */
+  followersTotal: z.string().optional(),
+  followersLabel: z.string().optional(),
   videos: z.array(z.object({
     /** Video id or full YouTube link. */
     id: z.string().regex(YOUTUBE_RE, { error: "الصق رابط فيديو يوتيوب، مثل https://www.youtube.com/watch?v=..." }),
@@ -199,6 +241,43 @@ const Youtube = z.object({
 });
 
 const Final = z.object({ title: RichText, text: z.string(), cta: ChatCta });
+
+/** Students' feedback: screenshots of messages/reviews under a headline number. */
+const Reviews = z.object({
+  ...SectionHead,
+  metric: z.object({ value: z.string(), label: z.string() }).optional(),
+  stars: z.boolean().default(true),
+  images: z.array(z.object({ image: ImageRef, alt: z.string().optional() })).default([]),
+  moreLabel: z.string().default("عرض كل الآراء"),
+});
+
+/** Other services the teacher offers, each with its own button and links. */
+const Services = z.object({
+  ...SectionHead,
+  items: z.array(z.object({
+    title: z.string(),
+    text: z.string(),
+    image: OptionalImageRef.optional(),
+    cta: Action.optional(),
+    socials: z.array(Social).default([]),
+  })).default([]),
+});
+
+/** Announcement shown over the page shortly after it opens. Not part of the section order. */
+const Popup = z.object({
+  enabled: z.boolean().default(true),
+  title: z.string(),
+  text: z.string().optional(),
+  /** YouTube link played inside the pop-up (takes the place of the image). */
+  video: z.string().regex(YOUTUBE_RE, { error: "الصق رابط فيديو يوتيوب" }).optional(),
+  image: OptionalImageRef.optional(),
+  cta: Action.optional(),
+  /** Stops showing after this date. */
+  endsAt: EndDate.optional(),
+  delaySeconds: z.number().min(0).max(60).default(2),
+  /** After a visitor closes it, show it to them again after this many hours. */
+  remindAfterHours: z.number().min(0).max(24 * 60).default(5),
+});
 
 /* ---------- content.json ---------- */
 
@@ -231,11 +310,7 @@ export const ContentSchema = z.object({
     photoBadge: z.string().optional(),
     replyNote: z.string().optional(),
   }),
-  socials: z.array(z.object({
-    type: z.enum(["youtube", "tiktok", "facebook", "instagram", "whatsappChannel", "telegram", "x"]),
-    label: z.string(),
-    url: z.string().url(),
-  })).default([]),
+  socials: z.array(Social).default([]),
   nav: z.array(LinkCta).default([]),
   navCta: ChatCta,
   sections: z.array(SectionKey).min(1),
@@ -248,7 +323,10 @@ export const ContentSchema = z.object({
   challenge: Challenge.optional(),
   exams: Exams.optional(),
   youtube: Youtube.optional(),
+  reviews: Reviews.optional(),
+  services: Services.optional(),
   final: Final.optional(),
+  popup: Popup.optional(),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),
   sticky: z.object({ secondary: LinkCta.optional(), cta: ChatCta }),
   labels: z.object({
@@ -308,4 +386,6 @@ export type Theme = z.infer<typeof ThemeSchema>;
 export type Deploy = z.infer<typeof DeploySchema>;
 export type RichTextT = z.infer<typeof RichText>;
 export type ChatCtaT = z.infer<typeof ChatCta>;
+export type ActionT = z.infer<typeof Action>;
+export type SocialT = z.infer<typeof Social>;
 export type DayKeyT = z.infer<typeof DayKey>;

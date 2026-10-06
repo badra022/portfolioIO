@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ContentSchema, ThemeSchema, type Content } from "./schema";
+import { deadline, endOfDay, isOver } from "./dates";
 
 type JsonSchema = Record<string, unknown> & { properties?: Record<string, JsonSchema>; items?: JsonSchema; anyOf?: JsonSchema[] };
 
@@ -49,13 +50,23 @@ export function mapImages(content: Content, fn: (value: string) => string): Cont
   return copy;
 }
 
-const parseDate = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : new Date(iso));
-
-/** Drops exams whose day is over. Runs when the page is (re)rendered, so cached pages refresh at least hourly. */
-export function withUpcomingExams(content: Content, now: Date): Content {
-  if (!content.exams) return content;
-  const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
-  return { ...content, exams: { ...content.exams, items: content.exams.items.filter((e) => parseDate(e.date) >= startOfToday) } };
+/**
+ * Drops what has expired: exams whose day is over (Cairo time), the exam red line
+ * after its end date, and the pop-up when it's switched off or past its end date.
+ * Runs whenever the page is (re)rendered; cached pages refresh at least hourly, and
+ * the red line and pop-up also check their end date in the visitor's browser.
+ */
+export function withLiveContent(content: Content, now: Date): Content {
+  let c = content;
+  if (c.exams) {
+    const items = c.exams.items.filter((e) => !isOver(endOfDay(e.date), now));
+    const barOver = c.exams.announcementEnds ? isOver(deadline(c.exams.announcementEnds), now) : false;
+    c = { ...c, exams: { ...c.exams, items, announcement: barOver ? undefined : c.exams.announcement } };
+  }
+  if (c.popup && (!c.popup.enabled || (c.popup.endsAt && isOver(deadline(c.popup.endsAt), now)))) {
+    c = { ...c, popup: undefined };
+  }
+  return c;
 }
 
 export type Issue = { path: string; message: string };

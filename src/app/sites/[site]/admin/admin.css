@@ -146,6 +146,8 @@
 .f-order li span:first-child::before { counter-increment: s; content: counter(s) ". "; color: var(--a-muted); }
 .f-color { display: flex; gap: 8px; align-items: center; }
 .f-color input[type="color"] { width: 48px; height: 44px; padding: 2px; border: 1px solid #cfc8c3; border-radius: 10px; background: #fff; flex: none; }
+.f-datetime { display: flex; gap: 8px; flex-wrap: wrap; }
+.f-datetime input { flex: 1 1 140px; }
 .f-image { display: grid; gap: 8px; justify-items: start; }
 .f-image img { max-width: 220px; max-height: 180px; width: auto; height: auto; border-radius: 10px; border: 1px solid var(--a-line); background: #1d1a19; }
 .f-image-empty { display: grid; place-items: center; width: 220px; height: 110px; border: 1px dashed #b9b0aa; border-radius: 10px; color: var(--a-muted); font-size: 13px; }

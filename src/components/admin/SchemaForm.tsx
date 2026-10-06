@@ -325,6 +325,7 @@ function StringInput({ id, s, value, onChange, name, path, required, ctx }: { id
   const set = (x: string) => onChange(x === "" && !required ? undefined : x);
   if (s.widget === "image") return <ImageInput value={value} onChange={onChange} required={required} ctx={ctx} />;
   if (s.pattern === TIME_PATTERN) return <input id={id} type="time" dir="ltr" value={v} onChange={(e) => set(e.target.value)} />;
+  if (s.widget === "date") return <DateTimeInput id={id} value={v} onChange={set} />;
   if (name === "date") {
     const dateOnly = !v || /^\d{4}-\d{2}-\d{2}$/.test(v);
     return <input id={id} type={dateOnly ? "date" : "text"} dir="ltr" value={v} onChange={(e) => set(e.target.value)} />;
@@ -340,6 +341,18 @@ function StringInput({ id, s, value, onChange, name, path, required, ctx }: { id
   if (LONG_TEXT.has(name) && !SEGMENT_TEXT.test(path)) return <textarea id={id} rows={Math.min(8, Math.max(2, Math.ceil(v.length / 60)))} value={v} onChange={(e) => set(e.target.value)} />;
   const ltr = LTR.has(name) || s.format === "uri";
   return <input id={id} type={s.format === "uri" ? "url" : "text"} dir={ltr ? "ltr" : undefined} value={v} onChange={(e) => set(e.target.value)} />;
+}
+
+/** A day, and optionally a time on that day ("2026-10-10" or "2026-10-10T18:00"). */
+function DateTimeInput({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
+  const [day, time = ""] = value.split("T");
+  return (
+    <span className="f-datetime">
+      <input id={id} type="date" dir="ltr" value={day ?? ""} onChange={(e) => onChange(e.target.value ? e.target.value + (time ? `T${time.slice(0, 5)}` : "") : "")} />
+      <input type="time" dir="ltr" aria-label="الساعة (اختياري)" value={time.slice(0, 5)} disabled={!day}
+        onChange={(e) => onChange(day + (e.target.value ? `T${e.target.value}` : ""))} />
+    </span>
+  );
 }
 
 function ImageInput({ value, onChange, required, ctx }: { value: string | undefined; onChange: (v: unknown) => void; required: boolean; ctx: FormCtx }) {

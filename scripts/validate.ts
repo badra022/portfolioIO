@@ -24,7 +24,11 @@ for (const slug of tenants) {
   if (content.success) {
     const c = content.data;
     if (c.slug !== slug) errors.push(`content.json slug "${c.slug}" must equal folder "${slug}"`);
-    const files = [c.profile.photo, c.profile.avatar, c.profile.logo, c.seo.ogImage, c.book?.cover, c.book?.backCover, c.students?.photo]
+    const files = [
+      c.profile.photo, c.profile.avatar, c.profile.logo, c.seo.ogImage, c.book?.cover, c.book?.backCover, c.students?.photo, c.popup?.image,
+      ...(c.book?.pages ?? []).map((p) => p.image), ...(c.students?.gallery ?? []).map((g) => g.image),
+      ...(c.reviews?.images ?? []).map((r) => r.image), ...(c.services?.items ?? []).map((s) => s.image),
+    ]
       .filter((f): f is string => typeof f === "string" && !/^https?:/.test(f));
     for (const f of files) {
       const base = path.join(dir, slug, "assets", f);

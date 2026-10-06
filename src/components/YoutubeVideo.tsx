@@ -6,8 +6,9 @@ import { Icon } from "./Icon";
  * Thumbnail that turns into the YouTube player when tapped. The player (and its
  * cookies and ~1 MB of script) only loads on demand, so the page stays fast.
  * Without JavaScript, or with a modifier key, it opens the video on YouTube.
+ * `bare` shows only the player (no title link underneath).
  */
-export function YoutubeVideo({ id, title, caption }: { id: string; title: string; caption?: string }) {
+export function YoutubeVideo({ id, title, caption, bare }: { id: string; title: string; caption?: string; bare?: boolean }) {
   const [playing, setPlaying] = useState(false);
   const watchUrl = `https://www.youtube.com/watch?v=${id}`;
 
@@ -39,8 +40,8 @@ export function YoutubeVideo({ id, title, caption }: { id: string; title: string
           <span className="play"><Icon name="play" /></span>
         </a>
       )}
-      <a className="vid-title" href={watchUrl} target="_blank" rel="noopener noreferrer"><b>{title}</b></a>
-      {caption && <span>{caption}</span>}
+      {!bare && <a className="vid-title" href={watchUrl} target="_blank" rel="noopener noreferrer"><b>{title}</b></a>}
+      {!bare && caption && <span>{caption}</span>}
     </div>
   );
 }

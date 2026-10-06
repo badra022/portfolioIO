@@ -15,6 +15,9 @@ function Result({ state }: { state: ConsoleState }) {
         <dl className="a-secret">
           <dt>اسم المستخدم</dt><dd dir="ltr"><code>{state.secret.username}</code></dd>
           <dt>كلمة المرور</dt><dd dir="ltr"><code>{state.secret.password}</code></dd>
+          {state.secret.loginUrl && (
+            <><dt>رابط الدخول</dt><dd dir="ltr"><a href={state.secret.loginUrl} target="_blank" rel="noopener"><code>{state.secret.loginUrl}</code></a></dd></>
+          )}
         </dl>
       )}
     </div>
