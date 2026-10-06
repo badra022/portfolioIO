@@ -7,6 +7,7 @@ import { slugForSite } from "@/lib/server/site";
 import { getTenant } from "@/lib/server/repo";
 import { RANGES, report, type RangeT } from "@/lib/server/analytics";
 import { AnalyticsView } from "@/components/admin/AnalyticsView";
+import { CountThisBrowser } from "@/components/admin/CountThisBrowser";
 
 export const metadata: Metadata = { title: "الإحصائيات" };
 
@@ -41,9 +42,10 @@ export default async function Analytics({ params, searchParams }: PageProps<"/si
       ) : (
         <>
           <AnalyticsView r={r} sectionOrder={t.content.sections} />
+          <CountThisBrowser />
           <p className="a-sub an-foot">
             بدون كوكيز وبدون بيانات شخصية: الزائر هو الجهاز/المتصفح (نفس الطالب على موبايل وكمبيوتر يُحسب مرتين).
-            زياراتك أنت من أي متصفح فتح لوحة التحكم مش بتتحسب. مانعات الإعلانات نادراً ما تمنعها لأنها على نفس الدومين.
+            أي متصفح فتح لوحة التحكم على العنوان ده مش بيتحسب، إلا لو اخترت تحسبه من فوق. مانعات الإعلانات نادراً ما تمنعها لأنها على نفس الدومين.
           </p>
         </>
       )}
