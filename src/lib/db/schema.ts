@@ -1,4 +1,4 @@
-import { bigserial, boolean, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, bigserial, boolean, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /** One row per teacher. content/theme hold the same JSON that tenants/<slug>/*.json hold, validated by Zod on every write. */
 export const tenants = pgTable("tenants", {
@@ -44,3 +44,15 @@ export const tenantRevisions = pgTable("tenant_revisions", {
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("tenant_revisions_tenant_idx").on(t.tenantId, t.createdAt)]);
+
+/**
+ * Site analytics as daily counters (see lib/analytics.ts): one row per teacher,
+ * Cairo day, metric and key, e.g. (day, "click", "whatsapp") = 37. No visitor data.
+ */
+export const analyticsDaily = pgTable("analytics_daily", {
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  day: date("day").notNull(),
+  metric: text("metric").notNull(),
+  key: text("key").notNull().default(""),
+  value: bigint("value", { mode: "number" }).notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.tenantId, t.day, t.metric, t.key] })]);

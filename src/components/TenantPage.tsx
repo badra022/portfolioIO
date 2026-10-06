@@ -15,6 +15,7 @@ import { Reviews } from "./Reviews";
 import { Services } from "./Services";
 import { Popup } from "./Popup";
 import { DevCredit } from "./DevCredit";
+import { Tracker } from "./Tracker";
 import { Footer, StickyBar } from "./Footer";
 
 function chatConfig(c: Content): ChatConfig {
@@ -30,7 +31,7 @@ function hash(value: unknown): string {
 }
 
 /** The public teacher page. Content arrives with image URLs resolved and expired items (exams, pop-up) removed. */
-export function TenantPage({ c }: { c: Content }) {
+export function TenantPage({ c, base }: { c: Content; base: string }) {
   const chat = chatConfig(c);
   const render: Record<Content["sections"][number], () => React.ReactNode> = {
     hero: () => <Hero c={c} chat={chat} />,
@@ -70,6 +71,7 @@ export function TenantPage({ c }: { c: Content }) {
       <Footer c={c} />
       <DevCredit siteName={c.profile.fullTitle} />
       <StickyBar c={c} chat={chat} />
+      <Tracker slug={c.slug} base={base} />
       {c.popup && <Popup data={c.popup} chat={chat} storageKey={`popup:${c.slug}:${hash(c.popup)}`} closeLabel="إغلاق" />}
     </>
   );
