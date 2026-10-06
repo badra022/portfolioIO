@@ -11,13 +11,16 @@ export type SectionDef = {
 };
 
 export const SECTIONS: SectionDef[] = [
+  { id: "popup", title: "الإعلان المنبثق", description: "رسالة أو فيديو يظهر فوق الصفحة بعد فتحها، مع تاريخ انتهاء.", keys: ["popup"] },
   { id: "exams", title: "الامتحانات والجوائز", description: "إضافة امتحان، التاريخ، الجائزة، والشريط الأحمر.", keys: ["exams"] },
   { id: "schedule", title: "جدول المواعيد", description: "المجموعات، الأيام، الساعات، المنطقة والسنتر، ورسائل الحجز.", keys: ["schedule"] },
   { id: "book", title: "الكتاب", description: "الغلاف، صفحات من داخل الكتاب، المميزات، ونموذج الطلب.", keys: ["book"] },
-  { id: "youtube", title: "قناة اليوتيوب", description: "رابط القناة والفيديوهات المميزة.", keys: ["youtube"] },
+  { id: "youtube", title: "قناة اليوتيوب", description: "رابط القناة، الفيديوهات، وعدد المتابعين على المنصات.", keys: ["youtube"] },
+  { id: "reviews", title: "آراء الطلاب", description: "صور رسائل وتقييمات الطلاب والرقم الكبير.", keys: ["reviews"] },
+  { id: "services", title: "خدمات أخرى", description: "خدمات إضافية بصورة وزر تواصل (أي رقم أو تطبيق) وروابط.", keys: ["services"] },
   { id: "profile", title: "الملف الشخصي", description: "الاسم، اللقب، الصورة، واللوجو.", keys: ["profile"] },
   { id: "contact", title: "التواصل", description: "رقم الواتساب، أرقام الهاتف، وكود التتبع.", keys: ["contact"] },
-  { id: "socials", title: "السوشيال ميديا", description: "روابط يوتيوب، تيك توك، فيسبوك...", keys: ["socials"] },
+  { id: "socials", title: "السوشيال ميديا", description: "روابط يوتيوب، تيك توك، فيسبوك... وعدد المتابعين وجملة لكل منصة.", keys: ["socials"] },
   { id: "hero", title: "الواجهة الرئيسية", description: "العنوان الكبير، الفقرة، الأزرار، والأرقام.", keys: ["hero"] },
   { id: "grades", title: "الصفوف والمواد", description: "المراحل والصفوف التي تدرّسها.", keys: ["grades"] },
   { id: "method", title: "طريقة الشرح", description: "النقاط التي تميزك.", keys: ["method"] },

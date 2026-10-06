@@ -11,6 +11,10 @@ import { Challenge } from "./Challenge";
 import { Announcement, Exams } from "./Exams";
 import { Youtube } from "./Youtube";
 import { Final } from "./Final";
+import { Reviews } from "./Reviews";
+import { Services } from "./Services";
+import { Popup } from "./Popup";
+import { DevCredit } from "./DevCredit";
 import { Footer, StickyBar } from "./Footer";
 
 function chatConfig(c: Content): ChatConfig {
@@ -18,7 +22,14 @@ function chatConfig(c: Content): ChatConfig {
   return { primary, whatsapp, telegram, messenger, refCodes, refLabel };
 }
 
-/** The public teacher page. Content arrives with image URLs resolved and past exams removed. */
+/** Short stable hash, so editing the pop-up shows it again to visitors who closed the old one. */
+function hash(value: unknown): string {
+  let h = 5381;
+  for (const ch of JSON.stringify(value)) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0;
+  return h.toString(36);
+}
+
+/** The public teacher page. Content arrives with image URLs resolved and expired items (exams, pop-up) removed. */
 export function TenantPage({ c }: { c: Content }) {
   const chat = chatConfig(c);
   const render: Record<Content["sections"][number], () => React.ReactNode> = {
@@ -38,7 +49,9 @@ export function TenantPage({ c }: { c: Content }) {
     students: () => <Students data={c.students!} chat={chat} />,
     challenge: () => <Challenge data={c.challenge!} chat={chat} />,
     exams: () => <Exams data={c.exams!} locale={c.locale} chat={chat} />,
-    youtube: () => <Youtube data={c.youtube!} avatar={c.profile.avatar} />,
+    youtube: () => <Youtube data={c.youtube!} avatar={c.profile.avatar} socials={c.socials} />,
+    reviews: () => <Reviews data={c.reviews!} />,
+    services: () => <Services data={c.services!} chat={chat} />,
     final: () => <Final c={c} chat={chat} />,
   };
 
@@ -55,7 +68,9 @@ export function TenantPage({ c }: { c: Content }) {
         ))}
       </main>
       <Footer c={c} />
+      <DevCredit siteName={c.profile.fullTitle} />
       <StickyBar c={c} chat={chat} />
+      {c.popup && <Popup data={c.popup} chat={chat} storageKey={`popup:${c.slug}:${hash(c.popup)}`} closeLabel="إغلاق" />}
     </>
   );
 }

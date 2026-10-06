@@ -108,7 +108,7 @@ export async function restoreRevisionAction(site: string, revisionId: number): P
 const PLATFORM = "_platform";
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/;
 
-export type ConsoleState = { ok: boolean; message: string; lines?: string[]; secret?: { username: string; password: string } } | null;
+export type ConsoleState = { ok: boolean; message: string; lines?: string[]; secret?: { username: string; password: string; loginUrl?: string } } | null;
 
 export async function importBundledAction(_prev: ConsoleState, form: FormData): Promise<ConsoleState> {
   const p = await requireSuper(PLATFORM);
@@ -201,6 +201,15 @@ export async function setStatusAction(slug: string, status: "active" | "disabled
 
 const USERNAME_RE = /^[a-z0-9._-]{3,32}$/;
 
+/** Where this teacher logs in: their main domain, else <slug>.<ROOT_DOMAIN>, else the preview path on this host. */
+async function loginUrlFor(slug: string): Promise<string> {
+  const t = await repo.getTenant(slug);
+  const primary = t?.domains.find((d) => d.isPrimary)?.domain ?? t?.domains[0]?.domain;
+  if (primary) return `https://${primary}/admin`;
+  if (env.rootDomain) return `https://${slug}.${env.rootDomain}/admin`;
+  return `/t/${slug}/admin`;
+}
+
 export async function createUserAction(slug: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {
   await requireSuper(PLATFORM);
   const username = String(form.get("username") ?? "").trim().toLowerCase();
@@ -212,14 +221,14 @@ export async function createUserAction(slug: string, _prev: ConsoleState, form: 
     return { ok: false, message: "اسم المستخدم مستخدم بالفعل." };
   }
   refresh();
-  return { ok: true, message: "تم إنشاء الحساب. انسخ كلمة المرور الآن، لن تظهر مرة أخرى.", secret: { username, password } };
+  return { ok: true, message: "تم إنشاء الحساب. انسخ كلمة المرور الآن، لن تظهر مرة أخرى.", secret: { username, password, loginUrl: await loginUrlFor(slug) } };
 }
 
 export async function resetPasswordAction(slug: string, userId: string, username: string, _prev: ConsoleState): Promise<ConsoleState> {
   await requireSuper(PLATFORM);
   const password = generatePassword();
   await repo.updateUser(slug, userId, { passwordHash: await hashPassword(password) });
-  return { ok: true, message: "كلمة مرور جديدة. انسخها الآن، لن تظهر مرة أخرى.", secret: { username, password } };
+  return { ok: true, message: "كلمة مرور جديدة. انسخها الآن، لن تظهر مرة أخرى.", secret: { username, password, loginUrl: await loginUrlFor(slug) } };
 }
 
 export async function setUserDisabledAction(slug: string, userId: string, disabled: boolean): Promise<void> {

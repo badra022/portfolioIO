@@ -57,7 +57,7 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
 
       <section className="a-panel">
         <h2>حسابات المدرس</h2>
-        <p className="a-sub">كل حساب يقدر يعدّل موقع هذا المدرس فقط، من <code dir="ltr">/admin</code> على دومينه.</p>
+        <p className="a-sub">كل حساب يقدر يعدّل موقع هذا المدرس فقط، من <code dir="ltr">/admin</code> على دومينه. لو دخل من لوحة المنصة بحسابه بيتحوّل لموقعه تلقائياً.</p>
         <ul className="a-list">
           {users.map((u) => (
             <li key={u.id}>

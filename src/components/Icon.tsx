@@ -21,6 +21,10 @@ const paths: Record<string, React.ReactNode> = {
   users: (<><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6" /></>),
   play: (<path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none" />),
   calendar: (<><rect x="3.5" y="5" width="17" height="15.5" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>),
+  close: (<path d="M6 6l12 12M18 6L6 18" />),
+  arrow: (<path d="M14.5 6l-6 6 6 6" />),
+  link: (<><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2" /></>),
+  phone: (<path d="M5 3.5h3.5l1.8 4.5-2.3 1.4a11 11 0 0 0 6.6 6.6l1.4-2.3 4.5 1.8V19a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3.5 5.1 1.5 1.5 0 0 1 5 3.5z" />),
   megaphone: (<><path d="M3.5 10v4h3l7 4.5v-13L6.5 10z" /><path d="M17 9a4 4 0 0 1 0 6" /></>),
 };
 

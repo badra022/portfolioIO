@@ -42,18 +42,21 @@ export function Reviews({ data }: { data: Data }) {
           {(data.metric || data.stars) && (
             <div className="rv-metric">
               {data.stars && <div className="rv-stars" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => <Icon key={i} name="star" />)}</div>}
-              {data.metric && <><b className="num">{data.metric.value}</b><span>{data.metric.label}</span></>}
+              {data.metric && <><b className="num" dir="ltr">{data.metric.value}</b><span>{data.metric.label}</span></>}
             </div>
           )}
         </div>
         {photos.length > 0 && (
           <>
-            <div ref={wall} className={`rv-wall${expanded ? " open" : ""}${overflows && !expanded ? " cut" : ""}`}>
-              {photos.map((p, i) => (
-                <button key={p.src + i} type="button" className="rv" onClick={() => setView(i)} aria-label={p.alt}>
-                  <img src={p.src} alt={data.images[i].alt ?? ""} loading="lazy" />
-                </button>
-              ))}
+            {/* The height cap sits on a wrapper: on the column container itself, extra reviews would spill into hidden side columns. */}
+            <div ref={wall} className={`rv-clip${expanded ? " open" : ""}${overflows && !expanded ? " cut" : ""}`}>
+              <div className="rv-wall">
+                {photos.map((p, i) => (
+                  <button key={p.src + i} type="button" className="rv" onClick={() => setView(i)} aria-label={p.alt}>
+                    <img src={p.src} alt={data.images[i].alt ?? ""} loading="lazy" />
+                  </button>
+                ))}
+              </div>
             </div>
             {overflows && !expanded && (
               <div className="rv-more">

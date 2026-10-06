@@ -16,7 +16,19 @@ ahmedhassan.com ┼─▶ Vercel (one project) ──┤
 2. **The public page** loads that teacher's content and theme from the database through one cached function (`src/lib/server/site.ts`, `"use cache"` + `cacheTag`). Pages are rendered on the server, so Google and AI crawlers get the full HTML. After the first visit a page is served from Vercel's cache.
 3. **`/admin`** is protected with basic auth, which is checked in the proxy and again inside every admin page and server action. A save is validated against the Zod schemas (`src/lib/schema.ts`), written to the database with a full revision, and then `updateTag("tenant:<slug>")` clears only that teacher's cached page. The next visitor sees the change.
 4. **The admin forms are generated from the Zod schemas.** A new field in `schema.ts` automatically gets a form input; give it an Arabic label in `src/lib/admin/labels.ts`.
-5. **Finished exams disappear on their own.** Cached pages refresh at least hourly, and past exams are filtered out at render time.
+5. **Things with a date disappear on their own** (Cairo time): finished exams, the red exam bar (after its end date or the featured exam's day), and the pop-up announcement (after its end date). Cached pages refresh at least hourly, and the bar and pop-up also check their end date in the visitor's browser.
+
+### Page pieces the teacher manages from `/admin`
+
+| Piece | Notes |
+|---|---|
+| Pop-up announcement (`popup`) | Title, text, optional YouTube video or image, optional button, end date. Shown a moment after the page opens: a centered card on tablet/desktop, a bottom sheet on phones (no full-screen interstitial, which Google ranks down). Once closed it stays hidden on that device for `remindAfterHours` (default 5); editing it shows it to everyone again. |
+| Student reviews (`reviews`) | Headline number + stars over a wall of review screenshots; long walls fold behind "show all"; any review opens full size. |
+| Other services (`services`) | Cards with image, text, a button to any channel (another WhatsApp number, Telegram, Messenger, call, or link) and optional social links. |
+| Social reach (`socials` + `youtube`) | Each social link can carry a follower count and a one-line "why follow"; the YouTube section shows them as cards under a total ("+5,000 followers on all our platforms"). |
+| Book (`book.pages`) | Inside pages are stacked behind the cover; hover fans them out, a tap opens them, and any page opens full size. |
+
+Below the teacher's footer every site carries a small, fixed "Developed by" credit (`src/lib/platform.ts`), which teachers can't edit.
 
 | Who | Logs in with | Can do |
 |---|---|---|
@@ -79,8 +91,9 @@ Without `DATABASE_URL` the app reads `tenants/*` directly in read-only mode. Thi
 
 ### 5. Give the teacher a login
 
-On the teacher's **إدارة** ("Manage") page, enter a username and click **إنشاء حساب** ("Create account"). Copy the password shown (it's only shown once) and send the teacher:
-`https://mohamedali.com/admin`, the username and the password. **كلمة مرور جديدة** ("New password") resets it.
+On the teacher's **إدارة** ("Manage") page, enter a username and click **إنشاء حساب** ("Create account"). Copy the password and the login link shown (the password is only shown once) and send them to the teacher with the username. **كلمة مرور جديدة** ("New password") resets it.
+
+The username is not case sensitive and stray spaces are ignored (phones capitalize the first letter). A teacher who logs in on the platform's own `/admin` is sent to their site's admin automatically, and `www.` and the bare domain both work even if only one was added.
 
 ### Adding the next teacher
 
