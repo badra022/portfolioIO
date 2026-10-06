@@ -5,7 +5,10 @@ import {
   type GroupT, type PeriodT, type TrackEvent,
 } from "@/lib/analytics";
 
-/** Browsers that opened /admin on this site set this, so the teacher's own visits aren't counted. */
+/**
+ * "1": this browser opened /admin on this site, so its visits aren't counted.
+ * "count": its owner chose to be counted anyway (from the dashboard); /admin leaves it alone.
+ */
 export const IGNORE_KEY = "pa:ignore";
 
 /** One view per page load, even if the effect runs twice (React dev mode). */
@@ -47,16 +50,21 @@ function placeOf(el: Element): string | null {
 
 /**
  * Counts page views, unique visitors, sections reached, button clicks (and the
- * visitors who clicked) and time on page. Sends small batches to <base>/api/track
+ * visitors who clicked) and time on page. Sends small batches to <base>/api/v
  * with sendBeacon, so it never delays the page or a click.
  */
 export function Tracker({ slug, base }: { slug: string; base: string }) {
   useEffect(() => {
     let ignored = false;
     try { ignored = localStorage.getItem(IGNORE_KEY) === "1"; } catch { /* storage blocked */ }
-    if (ignored || navigator.webdriver) return;
+    if (ignored) {
+      console.info("Analytics: this browser opened /admin on this site, so its visits are not counted. Change it from the analytics page in /admin.");
+      return;
+    }
+    if (navigator.webdriver) return;
 
-    const endpoint = `${base}/api/track`;
+    // A neutral path: ad blockers' lists commonly block ".../track" and ".../analytics".
+    const endpoint = `${base}/api/v`;
     const memKey = `pa:${slug}`;
     const host = location.hostname;
     const day = cairoDay();
@@ -156,7 +164,7 @@ export function Tracker({ slug, base }: { slug: string; base: string }) {
 /** Rendered on admin pages: this browser belongs to the teacher (or you), so stop counting it. */
 export function IgnoreThisBrowser() {
   useEffect(() => {
-    try { localStorage.setItem(IGNORE_KEY, "1"); } catch { /* ignore */ }
+    try { if (localStorage.getItem(IGNORE_KEY) !== "count") localStorage.setItem(IGNORE_KEY, "1"); } catch { /* ignore */ }
   }, []);
   return null;
 }

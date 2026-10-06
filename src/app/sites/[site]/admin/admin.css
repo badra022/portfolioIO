@@ -202,3 +202,5 @@
 .an-val small { font-weight: 400; color: var(--a-muted); }
 .an-empty { color: var(--a-muted); font-size: 14px; margin: 8px 0 0; }
 .an-foot { margin-top: 18px; }
+.an-self { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: var(--a-card); border: 1px solid var(--a-line); font-size: 14px; }
+.an-self span { flex: 1 1 260px; }
