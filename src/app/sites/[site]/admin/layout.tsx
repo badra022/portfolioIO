@@ -4,6 +4,7 @@ import { hasDb } from "@/lib/env";
 import { baseForSite } from "@/lib/routing";
 import { principalName, requireAdmin } from "@/lib/server/auth";
 import { slugForSite } from "@/lib/server/site";
+import { IgnoreThisBrowser } from "@/components/Tracker";
 import "./admin.css";
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ async function Gate({ params, children }: { params: Promise<{ site: string }>; c
   const base = baseForSite(site);
   return (
     <>
+      <IgnoreThisBrowser />
       <header className="a-top">
         <a className="a-brand" href={`${base}/admin`}>لوحة التحكم</a>
         <span className="a-site">{slug ? slug : "المنصة"}</span>

@@ -27,6 +27,7 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
         </p>
         <div className="a-actions">
           <a className="btn-sm ghost" href={`${base}/`} target="_blank" rel="noopener">عرض الموقع</a>
+          <a className="btn-sm primary" href={`${base}/admin/analytics`}>الإحصائيات</a>
           <a className="btn-sm ghost" href={`${base}/admin/history`}>سجل التعديلات</a>
         </div>
       </div>
