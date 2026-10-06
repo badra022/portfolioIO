@@ -1,30 +1,28 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { Lightbox, type Photo } from "./Lightbox";
 
-export type Photo = { src: string; alt: string; caption?: string };
+export type { Photo };
 
 /**
- * A row of photos that open full size in a dialog. Without JavaScript each
- * photo is a plain link to the full image.
+ * A set of photos that open full size (with previous/next). Without JavaScript
+ * each photo is a plain link to the full image.
  */
 export function PhotoViewer({ photos, className, closeLabel }: { photos: Photo[]; className: string; closeLabel: string }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const [open, setOpen] = useState<Photo | null>(null);
-
+  const [open, setOpen] = useState<number | null>(null);
   return (
     <>
       <div className={className}>
-        {photos.map((p) => (
+        {photos.map((p, i) => (
           <figure key={p.src}>
             <a
               href={p.src}
               target="_blank"
               rel="noopener"
               onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || !dialog.current) return;
+                if (e.metaKey || e.ctrlKey || e.shiftKey) return;
                 e.preventDefault();
-                setOpen(p);
-                dialog.current.showModal();
+                setOpen(i);
               }}
             >
               <img src={p.src} alt={p.alt} loading="lazy" />
@@ -33,20 +31,7 @@ export function PhotoViewer({ photos, className, closeLabel }: { photos: Photo[]
           </figure>
         ))}
       </div>
-      <dialog
-        ref={dialog}
-        className="viewer"
-        onClose={() => setOpen(null)}
-        onClick={(e) => { if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === "IMG") dialog.current?.close(); }}
-      >
-        <button type="button" className="viewer-close" aria-label={closeLabel} onClick={() => dialog.current?.close()}>×</button>
-        {open && (
-          <figure>
-            <img src={open.src} alt={open.alt} />
-            {open.caption && <figcaption>{open.caption}</figcaption>}
-          </figure>
-        )}
-      </dialog>
+      {open !== null && <Lightbox photos={photos} index={open} onIndex={setOpen} onClose={() => setOpen(null)} closeLabel={closeLabel} />}
     </>
   );
 }
