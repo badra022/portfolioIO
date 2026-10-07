@@ -229,3 +229,42 @@ a.thumb { display: block; }
 @media (prefers-reduced-motion: reduce) {
   .pop-layer, .pop { animation: none; }
 }
+
+/* ---------- form buttons (LeadForms) ---------- */
+button.btn { font: inherit; cursor: pointer; }
+.lead-layer { z-index: 70; } /* above the pop-up announcement, whose button may open a form */
+.lead-form, .lead-done { gap: 14px; }
+.lead-form h2, .lead-done h2 { padding-inline-end: 40px; }
+.lead-form > p { color: var(--muted); margin: 0; }
+.lead-ctx { margin: 0; display: grid; gap: 6px; padding: 10px 12px; border-radius: var(--r-control); background: var(--accent-12); border: 1px solid var(--accent-35); font-size: 14px; }
+.lead-ctx div { display: flex; gap: 8px; flex-wrap: wrap; }
+.lead-ctx dt { color: var(--muted); }
+.lead-ctx dd { margin: 0; font-weight: 700; }
+.lead-known { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0; padding: 8px 12px; border-radius: var(--r-control); background: var(--raised); border: 1px solid var(--line); font-size: 14px; }
+.lead-edit { border: 0; background: none; color: var(--accent-hot); font: inherit; font-weight: 700; cursor: pointer; padding: 4px; }
+.lead-field { display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+.lead-field span em { font-style: normal; color: var(--subtle); font-size: 13px; }
+.lead-field input, .lead-field select, .lead-field textarea {
+  width: 100%; font: inherit; font-size: 16px; /* 16px stops iOS zooming in */
+  padding: 12px 14px; border-radius: var(--r-control); border: 1px solid var(--line); background: var(--raised); color: var(--text);
+}
+.lead-field input[dir="ltr"] { text-align: right; }
+.lead-field :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.lead-field [aria-invalid="true"] { border-color: var(--accent-hot); }
+.lead-err { color: var(--accent-hot); font-size: 13px; margin: 0; }
+.lead-hp { position: absolute; inset-inline-start: -9999px; width: 1px; height: 1px; opacity: 0; }
+.lead-done { align-items: center; text-align: center; padding-top: 32px; }
+.lead-check { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-12); color: var(--accent); }
+.lead-check svg { width: 30px; height: 30px; }
+.lead-toast {
+  position: fixed; z-index: 75; inset-inline: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); margin-inline: auto; max-width: 520px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: var(--r-card);
+  background: var(--text); color: var(--bg); box-shadow: 0 20px 50px -20px rgb(0 0 0 / .7); font-size: 15px; animation: pop-in .25s ease-out;
+}
+.lead-toast.ok { border-inline-start: 4px solid var(--online); }
+.lead-toast button { border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; white-space: nowrap; }
+@media (max-width: 560px) {
+  /* The form needs the keyboard and full attention: a real sheet with a dimmed page, not the passive pop-up sheet. */
+  .lead-layer { pointer-events: auto; background: rgb(0 0 0 / .45); }
+  .lead-layer .pop { max-height: 88dvh; }
+}

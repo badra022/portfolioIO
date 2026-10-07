@@ -1,7 +1,7 @@
 -- portfolioIO: one-time database setup for Supabase.
 -- Open Supabase > SQL Editor > New query, paste EVERYTHING in this file (the SQL text itself, not the file name), then click Run.
--- Safe to run once on an empty project. Generated from db/migrations/0000 + 0001 + 0002.
--- Already set up before analytics existed? Run only db/migrations/0002_analytics.sql instead.
+-- Safe to run once on an empty project. Generated from db/migrations/0000 to 0003.
+-- Already set up earlier? Run only the db/migrations files added since (0002_analytics.sql, 0003_submissions.sql), in order.
 
 CREATE TABLE "admin_users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -75,3 +75,18 @@ CREATE TABLE "analytics_daily" (
 ALTER TABLE "analytics_daily" ADD CONSTRAINT "analytics_daily_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "analytics_daily" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON "analytics_daily" FROM anon, authenticated;
+
+-- Form submissions (0003): what students send through form buttons.
+CREATE TABLE "submissions" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"tenant_id" uuid NOT NULL,
+	"form_id" text NOT NULL,
+	"source" text DEFAULT '' NOT NULL,
+	"place" text DEFAULT '' NOT NULL,
+	"fields" jsonb NOT NULL,
+	"context" jsonb NOT NULL,
+	"status" text DEFAULT 'new' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "submissions" ADD CONSTRAINT "submissions_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;CREATE INDEX "submissions_tenant_created_idx" ON "submissions" USING btree ("tenant_id","created_at");-- Same lock-down as 0001: only the app's own connection can read or write submissions (they hold phone numbers).
+ALTER TABLE "submissions" ENABLE ROW LEVEL SECURITY;REVOKE ALL ON "submissions" FROM anon, authenticated;

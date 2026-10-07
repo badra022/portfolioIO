@@ -4,6 +4,7 @@ import type { Content } from "@/lib/schema";
 import { chatUrl, fill, type ChatConfig } from "@/lib/chat";
 import { parseDate } from "@/lib/format";
 import { Icon } from "./Icon";
+import { ChatButton } from "./ChatButton";
 
 type Data = NonNullable<Content["exams"]>;
 type Exam = Data["items"][number];
@@ -69,7 +70,12 @@ export function ExamCard({ exam, parts, labels, chat }: { exam: Exam; parts: Par
             </label>
           ))}
         </div>
-        <a className="btn btn-wa btn-block" href={href} target="_blank" rel="noopener noreferrer"><Icon name={chat.primary} />{exam.cta}</a>
+        {exam.form ? (
+          <ChatButton chat={chat} block label={exam.cta} message="" refCode={`EXAM-${exam.id}`} form={exam.form}
+            context={{ "الامتحان": `${exam.title} — ${parts.short}`, [labels.trackLabel]: t.label }} />
+        ) : (
+          <a className="btn btn-wa btn-block" href={href} target="_blank" rel="noopener noreferrer"><Icon name={chat.primary} />{exam.cta}</a>
+        )}
       </div>
     </article>
   );

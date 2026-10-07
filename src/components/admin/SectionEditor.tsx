@@ -25,6 +25,7 @@ export function SectionEditor(props: {
   version: number;
   assetBase: string;
   viewUrl: string;
+  forms?: { id: string; title: string }[];
 }) {
   const { site, sectionId, schema, assetBase, viewUrl } = props;
   const [value, setValue] = useState(props.initial);
@@ -43,12 +44,13 @@ export function SectionEditor(props: {
   const ctx: FormCtx = useMemo(() => ({
     errors: Object.fromEntries(issues.map((i) => [i.path, i.message])),
     assetBase,
+    forms: props.forms,
     upload: async (file: File) => {
       const fd = new FormData();
       fd.set("file", file);
       return uploadImageAction(site, fd);
     },
-  }), [issues, assetBase, site]);
+  }), [issues, assetBase, site, props.forms]);
 
   async function save() {
     setStatus({ kind: "saving" });

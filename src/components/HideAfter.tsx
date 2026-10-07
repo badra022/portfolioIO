@@ -1,23 +1,26 @@
 "use client";
 import { useEffect, useState } from "react";
-import { deadline } from "@/lib/dates";
+import { deadline, instantOf } from "@/lib/dates";
 
 /**
- * Hides its children once an end date passes, in the visitor's browser. The server
- * already drops expired content, but a cached page can be up to an hour old.
+ * Shows its children only between a start and an end date, checked in the
+ * visitor's browser. The server already leaves out what's over or far off, but a
+ * cached page can be up to an hour old, so this switches on and off on time.
+ * Without a start date it renders on the server (no flash); with one it appears
+ * once the browser confirms the time has come.
  */
-export function HideAfter({ until, children }: { until?: string; children: React.ReactNode }) {
-  const [over, setOver] = useState(false);
+export function HideAfter({ until, from, children }: { until?: string; from?: string; children: React.ReactNode }) {
+  const [on, setOn] = useState(!from);
   useEffect(() => {
-    if (!until) return;
-    const end = deadline(until).getTime();
-    const check = () => setOver(Date.now() >= end);
+    const start = from ? instantOf(from).getTime() : -Infinity;
+    const end = until ? deadline(until).getTime() : Infinity;
+    const check = () => { const t = Date.now(); setOn(t >= start && t < end); };
     check();
-    const ms = end - Date.now();
-    if (ms > 0 && ms < 2 ** 31 - 1) {
-      const t = setTimeout(check, ms);
-      return () => clearTimeout(t);
-    }
-  }, [until]);
-  return over ? null : <>{children}</>;
+    const timers = [start, end]
+      .map((at) => at - Date.now())
+      .filter((ms) => ms > 0 && ms < 2 ** 31 - 1)
+      .map((ms) => setTimeout(check, ms + 50));
+    return () => timers.forEach(clearTimeout);
+  }, [until, from]);
+  return on ? <>{children}</> : null;
 }

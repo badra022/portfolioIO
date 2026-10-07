@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Content } from "@/lib/schema";
 import { chatUrl, fill, type ChatConfig } from "@/lib/chat";
 import { Icon } from "./Icon";
+import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
 
 type Data = NonNullable<Content["challenge"]>;
@@ -22,9 +23,22 @@ function Question({ q, n, data, chat }: { q: Data["questions"][number]; n: numbe
           </label>
         ))}
       </div>
-      <a className={`btn ${answer ? "btn-wa" : "btn-ghost"}`} href={href} target="_blank" rel="noopener noreferrer">
-        <Icon name={chat.primary} />{data.sendLabel}
-      </a>
+      {data.form ? (
+        <ChatButton
+          chat={chat}
+          variant={answer ? "primary" : "ghost"}
+          label={data.sendLabel}
+          message=""
+          refCode={`CHALLENGE-${n}`}
+          form={data.form}
+          context={{ "السؤال": `${n}. ${q.question}`, "الإجابة": answer ?? "" }}
+          needs={answer ? undefined : "اختار إجابة الأول"}
+        />
+      ) : (
+        <a className={`btn ${answer ? "btn-wa" : "btn-ghost"}`} href={href} target="_blank" rel="noopener noreferrer">
+          <Icon name={chat.primary} />{data.sendLabel}
+        </a>
+      )}
     </div>
   );
 }

@@ -39,7 +39,7 @@ export function Announcement({ data, locale }: { data: Data; locale: string }) {
   const ends = data.announcementEnds;
   const until = ends && deadline(ends) < deadline(examDay) ? ends : examDay;
   return (
-    <HideAfter until={until}>
+    <HideAfter until={until} from={data.announcementStarts}>
       <a className="announce" href="#exams">
         <Icon name="megaphone" />
         <span>{text}</span>

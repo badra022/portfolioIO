@@ -19,7 +19,7 @@ export function Final({ c, chat }: { c: Content; chat: ChatConfig }) {
         <h2><Rich value={f.title} /></h2>
         <p>{f.text}</p>
         <div className="cta-row center">
-          <ChatButton chat={chat} label={f.cta.label} message={f.cta.message} refCode={f.cta.ref} />
+          <ChatButton chat={chat} label={f.cta.label} message={f.cta.message} refCode={f.cta.ref} form={f.cta.form} />
         </div>
         {c.contact.phones.length > 0 && (
           <div className="phones">

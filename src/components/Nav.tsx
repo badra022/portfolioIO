@@ -17,7 +17,7 @@ export function Nav({ c, chat }: { c: Content; chat: ChatConfig }) {
             {c.nav.map((n) => <a key={n.href} href={n.href}>{n.label}</a>)}
           </nav>
         )}
-        <ChatButton chat={chat} size="sm" label={c.navCta.label} message={c.navCta.message} refCode={c.navCta.ref} />
+        <ChatButton chat={chat} size="sm" label={c.navCta.label} message={c.navCta.message} refCode={c.navCta.ref} form={c.navCta.form} />
       </div>
     </header>
   );

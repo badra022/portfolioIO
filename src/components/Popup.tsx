@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Content } from "@/lib/schema";
 import type { ChatConfig } from "@/lib/chat";
-import { deadline } from "@/lib/dates";
+import { deadline, instantOf } from "@/lib/dates";
 import { youtubeId } from "@/lib/youtube";
 import { ActionButton } from "./ActionButton";
 import { Icon } from "./Icon";
@@ -25,9 +25,12 @@ export function Popup({ data, chat, storageKey, closeLabel }: { data: Data; chat
     let closedAt = 0;
     try { closedAt = Number(localStorage.getItem(storageKey)) || 0; } catch { /* storage blocked: show it */ }
     if (closedAt && Date.now() - closedAt < data.remindAfterHours * 3_600_000) return;
-    const t = setTimeout(() => setOpen(true), data.delaySeconds * 1000);
+    // Not started yet (the cached page can be up to an hour early): wait for the start, then the usual delay.
+    const wait = data.startsAt ? Math.max(0, instantOf(data.startsAt).getTime() - Date.now()) : 0;
+    if (wait > 2 ** 31 - 1) return;
+    const t = setTimeout(() => setOpen(true), wait + data.delaySeconds * 1000);
     return () => clearTimeout(t);
-  }, [data.endsAt, data.delaySeconds, data.remindAfterHours, storageKey]);
+  }, [data.startsAt, data.endsAt, data.delaySeconds, data.remindAfterHours, storageKey]);
 
   const close = useCallback(() => {
     setOpen(false);

@@ -26,7 +26,7 @@ export function StickyBar({ c, chat }: { c: Content; chat: ChatConfig }) {
         </div>
         <div className="acts">
           {c.sticky.secondary && <a className="btn btn-ghost btn-sm" href={c.sticky.secondary.href}>{c.sticky.secondary.label}</a>}
-          <ChatButton chat={chat} size="sm" label={c.sticky.cta.label} message={c.sticky.cta.message} refCode={c.sticky.cta.ref} />
+          <ChatButton chat={chat} size="sm" label={c.sticky.cta.label} message={c.sticky.cta.message} refCode={c.sticky.cta.ref} form={c.sticky.cta.form} />
         </div>
       </div>
     </div>

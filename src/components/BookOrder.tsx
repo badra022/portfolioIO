@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Content } from "@/lib/schema";
 import { chatUrl, fill, type ChatConfig } from "@/lib/chat";
 import { Icon } from "./Icon";
+import { ChatButton } from "./ChatButton";
 
 export function BookOrder({ order, chat }: { order: NonNullable<Content["book"]>["order"]; chat: ChatConfig }) {
   const [grade, setGrade] = useState(order.grades[0]);
@@ -32,7 +33,12 @@ export function BookOrder({ order, chat }: { order: NonNullable<Content["book"]>
           </div>
         </div>
       </div>
-      <a className="btn btn-wa" href={href} target="_blank" rel="noopener noreferrer"><Icon name={chat.primary} />{order.cta}</a>
+      {order.form ? (
+        <ChatButton chat={chat} label={order.cta} message="" refCode={order.ref} form={order.form}
+          context={{ [order.gradeLabel]: grade, [order.deliveryLabel]: d.label }} />
+      ) : (
+        <a className="btn btn-wa" href={href} target="_blank" rel="noopener noreferrer"><Icon name={chat.primary} />{order.cta}</a>
+      )}
       {order.note && (
         <p className="note">
           {order.note.split("{phone}")[0]}
