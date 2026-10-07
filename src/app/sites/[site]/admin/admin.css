@@ -202,5 +202,14 @@
 .an-val small { font-weight: 400; color: var(--a-muted); }
 .an-empty { color: var(--a-muted); font-size: 14px; margin: 8px 0 0; }
 .an-foot { margin-top: 18px; }
+
+/* ---------- photo upload page (/upload) ---------- */
+.up-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 180px; padding: 24px; border: 2px dashed var(--a-line); border-radius: 16px; background: var(--a-card); text-align: center; cursor: pointer; }
+.up-drop:hover { border-color: var(--a-primary); }
+.up-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.up-list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 8px; }
+.up-list li { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--a-line); border-radius: 12px; background: var(--a-card); font-size: 14px; overflow-wrap: anywhere; }
+.up-list li.bad { border-color: #f0a8a3; background: #fdf0ef; }
+.up-list img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex: none; }
 .an-self { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: var(--a-card); border: 1px solid var(--a-line); font-size: 14px; }
 .an-self span { flex: 1 1 260px; }

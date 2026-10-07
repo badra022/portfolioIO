@@ -73,6 +73,28 @@ Each teacher sees **الإحصائيات** ("Analytics") in their `/admin`; you 
 - **Cost:** about 2–4 small requests per visit to your own server and a few dozen rows per teacher per day (~30 MB/year for 10 teachers). It fits in Supabase Free (500 MB) and Vercel Pro's included usage; nothing to subscribe to.
 - **Existing database:** run `db/migrations/0002_analytics.sql` once in Supabase's SQL Editor (or `npm run db:migrate`). New setups get it from `db/supabase-setup.sql`.
 
+## Claude connector (MCP): onboard and edit teachers by chat
+
+The app is also an MCP server, so Claude (claude.ai, the Claude apps, or Claude Code) can do everything the admin panel does, straight on the live database: create a teacher, fill or change any section, upload and place photos, theme, domains, logins, history and analytics. Saves go through the same validation as the admin forms, keep a full revision (and can be restored), and are live within seconds.
+
+**Turn it on (once):**
+1. Generate a secret: `openssl rand -hex 32` (or any 32+ random characters).
+2. Vercel → Settings → Environment Variables: add `MCP_TOKEN` with it, then redeploy.
+3. Connect Claude:
+   - **claude.ai / Claude apps:** Settings → Connectors → Add custom connector → URL `https://<your-project>.vercel.app/api/mcp/<MCP_TOKEN>` (leave OAuth empty). Enable it in a chat from the tools menu.
+   - **Claude Code:** `claude mcp add --transport http portfolioio https://<your-project>.vercel.app/api/mcp --header "Authorization: Bearer <MCP_TOKEN>"`
+
+**Then just ask**, e.g. "Create a page for أ. سارة أحمد, math teacher, grades 1-3 secondary, groups in Faisal Sat/Tue 5pm, WhatsApp 2010..., use a blue theme", or "Move Sara's Tuesday group to 6pm and add a popup announcing the new term until the 1st". For photos Claude sends you a private upload link (it can't forward images attached in the chat): open it, drop the photos (naming them teacher.jpg, book-cover.jpg... helps), say done, and Claude looks at each one and puts it in place. Public Google Drive/Dropbox links work too.
+
+| Tools | |
+|---|---|
+| Read | `list_teachers`, `get_teacher`, `get_schema` (page outline, or one section's fields with the admin labels/hints), `get_example` (a full real page), `list_revisions`, `get_analytics` |
+| Write | `create_teacher` (full content, or `copy_from` + edits), `update_content` (whole sections), `edit_content` (path edits like `schedule.slots.2.time`, all in one revision), `update_theme`, `set_teacher_status`, `restore_revision` |
+| Photos | `create_upload_link`, `upload_image` (link or base64), `list_images`, `view_image` |
+| Platform | `manage_domain` (then add the domain in Vercel too), `manage_login` (create/reset shows the password once) |
+
+**Security:** the token is the key to every teacher, as powerful as `ADMIN_PASSWORD`. In the claude.ai form it is part of the URL, so treat the connector URL like a password and rotate `MCP_TOKEN` if it leaks (the old URL stops working). Without `MCP_TOKEN` the endpoint doesn't exist; it answers only on the platform host, and wrong tokens get a plain 404. Saves are recorded as "Claude (MCP)" in the history. Upload links are signed per teacher and expire (24 h by default). Image downloads from links only reach public internet addresses (no internal/cloud-metadata addresses), up to 4 MB.
+
 ## Set it up (about 30 minutes, once)
 
 ### 1. Supabase (database + images)

@@ -20,6 +20,8 @@ export const env = {
   /** Super admin basic-auth credentials (can edit every teacher and manage the platform). */
   adminUser: process.env.ADMIN_USER ?? "",
   adminPassword: process.env.ADMIN_PASSWORD ?? "",
+  /** Secret for the MCP server (/api/mcp) and its upload links. 32+ random characters; empty turns the MCP server off. */
+  mcpToken: process.env.MCP_TOKEN ?? "",
 };
 
 export const hasDb = () => Boolean(env.databaseUrl);
