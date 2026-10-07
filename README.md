@@ -67,9 +67,9 @@ Each teacher sees **الإحصائيات** ("Analytics") in their `/admin`; you 
 | Time on page | Seconds the page was actually on screen, until the visitor first left (e.g. to WhatsApp); average + spread |
 | Devices, sources | Phone/tablet/desktop; Google, Facebook, Instagram, YouTube, TikTok... (or `?utm_source=` on shared links) |
 
-- **Where it lives:** `src/components/Tracker.tsx` (browser, ~1 KB, `sendBeacon`), `POST /api/track` on each site, daily counters in the `analytics_daily` table (`src/lib/server/analytics.ts`), dashboard at `/admin/analytics`.
-- **Privacy:** no cookies, no IP or personal data stored, so no cookie banner is needed. Bots, automated browsers, preview addresses (`/t/<slug>` in production) and any browser that opened `/admin` on that site are not counted.
-- **Limits:** a student on two devices counts as two visitors (true of every cookie-free tool). Anyone can send fake events to the endpoint; they can only add to known counters, but there is no rate limit yet (a Vercel WAF rule on `/api/track` is the fix if that's ever abused).
+- **Where it lives:** `src/components/Tracker.tsx` (browser, ~1 KB, `sendBeacon`), `POST /api/v` on each site, daily counters in the `analytics_daily` table (`src/lib/server/analytics.ts`), dashboard at `/admin/analytics`. The browser posts to `POST /api/v` (a neutral name: ad-block lists commonly block `/track` and `/analytics` paths).
+- **Privacy:** no cookies, no IP or personal data stored, so no cookie banner is needed. Bots and automated browsers are not counted, and neither is any browser that opened `/admin` on the same address (on `*.vercel.app` that includes the console). The analytics page shows whether the current browser is counted and can switch it back on, which is how to test the counters yourself. Every address of a teacher counts, including `/t/<slug>`.
+- **Limits:** a student on two devices counts as two visitors (true of every cookie-free tool). Anyone can send fake events to the endpoint; they can only add to known counters, but there is no rate limit yet (a Vercel WAF rule on `/api/v` is the fix if that's ever abused).
 - **Cost:** about 2–4 small requests per visit to your own server and a few dozen rows per teacher per day (~30 MB/year for 10 teachers). It fits in Supabase Free (500 MB) and Vercel Pro's included usage; nothing to subscribe to.
 - **Existing database:** run `db/migrations/0002_analytics.sql` once in Supabase's SQL Editor (or `npm run db:migrate`). New setups get it from `db/supabase-setup.sql`.
 
