@@ -14,12 +14,19 @@ export const Segment = z.object({
 });
 export const RichText = z.array(Segment);
 
-/** A call to action that opens a chat with a pre-written message. */
+/**
+ * Id of a form from content.forms. When set on a button, the button opens that
+ * form (the student leaves their details for the teacher) instead of WhatsApp.
+ */
+const FormRef = z.string().meta({ widget: "form" });
+
+/** A call to action that opens a chat with a pre-written message (or a form, see FormRef). */
 export const ChatCta = z.object({
   label: z.string(),
   message: z.string(),
   /** Short code appended to the message so the team knows which button was used. */
   ref: z.string().optional(),
+  form: FormRef.optional(),
 });
 
 export const LinkCta = z.object({ label: z.string(), href: z.string() });
@@ -36,7 +43,9 @@ export const Action = z.object({
   /** Pre-written message (WhatsApp and Telegram only). */
   message: z.string().optional(),
   ref: z.string().optional(),
+  form: FormRef.optional(),
 }).superRefine((a, ctx) => {
+  if (a.form) return; // opens the form; "to" isn't used
   const to = (a.to ?? "").trim();
   const bad = (message: string) => ctx.addIssue({ code: "custom", path: ["to"], message });
   if (a.type === "link" && !/^https?:\/\//.test(to)) bad("اكتب رابط كامل يبدأ بـ https://");
@@ -47,6 +56,39 @@ export const Action = z.object({
 
 /** "2026-10-10" (the whole day, Cairo time) or "2026-10-10T18:00". */
 const EndDate = z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)?)?$/, { error: "اختر التاريخ" }).meta({ widget: "date" });
+/** Same format; a date alone means from the start of that day (Cairo). Empty = right away. */
+const StartDate = EndDate;
+
+/** A question on a form. Remembered answers (name, phone...) are filled in next time on the student's device. */
+const FormField = z.object({
+  /** Short English id, e.g. "name", "phone", "grade". The same id on two forms shares the remembered value. */
+  id: z.string().regex(/^[a-z][a-z0-9_]{0,30}$/, { error: "حروف إنجليزية صغيرة وأرقام و _ فقط، مثل phone" }),
+  label: z.string(),
+  type: z.enum(["text", "tel", "number", "select", "textarea"]).default("text"),
+  required: z.boolean().default(true),
+  /** Remember on the student's device and don't ask again (name, phone). Off for answers that change each time. */
+  remember: z.boolean().default(true),
+  /** Choices for "select". */
+  options: z.array(z.string()).default([]),
+  placeholder: z.string().optional(),
+});
+
+/** A form a button can open instead of WhatsApp. Submissions appear in the admin panel ("Requests"). */
+export const LeadForm = z.object({
+  id: z.string().regex(/^[a-z0-9-]{2,40}$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة، مثل student-info" }),
+  title: z.string(),
+  intro: z.string().optional(),
+  fields: z.array(FormField).min(1),
+  submitLabel: z.string().default("إرسال"),
+  successMessage: z.string().default("وصلتنا بياناتك، وهنكلمك قريب."),
+}).superRefine((f, ctx) => {
+  const seen = new Set<string>();
+  f.fields.forEach((x, i) => {
+    if (seen.has(x.id)) ctx.addIssue({ code: "custom", path: ["fields", i, "id"], message: "معرّف مكرر في نفس النموذج." });
+    seen.add(x.id);
+    if (x.type === "select" && x.options.length < 2) ctx.addIssue({ code: "custom", path: ["fields", i, "options"], message: "اكتب اختيارين على الأقل." });
+  });
+});
 
 export const Social = z.object({
   type: z.enum(["youtube", "tiktok", "facebook", "instagram", "whatsappChannel", "telegram", "x"]),
@@ -132,6 +174,8 @@ const Schedule = z.object({
     center: z.string().optional(),
   })),
   messages: z.object({ book: z.string(), ask: z.string() }),
+  /** Booking buttons open this form instead of WhatsApp (the group's details are attached). */
+  form: FormRef.optional(),
 });
 
 const Method = z.object({
@@ -162,6 +206,7 @@ const Book = z.object({
     cta: z.string(),
     message: z.string(),
     ref: z.string().optional(),
+    form: FormRef.optional(),
     /** Optional separate number for book orders. Falls back to contact.whatsapp. */
     whatsapp: z.string().optional(),
     note: z.string().optional(),
@@ -187,6 +232,8 @@ const Challenge = z.object({
   /** Highlighted prize line, e.g. what a correct answer on WhatsApp wins. Also available as {prize} in the message. */
   prize: z.string().optional(),
   message: z.string(),
+  /** Answers go to this form (question and chosen answer attached) instead of WhatsApp. */
+  form: FormRef.optional(),
   questions: z.array(z.object({
     level: z.string(),
     question: z.string(),
@@ -214,9 +261,12 @@ const Exams = z.object({
     tracks: z.array(z.object({ id: z.string(), label: z.string(), scope: z.string() })).min(1),
     cta: z.string(),
     message: z.string(),
+    form: FormRef.optional(),
   })),
   /** Top announcement bar for the featured exam. {date} is filled in. */
   announcement: z.string().optional(),
+  /** The bar starts showing on this date. Empty = right away. */
+  announcementStarts: StartDate.optional(),
   /** The bar stops showing after this date (it also goes once the featured exam's day is over). */
   announcementEnds: EndDate.optional(),
 });
@@ -272,6 +322,8 @@ const Popup = z.object({
   video: z.string().regex(YOUTUBE_RE, { error: "الصق رابط فيديو يوتيوب" }).optional(),
   image: OptionalImageRef.optional(),
   cta: Action.optional(),
+  /** Starts showing on this date. Empty = right away. */
+  startsAt: StartDate.optional(),
   /** Stops showing after this date. */
   endsAt: EndDate.optional(),
   delaySeconds: z.number().min(0).max(60).default(2),
@@ -327,6 +379,7 @@ export const ContentSchema = z.object({
   services: Services.optional(),
   final: Final.optional(),
   popup: Popup.optional(),
+  forms: z.array(LeadForm).default([]),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),
   sticky: z.object({ secondary: LinkCta.optional(), cta: ChatCta }),
   labels: z.object({
@@ -334,6 +387,23 @@ export const ContentSchema = z.object({
     daysJoiner: z.string().default(" & "),
   }),
 }).superRefine((c, ctx) => {
+  const formIds = new Set<string>();
+  c.forms.forEach((f, i) => {
+    if (formIds.has(f.id)) ctx.addIssue({ code: "custom", path: ["forms", i, "id"], message: "معرّف نموذج مكرر." });
+    formIds.add(f.id);
+  });
+  // Every button that points at a form must point at one that exists.
+  const walk = (v: unknown, path: (string | number)[]) => {
+    if (Array.isArray(v)) v.forEach((x, i) => walk(x, [...path, i]));
+    else if (v && typeof v === "object") {
+      for (const [k, x] of Object.entries(v)) {
+        if (k === "form" && typeof x === "string" && x && path[0] !== "forms" && !formIds.has(x)) {
+          ctx.addIssue({ code: "custom", path: [...path, k], message: `النموذج "${x}" غير موجود. أضفه في قسم النماذج أو اختر واتساب.` });
+        } else walk(x, [...path, k]);
+      }
+    }
+  };
+  walk(c, []);
   for (const key of c.sections) {
     if (key !== "hero" && !c[key]) {
       ctx.addIssue({ code: "custom", path: ["sections"], message: `القسم "${key}" ظاهر في ترتيب الأقسام لكن بياناته غير موجودة. أضف بياناته أو أخفِه.` });
@@ -387,5 +457,6 @@ export type Deploy = z.infer<typeof DeploySchema>;
 export type RichTextT = z.infer<typeof RichText>;
 export type ChatCtaT = z.infer<typeof ChatCta>;
 export type ActionT = z.infer<typeof Action>;
+export type LeadFormT = z.infer<typeof LeadForm>;
 export type SocialT = z.infer<typeof Social>;
 export type DayKeyT = z.infer<typeof DayKey>;

@@ -11,6 +11,7 @@ export type SectionDef = {
 };
 
 export const SECTIONS: SectionDef[] = [
+  { id: "forms", title: "نماذج جمع البيانات", description: "نماذج تفتحها الأزرار بدل واتساب (الاسم، الرقم...). الردود في صفحة الطلبات.", keys: ["forms"] },
   { id: "popup", title: "الإعلان المنبثق", description: "رسالة أو فيديو يظهر فوق الصفحة بعد فتحها، مع تاريخ انتهاء.", keys: ["popup"] },
   { id: "exams", title: "الامتحانات والجوائز", description: "إضافة امتحان، التاريخ، الجائزة، والشريط الأحمر.", keys: ["exams"] },
   { id: "schedule", title: "جدول المواعيد", description: "المجموعات، الأيام، الساعات، المنطقة والسنتر، ورسائل الحجز.", keys: ["schedule"] },

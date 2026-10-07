@@ -52,6 +52,19 @@ tenants/<slug>/                      seed data for each teacher (imported from t
 
 Without `DATABASE_URL` the app reads `tenants/*` directly in read-only mode. This is handy for `npm run dev`.
 
+## Form buttons: collect students' details instead of WhatsApp messages
+
+Any WhatsApp button can open a form instead, so the teacher gets a list to call back rather than hundreds of unread chats (a challenge with many answers, bookings, book orders...).
+
+1. **Create a form** in `/admin` → **نماذج جمع البيانات** (Forms): its questions (text, mobile number, number, choice list, long text), required or not, and **remember** (on for things that don't change, like name, phone, grade; off for answers that change each time).
+2. **Point a button at it**: every button's editor has **عند الضغط على الزر** (On click): *opens WhatsApp* (default) or *opens form: …*. Works for the hero, top bar, bottom bar, last call, students, schedule bookings, book order, exam booking, the challenge, services and the pop-up.
+3. **Students**: the form opens over the page (a sheet on phones) and asks only what isn't remembered on their device yet. What they picked on the page is attached automatically (the challenge question and answer, the group's day/time/place, the book's grade and delivery, the exam and level), so a second request is a single tap ("sent as Ahmed, not you? edit"). The challenge asks for an answer before sending.
+4. **Teacher**: `/admin` → **الطلبات** (Requests, with a count of new ones): call or WhatsApp in one tap, mark *contacted* / *done*, search, delete, and **download CSV** (opens in Excel with Arabic and phone numbers intact). Analytics counts a sent form as a contact.
+
+Submissions live in the `submissions` table (run `db/migrations/0003_submissions.sql` once on an existing database). Only the questions the form defines are stored; a hidden honeypot field and duplicate-within-10-minutes check keep out bots and double taps. Phone numbers are personal data: delete requests you no longer need.
+
+**Start dates:** the pop-up (`startsAt`) and the red exam bar (`announcementStarts`) can start later; empty means right away. Together with the end dates they show only inside their window, switching on and off on time even on a cached page.
+
 ## Analytics (built in, $0 extra)
 
 Each teacher sees **الإحصائيات** ("Analytics") in their `/admin`; you see every teacher (this month + all time) on the platform console, with a link to each teacher's dashboard.

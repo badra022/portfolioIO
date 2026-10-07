@@ -15,7 +15,7 @@ export function Students({ data, chat }: { data: NonNullable<Content["students"]
           <h2><Rich value={data.title} /></h2>
           <p>{data.text}</p>
           <div className="cta-row">
-            <ChatButton chat={chat} label={data.cta.label} message={data.cta.message} refCode={data.cta.ref} />
+            <ChatButton chat={chat} label={data.cta.label} message={data.cta.message} refCode={data.cta.ref} form={data.cta.form} />
           </div>
         </div>
         {data.photo && <img className="students-photo" src={asset(data.photo)} alt="" loading="lazy" />}

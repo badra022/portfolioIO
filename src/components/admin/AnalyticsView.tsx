@@ -1,14 +1,10 @@
 import type { Report } from "@/lib/server/analytics";
+import { PLACE } from "@/lib/admin/places";
 
 const CHANNEL: Record<string, string> = {
   whatsapp: "واتساب", telegram: "تيليجرام", messenger: "ماسنجر", phone: "اتصال",
   youtube: "يوتيوب", tiktok: "تيك توك", facebook: "فيسبوك", instagram: "إنستجرام", whatsappChannel: "قناة الواتساب", x: "إكس",
-  video: "تشغيل فيديو في الصفحة", link: "روابط أخرى",
-};
-const PLACE: Record<string, string> = {
-  hero: "الواجهة", grades: "الصفوف", schedule: "الجدول", method: "طريقة الشرح", book: "الكتاب", students: "الطلاب",
-  reviews: "آراء الطلاب", challenge: "التحدي", exams: "الامتحانات", youtube: "يوتيوب", services: "خدمات أخرى", final: "الدعوة الأخيرة",
-  nav: "القائمة العلوية", announce: "الشريط الأحمر", popup: "الإعلان المنبثق", sticky: "الشريط السفلي", footer: "الفوتر", other: "أخرى",
+  video: "تشغيل فيديو في الصفحة", link: "روابط أخرى", form: "نموذج (سابوا بياناتهم)",
 };
 const SOURCE: Record<string, string> = {
   direct: "مباشر / واتساب / بدون مصدر", google: "جوجل", facebook: "فيسبوك", instagram: "إنستجرام", youtube: "يوتيوب",
@@ -118,7 +114,7 @@ export function AnalyticsView({ r, sectionOrder }: { r: Report; sectionOrder: st
       <div className="an-tiles">
         <Tile strong label="زوار" value={fmt(r.visitors)} note="كل جهاز يُحسب مرة واحدة" />
         <Tile label="مشاهدات الصفحة" value={fmt(r.views)} />
-        <Tile strong label="تواصلوا معاك" value={fmt(r.converted.contact)} note={`${contactRate}% من الزوار · واتساب، تيليجرام، ماسنجر، اتصال`} />
+        <Tile strong label="تواصلوا معاك" value={fmt(r.converted.contact)} note={`${contactRate}% من الزوار · واتساب، تيليجرام، ماسنجر، اتصال، نموذج`} />
         <Tile label="راحوا لقنواتك" value={fmt(r.converted.social)} note={`${socialRate}% من الزوار · يوتيوب، تيك توك، فيسبوك...`} />
         <Tile label="متوسط وقت المشاهدة" value={duration(r.dwell.avg)} />
       </div>

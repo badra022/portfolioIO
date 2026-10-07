@@ -16,6 +16,7 @@ import { generatePassword, hashPassword } from "../passwords";
 import { ImageError, SLUG_RE, USERNAME_RE, loginUrlFor, normalizeDomain, sniffImage, storeImage } from "../admin-ops";
 import { makeUploadLink } from "../upload-link";
 import { RANGES, report } from "../analytics";
+import { STATUSES, listSubmissions, setStatus } from "../submissions";
 import { applyOps, contentOutline, deepMerge, schemaFor, type Op } from "./content-ops";
 import { fetchImage } from "./fetch-image";
 
@@ -30,6 +31,8 @@ Onboarding a new teacher:
 4. create_teacher with the full content (and optionally a theme), or with copy_from and then edit_content to replace everything that belongs to the other teacher (all text, numbers, images, links).
 5. Send the user preview_url to review; adjust with edit_content (small changes) or update_content (whole sections).
 6. When ready: manage_domain (also add the domain in Vercel → Settings → Domains), manage_login to create the teacher's account (the password is shown once; pass it to the user).
+
+Forms: any WhatsApp button can open a form instead (the student leaves name/phone/etc. for the teacher). Define forms in content "forms" (get_schema part "forms"), then set "form": "<form id>" on the button (hero.primaryCta, navCta, sticky.cta, final.cta, students.cta, schedule.form, book.order.form, exams.items[].form, challenge.form, services/popup cta.form). Fields with remember=true (name, phone) are asked once per device; the button's own details (challenge answer, chosen group, exam) are attached automatically. Submissions: list_requests / update_requests.
 
 Rules for content: match the tone and language of the example (Egyptian Arabic) unless told otherwise. WhatsApp numbers are international digits only (2010...). "sections" is the page order and every listed section needs its data. Messages may use placeholders listed in each field's description (e.g. {grade}, {date}). Pass expected_version from get_teacher when editing, so a change made meanwhile in the admin panel isn't overwritten.`;
 
@@ -367,6 +370,27 @@ export function buildMcpServer(origin: string): McpServer {
     const u = await loginUrlFor(slug);
     return u.startsWith("/") ? `${origin}${u}` : u;
   };
+
+  /* ----- form requests ----- */
+
+  server.registerTool("list_requests", {
+    title: "Form requests",
+    description: "What students sent through form buttons (newest first): their answers (name, phone...), what the button carried (challenge answer, group, exam), the button, and status new/contacted/done.",
+    inputSchema: {
+      slug: slugArg,
+      form: z.string().optional().describe("Only this form id."),
+      status: z.enum(STATUSES).optional(),
+      search: z.string().optional().describe("Text in the answers, e.g. part of a phone number or a name."),
+      limit: z.number().int().min(1).max(500).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  }, safe(async ({ slug, form, status, search, limit }) => ok(await listSubmissions(slug, { form, status, q: search, limit: limit ?? 50 }))));
+
+  server.registerTool("update_requests", {
+    title: "Mark requests",
+    description: "Set the status of requests (by id from list_requests): new, contacted, done.",
+    inputSchema: { slug: slugArg, ids: z.array(z.number().int()).min(1), status: z.enum(STATUSES) },
+  }, safe(async ({ slug, ids, status }) => { await setStatus(slug, ids, status); return ok({ updated: ids.length, status }); }));
 
   /* ----- history and analytics ----- */
 

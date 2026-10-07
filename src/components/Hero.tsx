@@ -19,7 +19,7 @@ export function Hero({ c, chat }: { c: Content; chat: ChatConfig }) {
           </h1>
           <p className="lede"><Rich value={h.lede} /></p>
           <div className="cta-row">
-            <ChatButton chat={chat} label={h.primaryCta.label} message={h.primaryCta.message} refCode={h.primaryCta.ref} />
+            <ChatButton chat={chat} label={h.primaryCta.label} message={h.primaryCta.message} refCode={h.primaryCta.ref} form={h.primaryCta.form} />
             {h.secondaryCta && <a className="btn btn-ghost" href={h.secondaryCta.href}>{h.secondaryCta.label}</a>}
           </div>
           {h.stats.length > 0 && (

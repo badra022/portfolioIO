@@ -1,9 +1,10 @@
 "use client";
 import { useEffect } from "react";
 import {
-  MAX_DWELL, cairoDay, channelOf, groupsOf, sourceOf,
+  CONVERT_EVENT, MAX_DWELL, cairoDay, channelOf, groupsOf, sourceOf,
   type GroupT, type PeriodT, type TrackEvent,
 } from "@/lib/analytics";
+import { placeOf } from "@/lib/place";
 
 /**
  * "1": this browser opened /admin on this site, so its visits aren't counted.
@@ -33,19 +34,6 @@ function firsts(stamp: Stamp, day: string): PeriodT[] {
 function deviceOf(): string {
   const w = Math.min(window.innerWidth, screen.width || window.innerWidth);
   return w < 600 ? "phone" : w < 1024 ? "tablet" : "desktop";
-}
-
-/** Where on the page a link sits: a section key, or one of the fixed areas. */
-function placeOf(el: Element): string | null {
-  const slot = el.closest(".section-slot");
-  const m = slot?.className.match(/\bslot-([a-z]+)/);
-  if (m) return m[1];
-  if (el.closest(".pop")) return "popup";
-  if (el.closest(".announce")) return "announce";
-  if (el.closest(".sticky")) return "sticky";
-  if (el.closest(".nav")) return "nav";
-  if (el.closest(".footer")) return "footer";
-  return null;
 }
 
 /**
@@ -130,6 +118,18 @@ export function Tracker({ slug, base }: { slug: string; base: string }) {
     };
     document.addEventListener("click", onClick, true);
 
+    // Conversions that aren't links: a form button sent (components/LeadForms.tsx).
+    const onConvert = (ev: Event) => {
+      const { ch, at } = (ev as CustomEvent<{ ch: string; at: string }>).detail ?? {};
+      if (!ch) return;
+      mem.c ??= {};
+      const u: Partial<Record<GroupT, PeriodT[]>> = {};
+      for (const g of groupsOf(ch)) u[g] = firsts((mem.c[g] ??= {}), day);
+      save();
+      push({ t: "click", ch, at: at || "other", u }, true);
+    };
+    window.addEventListener(CONVERT_EVENT, onConvert);
+
     // Time on page: only while the page is actually visible. Sent once, when the
     // visitor first leaves (switches to WhatsApp, another tab, or closes the page).
     let visibleSince = document.visibilityState === "visible" ? performance.now() : 0;
@@ -153,6 +153,7 @@ export function Tracker({ slug, base }: { slug: string; base: string }) {
     return () => {
       io.disconnect();
       document.removeEventListener("click", onClick, true);
+      window.removeEventListener(CONVERT_EVENT, onConvert);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pagehide", leave);
       flush();

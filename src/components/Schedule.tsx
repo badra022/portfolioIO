@@ -4,6 +4,7 @@ import type { Content } from "@/lib/schema";
 import { chatUrl, fill, type ChatConfig } from "@/lib/chat";
 import { formatTime } from "@/lib/format";
 import { Icon } from "./Icon";
+import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
 
 type Props = {
@@ -92,9 +93,14 @@ export function Schedule({ data, stages, dayLabels, joiner, chat }: Props) {
                   {s.days.length > 0 && <div className="days">{s.days.map((d) => <span className="day" key={d}>{dayLabels[d]}</span>)}</div>}
                 </div>
                 {perGroupPlaces && <span className="slot-place"><Icon name="pin" />{place}</span>}
-                <a className={`btn btn-block ${t ? "btn-wa" : "btn-ghost"}`} href={chatUrl(chat, msg, `SCH-${s.id}`)} target="_blank" rel="noopener noreferrer">
-                  <Icon name={chat.primary} />{t ? L.book : L.ask}
-                </a>
+                {data.form ? (
+                  <ChatButton chat={chat} block variant={t ? "primary" : "ghost"} label={t ? L.book : L.ask} message="" refCode={`SCH-${s.id}`} form={data.form}
+                    context={{ "المجموعة": `${s.grade} — ${s.subject}`, ...(days ? { "الأيام": days } : {}), ...(t ? { "الساعة": `${t.clock} ${t.period}` } : {}), "المكان": place || center }} />
+                ) : (
+                  <a className={`btn btn-block ${t ? "btn-wa" : "btn-ghost"}`} href={chatUrl(chat, msg, `SCH-${s.id}`)} target="_blank" rel="noopener noreferrer">
+                    <Icon name={chat.primary} />{t ? L.book : L.ask}
+                  </a>
+                )}
               </article>
             );
           })}

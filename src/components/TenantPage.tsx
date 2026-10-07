@@ -16,6 +16,7 @@ import { Services } from "./Services";
 import { Popup } from "./Popup";
 import { DevCredit } from "./DevCredit";
 import { Tracker } from "./Tracker";
+import { LeadForms } from "./LeadForms";
 import { Footer, StickyBar } from "./Footer";
 
 function chatConfig(c: Content): ChatConfig {
@@ -72,6 +73,7 @@ export function TenantPage({ c, base }: { c: Content; base: string }) {
       <DevCredit siteName={c.profile.fullTitle} />
       <StickyBar c={c} chat={chat} />
       <Tracker slug={c.slug} base={base} />
+      {c.forms.length > 0 && <LeadForms forms={c.forms} slug={c.slug} base={base} />}
       {c.popup && <Popup data={c.popup} chat={chat} storageKey={`popup:${c.slug}:${hash(c.popup)}`} closeLabel="إغلاق" />}
     </>
   );

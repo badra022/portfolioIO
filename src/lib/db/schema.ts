@@ -56,3 +56,24 @@ export const analyticsDaily = pgTable("analytics_daily", {
   key: text("key").notNull().default(""),
   value: bigint("value", { mode: "number" }).notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.tenantId, t.day, t.metric, t.key] })]);
+
+/**
+ * What students sent through a form button (name, phone... plus what they picked:
+ * the challenge answer, the group, the exam). The teacher works through them in
+ * /admin/requests: new -> contacted -> done.
+ */
+export const submissions = pgTable("submissions", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  formId: text("form_id").notNull(),
+  /** The button's label (and ref code), e.g. "أرسل إجابتك (CHALLENGE-2)". */
+  source: text("source").notNull().default(""),
+  /** Page area of the button: a section key, "nav", "sticky", "popup"... */
+  place: text("place").notNull().default(""),
+  /** The form's answers, by field id. */
+  fields: jsonb("fields").notNull(),
+  /** What the button carried: { "السؤال": "...", "الإجابة": "..." }. */
+  context: jsonb("context").notNull(),
+  status: text("status", { enum: ["new", "contacted", "done"] }).notNull().default("new"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("submissions_tenant_created_idx").on(t.tenantId, t.createdAt)]);

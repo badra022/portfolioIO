@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ContentSchema, ThemeSchema, type Content } from "./schema";
-import { deadline, endOfDay, isOver } from "./dates";
+import { deadline, endOfDay, instantOf, isOver } from "./dates";
 
 type JsonSchema = Record<string, unknown> & { properties?: Record<string, JsonSchema>; items?: JsonSchema; anyOf?: JsonSchema[] };
 
@@ -61,12 +61,35 @@ export function withLiveContent(content: Content, now: Date): Content {
   if (c.exams) {
     const items = c.exams.items.filter((e) => !isOver(endOfDay(e.date), now));
     const barOver = c.exams.announcementEnds ? isOver(deadline(c.exams.announcementEnds), now) : false;
-    c = { ...c, exams: { ...c.exams, items, announcement: barOver ? undefined : c.exams.announcement } };
+    const bar = startState(c.exams.announcementStarts, now);
+    c = {
+      ...c,
+      exams: {
+        ...c.exams, items,
+        announcement: barOver || bar === "later" ? undefined : c.exams.announcement,
+        announcementStarts: bar === "soon" ? c.exams.announcementStarts : undefined,
+      },
+    };
   }
-  if (c.popup && (!c.popup.enabled || (c.popup.endsAt && isOver(deadline(c.popup.endsAt), now)))) {
-    c = { ...c, popup: undefined };
+  if (c.popup) {
+    const start = startState(c.popup.startsAt, now);
+    if (!c.popup.enabled || start === "later" || (c.popup.endsAt && isOver(deadline(c.popup.endsAt), now))) c = { ...c, popup: undefined };
+    else c = { ...c, popup: { ...c.popup, startsAt: start === "soon" ? c.popup.startsAt : undefined } };
   }
   return c;
+}
+
+/**
+ * A start date relative to a render: "started" (show it; the date is dropped), "soon"
+ * (within the cache lifetime: kept so the browser reveals it on time) or "later"
+ * (left out; a later render picks it up).
+ */
+const CACHE_WINDOW = 2 * 60 * 60_000;
+function startState(starts: string | undefined, now: Date): "started" | "soon" | "later" {
+  if (!starts) return "started";
+  const at = instantOf(starts).getTime();
+  if (at <= now.getTime()) return "started";
+  return at - now.getTime() <= CACHE_WINDOW ? "soon" : "later";
 }
 
 export type Issue = { path: string; message: string };

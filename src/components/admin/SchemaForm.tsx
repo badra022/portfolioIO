@@ -10,6 +10,8 @@ export type FormCtx = {
   /** Base URL of this teacher's files, used to preview image keys. */
   assetBase: string;
   upload: (file: File) => Promise<UploadResult>;
+  /** The teacher's forms, offered wherever a button can open a form instead of WhatsApp. */
+  forms?: { id: string; title: string }[];
 };
 
 type FieldProps = {
@@ -326,6 +328,16 @@ function StringInput({ id, s, value, onChange, name, path, required, ctx }: { id
   if (s.widget === "image") return <ImageInput value={value} onChange={onChange} required={required} ctx={ctx} />;
   if (s.pattern === TIME_PATTERN) return <input id={id} type="time" dir="ltr" value={v} onChange={(e) => set(e.target.value)} />;
   if (s.widget === "date") return <DateTimeInput id={id} value={v} onChange={set} />;
+  if (s.widget === "form") {
+    const forms = ctx.forms ?? [];
+    return (
+      <select id={id} value={v} onChange={(e) => set(e.target.value)}>
+        <option value="">يفتح واتساب (الافتراضي)</option>
+        {forms.map((f) => <option key={f.id} value={f.id}>يفتح نموذج: {f.title}</option>)}
+        {v && !forms.some((f) => f.id === v) && <option value={v}>نموذج غير موجود: {v}</option>}
+      </select>
+    );
+  }
   if (name === "date") {
     const dateOnly = !v || /^\d{4}-\d{2}-\d{2}$/.test(v);
     return <input id={id} type={dateOnly ? "date" : "text"} dir="ltr" value={v} onChange={(e) => set(e.target.value)} />;

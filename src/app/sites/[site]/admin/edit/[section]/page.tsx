@@ -42,6 +42,7 @@ export default async function EditSection({ params }: PageProps<"/sites/[site]/a
         version={t.version}
         assetBase={assetBase(slug)}
         viewUrl={`${base}/`}
+        forms={t.content.forms.map((f) => ({ id: f.id, title: f.title }))}
       />
     </>
   );

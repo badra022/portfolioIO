@@ -15,6 +15,7 @@ import { ImageError, SLUG_RE, USERNAME_RE, loginUrlFor, normalizeDomain, storeIm
 import { generatePassword, hashPassword } from "@/lib/server/passwords";
 import { mapImages } from "@/lib/content-utils";
 import * as repo from "@/lib/server/repo";
+import * as submissionsRepo from "@/lib/server/submissions";
 
 type Fail = { ok: false; reason: "forbidden" | "missing" | "error"; message?: string };
 
@@ -209,5 +210,24 @@ export async function setUserDisabledAction(slug: string, userId: string, disabl
 export async function deleteUserAction(slug: string, userId: string): Promise<void> {
   await requireSuper(PLATFORM);
   await repo.deleteUser(slug, userId);
+  refresh();
+}
+
+/* ------------------------------------------------------------------ */
+/* Form requests (/admin/requests)                                     */
+/* ------------------------------------------------------------------ */
+
+export async function setRequestStatusAction(site: string, ids: number[], status: submissionsRepo.StatusT): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!submissionsRepo.STATUSES.includes(status)) return;
+  await submissionsRepo.setStatus(ctx.slug, ids.filter(Number.isInteger), status);
+  refresh();
+}
+
+export async function deleteRequestAction(site: string, ids: number[]): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  await submissionsRepo.deleteSubmissions(ctx.slug, ids.filter(Number.isInteger));
   refresh();
 }

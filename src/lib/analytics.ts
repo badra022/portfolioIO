@@ -12,12 +12,15 @@ import { TIME_ZONE } from "./dates";
 export const CHANNELS = [
   "whatsapp", "telegram", "messenger", "phone",
   "youtube", "tiktok", "facebook", "instagram", "whatsappChannel", "x",
-  "video", "link",
+  "video", "link", "form",
 ] as const;
 export type ChannelT = (typeof CHANNELS)[number];
 
-/** Clicks that open a conversation with the teacher. */
-export const CONTACT: ReadonlySet<string> = new Set(["whatsapp", "telegram", "messenger", "phone"]);
+/** Clicks that open a conversation with the teacher, and sent forms (the teacher gets the student's details). */
+export const CONTACT: ReadonlySet<string> = new Set(["whatsapp", "telegram", "messenger", "phone", "form"]);
+
+/** Window event a form button fires once sent, so the tracker counts it like a contact click. */
+export const CONVERT_EVENT = "pa:convert";
 /** Clicks that take the visitor to the teacher's channels. */
 export const SOCIAL: ReadonlySet<string> = new Set(["youtube", "tiktok", "facebook", "instagram", "whatsappChannel", "x"]);
 

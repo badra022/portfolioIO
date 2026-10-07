@@ -213,3 +213,29 @@
 .up-list img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex: none; }
 .an-self { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: var(--a-card); border: 1px solid var(--a-line); font-size: 14px; }
 .an-self span { flex: 1 1 260px; }
+
+/* ---------- requests (/admin/requests) ---------- */
+.rq-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+.rq-filters input, .rq-filters select { flex: 1 1 180px; min-height: 40px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--a-line); background: var(--a-card); font: inherit; }
+.rq-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.rq { background: var(--a-card); border: 1px solid var(--a-line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; }
+.rq-new { border-inline-start: 4px solid var(--a-primary); }
+.rq-done { opacity: .72; }
+.rq-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.rq-badge { font-size: 12px; padding: 2px 10px; border-radius: 99px; background: #efebe8; }
+.rq-badge.new { background: var(--a-primary); color: #fff; }
+.rq-badge.contacted { background: #e6f0fb; color: #1d4f91; }
+.rq-data { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 8px 16px; }
+.rq-data dt { font-size: 12px; color: var(--a-muted); }
+.rq-data dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.rq-ctx dd { font-weight: 500; }
+.rq-phone { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.rq-phone a { text-decoration: none; }
+.rq-phone a[dir="ltr"] { font-size: 16px; }
+.rq-wa { font-size: 13px; padding: 2px 10px; border-radius: 99px; background: #e8f7ee; color: var(--a-ok); }
+.rq-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--a-line); padding-top: 10px; }
+.rq-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rq-actions form { display: inline; }
+.rq-actions .btn-sm { min-height: 34px; padding: 4px 12px; font-size: 13px; }
+.rq-pages { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; }
+.a-count { display: inline-block; min-width: 20px; padding: 0 6px; margin-inline-start: 6px; border-radius: 99px; background: #fff; color: var(--a-primary); font-size: 12px; text-align: center; }

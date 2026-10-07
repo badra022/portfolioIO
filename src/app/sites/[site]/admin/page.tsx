@@ -5,6 +5,7 @@ import { slugForSite } from "@/lib/server/site";
 import { getTenant } from "@/lib/server/repo";
 import { PlatformConsole } from "@/components/admin/PlatformConsole";
 import { formatWhen } from "@/lib/admin/format";
+import { countNew } from "@/lib/server/submissions";
 
 export default async function AdminHome({ params }: PageProps<"/sites/[site]/admin">) {
   const site = decodeURIComponent((await params).site);
@@ -15,6 +16,7 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
   const t = slug ? await getTenant(slug) : null;
   if (!t) return <p>لا يوجد مدرس على هذا العنوان.</p>;
   const base = baseForSite(site);
+  const newRequests = await countNew(slug!);
   const sections = SECTIONS.filter((s) => !s.superOnly || p.kind === "super");
 
   return (
@@ -27,6 +29,7 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
         </p>
         <div className="a-actions">
           <a className="btn-sm ghost" href={`${base}/`} target="_blank" rel="noopener">عرض الموقع</a>
+          <a className="btn-sm primary" href={`${base}/admin/requests`}>الطلبات{newRequests > 0 && <span className="a-count">{newRequests}</span>}</a>
           <a className="btn-sm primary" href={`${base}/admin/analytics`}>الإحصائيات</a>
           <a className="btn-sm ghost" href={`${base}/admin/history`}>سجل التعديلات</a>
         </div>

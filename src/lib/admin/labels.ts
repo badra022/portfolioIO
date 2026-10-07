@@ -165,6 +165,17 @@ const BY_KEY: Record<string, string> = {
   remindAfterHours: "يظهر مرة أخرى لنفس الزائر بعد (ساعات)",
   to: "الرقم أو اسم المستخدم أو الرابط",
   announcementEnds: "إخفاء الشريط الأحمر بعد",
+  announcementStarts: "إظهار الشريط الأحمر من",
+  startsAt: "يبدأ الظهور من",
+  // forms
+  forms: "النماذج",
+  form: "عند الضغط على الزر",
+  fields: "الأسئلة",
+  required: "إجباري",
+  remember: "تذكّر الإجابة على جهاز الطالب",
+  placeholder: "نص توضيحي داخل الخانة",
+  submitLabel: "نص زر الإرسال",
+  successMessage: "رسالة بعد الإرسال",
   // final / footer / sticky
   final: "الدعوة الأخيرة",
   footer: "الفوتر",
@@ -264,6 +275,14 @@ const HINTS: Record<string, string> = {
   "students.photo": "اختياري. بدون صورة يظهر الرقم فقط.",
   "nav.href": "مثل #schedule للانتقال لقسم في الصفحة.",
   "contact.phoneHighlights": "بصيغة JSON: رقم الهاتف ← مواضع الأرقام الملوّنة.",
+  "forms": "كل نموذج له معرّف بالإنجليزي. بعد إنشائه، اختره من خانة «عند الضغط على الزر» في أي زر واتساب (الواجهة، الجدول، الكتاب، الامتحانات، التحدي...). الطلبات بتظهر في صفحة «الطلبات».",
+  "forms.id": "مثل student-info. ميتغيرش بعد ما تستخدمه في الأزرار.",
+  "forms.fields.id": "بالإنجليزي، مثل name أو phone. نفس المعرّف في نموذجين = الطالب ميكتبهوش مرتين.",
+  "forms.fields.remember": "شغّلها لبيانات الطالب الثابتة (الاسم، الرقم، الصف) عشان متتسألش تاني. اقفلها للإجابات اللي بتتغير كل مرة.",
+  "forms.fields.options": "للنوع «اختيار من قائمة» فقط.",
+  "forms.fields.type": "«رقم موبايل» بيتأكد إن الرقم صحيح.",
+  "popup.startsAt": "فارغ = يظهر فوراً. لو حددت الساعة يبدأ في الساعة دي.",
+  "exams.announcementStarts": "فارغ = يظهر فوراً.",
   "popup": "يظهر فوق الصفحة بعد فتحها (على الموبايل يظهر من أسفل الشاشة). لو فيه فيديو يظهر بدل الصورة.",
   "popup.endsAt": "بعد التاريخ ده الإعلان يختفي من الموقع لوحده. لو حددت الساعة يختفي في الساعة دي.",
   "popup.remindAfterHours": "لو الزائر قفل الإعلان، مش هيظهر له تاني إلا بعد المدة دي. أي تعديل في الإعلان يخليه يظهر للكل من جديد.",
@@ -284,6 +303,7 @@ const ENUMS: Record<string, string> = {
   hero: "الواجهة", grades: "الصفوف", schedule: "الجدول", method: "طريقة الشرح", book: "الكتاب", students: "الطلاب",
   challenge: "التحدي", exams: "الامتحانات", final: "الدعوة الأخيرة", reviews: "آراء الطلاب", services: "خدمات أخرى",
   phone: "اتصال", link: "رابط",
+  tel: "رقم موبايل", number: "رقم", select: "اختيار من قائمة", textarea: "نص طويل",
   sat: "السبت", sun: "الأحد", mon: "الاثنين", tue: "الثلاثاء", wed: "الأربعاء", thu: "الخميس", fri: "الجمعة",
   chat: "محادثة", check: "علامة صح", loop: "تكرار", trophy: "كأس", bolt: "برق", star: "نجمة", users: "طلاب",
   dark: "داكن", light: "فاتح", grain: "حبيبات", none: "بدون", blob: "شكل حر", rounded: "حواف مستديرة", circle: "دائرة",
@@ -296,8 +316,13 @@ export function labelFor(path: string, key: string): string {
   return BY_PATH[path] ?? BY_PATH[g] ?? BY_KEY[key] ?? key;
 }
 
+/** Hints that apply wherever a key appears (e.g. every button's "form"). */
+const KEY_HINTS: Record<string, string> = {
+  form: "واتساب = الطالب يبعت رسالة. نموذج = الطالب يكتب بياناته (ومعاها اختياره: الإجابة، المجموعة، الامتحان...) وتوصلك في صفحة «الطلبات» بدل الواتساب.",
+};
+
 export function hintFor(path: string): string | undefined {
-  return HINTS[path] ?? HINTS[generic(path)];
+  return HINTS[path] ?? HINTS[generic(path)] ?? KEY_HINTS[path.split(".").pop() ?? ""];
 }
 
 export function enumLabel(value: string): string {
