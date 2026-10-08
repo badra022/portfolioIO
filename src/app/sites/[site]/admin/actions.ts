@@ -16,6 +16,7 @@ import { generatePassword, hashPassword } from "@/lib/server/passwords";
 import { mapImages } from "@/lib/content-utils";
 import * as repo from "@/lib/server/repo";
 import * as submissionsRepo from "@/lib/server/submissions";
+import * as quizRepo from "@/lib/server/quiz-attempts";
 
 type Fail = { ok: false; reason: "forbidden" | "missing" | "error"; message?: string };
 
@@ -229,5 +230,31 @@ export async function deleteRequestAction(site: string, ids: number[]): Promise<
   const ctx = await teacherContext(site);
   if ("ok" in ctx) throw new ForbiddenError();
   await submissionsRepo.deleteSubmissions(ctx.slug, ids.filter(Number.isInteger));
+  refresh();
+}
+
+/* ------------------------------------------------------------------ */
+/* Quizzes (/admin/quizzes)                                            */
+/* ------------------------------------------------------------------ */
+
+/** Open now / close now / back to the dates. Saved like any edit (with a revision). */
+export async function setQuizStateAction(site: string, path: string, state: "auto" | "open" | "closed"): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!["auto", "open", "closed"].includes(state)) return;
+  const t = await repo.getTenant(ctx.slug);
+  if (!t || !t.content.quizzes.some((q) => q.path === path)) return;
+  const content = { ...t.content, quizzes: t.content.quizzes.map((q) => (q.path === path ? { ...q, state } : q)) };
+  const note = state === "open" ? "فتح اختبار" : state === "closed" ? "قفل اختبار" : "اختبار حسب التواريخ";
+  const r = await repo.saveTenant(ctx.slug, { content }, t.version, principalName(ctx.p), `${note}: ${path}`);
+  if (r.ok) updateTag(tenantTag(ctx.slug));
+  refresh();
+}
+
+/** Removes attempts (e.g. so a student can take the quiz again). */
+export async function deleteAttemptAction(site: string, path: string, ids: number[]): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  await quizRepo.deleteAttempts(ctx.slug, path, ids.filter(Number.isInteger));
   refresh();
 }

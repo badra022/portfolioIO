@@ -5,15 +5,11 @@ import type { LeadTrigger } from "@/lib/lead";
 import { CONVERT_EVENT } from "@/lib/analytics";
 import { placeOf } from "@/lib/place";
 import { Icon } from "./Icon";
+import { FormFields, checkFields } from "./FormFields";
 
 type Open = { form: LeadFormT; trigger: LeadTrigger; place: string; ask: LeadFormT["fields"]; known: Record<string, string> };
 type Toast = { text: string; tone: "ok" | "info"; edit?: Omit<Open, "ask"> };
 
-const TYPE: Record<string, React.InputHTMLAttributes<HTMLInputElement>> = {
-  tel: { type: "tel", inputMode: "tel", dir: "ltr", autoComplete: "tel" },
-  number: { type: "text", inputMode: "decimal", dir: "ltr" },
-  text: { type: "text" },
-};
 
 /**
  * Forms that buttons open instead of WhatsApp (see lib/lead.ts). Answers marked
@@ -29,7 +25,6 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
   const [done, setDone] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const firstInput = useRef<HTMLElement | null>(null);
   const memKey = `lf:${slug}`;
 
   const remembered = useCallback((): Record<string, string> => {
@@ -112,7 +107,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
   const close = useCallback(() => { setOpen(null); setDone(null); }, []);
   useEffect(() => {
     if (!open) return;
-    firstInput.current?.focus({ preventScroll: true });
+    document.querySelector<HTMLElement>(".lead .lead-field :is(input, select, textarea)")?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -122,14 +117,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
     e.preventDefault();
     if (!open) return;
     const answers = Object.fromEntries(open.form.fields.map((f) => [f.id, (values[f.id] ?? open.known[f.id] ?? "").trim()]));
-    // Same checks as the server, so mistakes show instantly.
-    const problems: Record<string, string> = {};
-    for (const f of open.ask) {
-      const v = answers[f.id];
-      if (!v) { if (f.required) problems[f.id] = "مطلوب"; continue; }
-      if (f.type === "tel" && !/^\+?\d{8,15}$/.test(v.replace(/[\s\-().]/g, "").replace(/^00/, "+"))) problems[f.id] = "اكتب رقم صحيح";
-      if (f.type === "number" && !/^-?\d+([.,]\d+)?$/.test(v)) problems[f.id] = "اكتب رقم";
-    }
+    const problems = checkFields(open.ask, answers);
     if (Object.keys(problems).length) { setErrors(problems); return; }
     const hp = (e.currentTarget as HTMLFormElement).elements.namedItem("website") as HTMLInputElement | null;
     if (await send(open, answers, hp?.value ?? "")) setDone(open.form.successMessage);
@@ -166,35 +154,12 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
                     <button type="button" className="lead-edit" onClick={() => setOpen({ ...open, ask: open.form.fields })}>تعديل</button>
                   </p>
                 )}
-                {open.ask.map((f, i) => {
-                  const id = `lead-${f.id}`;
-                  const common = {
-                    id, name: f.id, value: values[f.id] ?? "", required: f.required, placeholder: f.placeholder,
-                    "aria-invalid": errors[f.id] ? true : undefined,
-                    ref: i === 0 ? (el: HTMLElement | null) => { firstInput.current = el; } : undefined,
-                    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-                      const v = e.target.value;
-                      setValues((x) => ({ ...x, [f.id]: v }));
-                      setErrors((x) => ({ ...x, [f.id]: "" }));
-                    },
-                  };
-                  return (
-                    <label className="lead-field" key={f.id} htmlFor={id}>
-                      <span>{f.label}{!f.required && <em> (اختياري)</em>}</span>
-                      {f.type === "select" ? (
-                        <select {...common}>
-                          <option value="" disabled>اختر…</option>
-                          {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      ) : f.type === "textarea" ? (
-                        <textarea rows={3} {...common} />
-                      ) : (
-                        <input {...TYPE[f.type] ?? TYPE.text} autoComplete={f.id === "name" ? "name" : TYPE[f.type]?.autoComplete} {...common} />
-                      )}
-                      {errors[f.id] && <small className="lead-err" role="alert">{errors[f.id]}</small>}
-                    </label>
-                  );
-                })}
+                <FormFields
+                  fields={open.ask}
+                  values={values}
+                  errors={errors}
+                  onChange={(id, v) => { setValues((x) => ({ ...x, [id]: v })); setErrors((x) => ({ ...x, [id]: "" })); }}
+                />
                 {/* Honeypot: invisible to people; bots that fill it are ignored by the server. */}
                 <input className="lead-hp" tabIndex={-1} autoComplete="off" aria-hidden="true" name="website" />
                 {errors._ && <p className="lead-err" role="alert">{errors._}</p>}

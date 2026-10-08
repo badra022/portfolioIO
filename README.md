@@ -58,12 +58,23 @@ Any WhatsApp button can open a form instead, so the teacher gets a list to call 
 
 1. **Create a form** in `/admin` → **نماذج جمع البيانات** (Forms): its questions (text, mobile number, number, choice list, long text), required or not, and **remember** (on for things that don't change, like name, phone, grade; off for answers that change each time).
 2. **Point a button at it**: every button's editor has **عند الضغط على الزر** (On click): *opens WhatsApp* (default) or *opens form: …*. Works for the hero, top bar, bottom bar, last call, students, schedule bookings, book order, exam booking, the challenge, services and the pop-up.
-3. **Students**: the form opens over the page (a sheet on phones) and asks only what isn't remembered on their device yet. What they picked on the page is attached automatically (the challenge question and answer, the group's day/time/place, the book's grade and delivery, the exam and level), so a second request is a single tap ("sent as Ahmed, not you? edit"). The challenge asks for an answer before sending.
+3. **Students**: the form opens over the page (a sheet on phones) and asks only what isn't remembered on their device yet. What they picked on the page is attached automatically and never remembered (the challenge question and answer, the group's day/time/place, the book's grade and delivery, the exam and level), so the form only needs what isn't on the page, and a second request is a single tap ("sent as Ahmed, not you? edit"). The challenge asks for an answer before sending.
 4. **Teacher**: `/admin` → **الطلبات** (Requests, with a count of new ones): call or WhatsApp in one tap, mark *contacted* / *done*, search, delete, and **download CSV** (opens in Excel with Arabic and phone numbers intact). Analytics counts a sent form as a contact.
 
 Submissions live in the `submissions` table (run `db/migrations/0003_submissions.sql` once on an existing database). Only the questions the form defines are stored; a hidden honeypot field and duplicate-within-10-minutes check keep out bots and double taps. Phone numbers are personal data: delete requests you no longer need.
 
 **Start dates:** the pop-up (`startsAt`) and the red exam bar (`announcementStarts`) can start later; empty means right away. Together with the end dates they show only inside their window, switching on and off on time even on a cached page.
+
+## Quizzes
+
+Timed quizzes on their own page, e.g. `teacher.com/exam-oct`, managed from `/admin` → **الاختبارات** (Quizzes).
+
+- **Set up** (admin → edit quizzes): the page name, title and intro, an optional form asked before starting (name, phone…), duration in minutes (0 = no timer), start/end dates, pass percentage, and questions. Each question has text and/or an image, is multiple choice or written, and may list its correct answers: several accepted spellings for written ones, compared without extra spaces, upper/lower case, Arabic diacritics, and with Arabic digits and decimal point equal to Latin ones. Questions without correct answers aren't graded; students can leave any question empty.
+- **Open/close**: *automatic* follows the dates; **Open now** / **Close now** buttons override them (closing also ends attempts in progress).
+- **Students**: fill the form (nothing is sent yet but the start), then answer with a countdown. Questions load only when they start, and the answer key never leaves the server. The deadline is kept by the server and answers are saved as they go, so a refresh (or another device with the same number) continues with the same answers and remaining time, and when time is up the latest answers are handed in, even if the page was closed. After handing in (button or timer), the quiz can't be taken again on that device or, if the form has a mobile number, with that number. Students don't see their score.
+- **Results** (one page per quiz): started / finished / timed out / in progress, completion rate, average, median and top score, pass rate, average time, score distribution, questions from hardest with their most common wrong answers, every student ranked by score with their answers marked, tap to call/WhatsApp, delete (lets them retake), and CSV export for Excel. Scores are worked out from the current answer key, so fixing a key updates past results.
+
+Attempts live in `quiz_attempts` (run `db/migrations/0004_quizzes.sql` once on an existing database). Claude can create and edit quizzes through the connector and read results with `quiz_results`. Don't reorder questions after students start: answers are stored by question number.
 
 ## Analytics (built in, $0 extra)
 
