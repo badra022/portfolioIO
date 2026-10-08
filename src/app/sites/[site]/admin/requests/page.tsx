@@ -106,6 +106,7 @@ export default async function Requests({ params, searchParams }: PageProps<"/sit
                       </dd>
                     </div>
                   ))}
+                  {Object.keys(r.context).length > 0 && <div className="rq-ctx-head">اختيارات الطالب في الصفحة</div>}
                   {Object.entries(r.context).map(([k, v]) => (
                     <div key={`c-${k}`} className="rq-ctx"><dt>{k}</dt><dd>{v}</dd></div>
                   ))}

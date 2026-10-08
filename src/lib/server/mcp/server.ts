@@ -17,6 +17,7 @@ import { ImageError, SLUG_RE, USERNAME_RE, loginUrlFor, normalizeDomain, sniffIm
 import { makeUploadLink } from "../upload-link";
 import { RANGES, report } from "../analytics";
 import { STATUSES, listSubmissions, setStatus } from "../submissions";
+import { listAttempts, quizMetrics } from "../quiz-attempts";
 import { applyOps, contentOutline, deepMerge, schemaFor, type Op } from "./content-ops";
 import { fetchImage } from "./fetch-image";
 
@@ -33,6 +34,8 @@ Onboarding a new teacher:
 6. When ready: manage_domain (also add the domain in Vercel → Settings → Domains), manage_login to create the teacher's account (the password is shown once; pass it to the user).
 
 Forms: any WhatsApp button can open a form instead (the student leaves name/phone/etc. for the teacher). Define forms in content "forms" (get_schema part "forms"), then set "form": "<form id>" on the button (hero.primaryCta, navCta, sticky.cta, final.cta, students.cta, schedule.form, book.order.form, exams.items[].form, challenge.form, services/popup cta.form). Fields with remember=true (name, phone) are asked once per device; the button's own details (challenge answer, chosen group, exam) are attached automatically. Submissions: list_requests / update_requests.
+
+Quizzes: content "quizzes" (get_schema part "quizzes"): each has a page at /<path>, an optional form asked before starting, a timer, start/end dates, state (auto/open/closed) and questions (text and/or image, choice or written, optional correct answers that students never see). Results: quiz_results.
 
 Rules for content: match the tone and language of the example (Egyptian Arabic) unless told otherwise. WhatsApp numbers are international digits only (2010...). "sections" is the page order and every listed section needs its data. Messages may use placeholders listed in each field's description (e.g. {grade}, {date}). Pass expected_version from get_teacher when editing, so a change made meanwhile in the admin panel isn't overwritten.`;
 
@@ -391,6 +394,19 @@ export function buildMcpServer(origin: string): McpServer {
     description: "Set the status of requests (by id from list_requests): new, contacted, done.",
     inputSchema: { slug: slugArg, ids: z.array(z.number().int()).min(1), status: z.enum(STATUSES) },
   }, safe(async ({ slug, ids, status }) => { await setStatus(slug, ids, status); return ok({ updated: ids.length, status }); }));
+
+  server.registerTool("quiz_results", {
+    title: "Quiz results",
+    description: "A quiz's metrics (started, finished, timed out, average/median/top score, pass rate, time, per-question correct rate and common wrong answers) and every attempt with the student's details, answers, marks and score.",
+    inputSchema: { slug: slugArg, path: z.string().describe("The quiz's path (content.quizzes[].path)."), attempts: z.boolean().optional().describe("Include each attempt (default true).") },
+    annotations: { readOnlyHint: true },
+  }, safe(async ({ slug, path, attempts }) => {
+    const t = await repo.getTenant(slug);
+    const quiz = t?.content.quizzes.find((q) => q.path === path);
+    if (!quiz) return fail(`No quiz "${path}" for ${slug}.`);
+    const rows = await listAttempts(slug, quiz);
+    return ok({ metrics: quizMetrics(quiz, rows), ...(attempts === false ? {} : { attempts: rows.map(({ questions: _q, ...r }) => r) }) });
+  }));
 
   /* ----- history and analytics ----- */
 

@@ -1,4 +1,5 @@
-import { bigint, bigserial, boolean, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, bigserial, boolean, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /** One row per teacher. content/theme hold the same JSON that tenants/<slug>/*.json hold, validated by Zod on every write. */
 export const tenants = pgTable("tenants", {
@@ -77,3 +78,33 @@ export const submissions = pgTable("submissions", {
   status: text("status", { enum: ["new", "contacted", "done"] }).notNull().default("new"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("submissions_tenant_created_idx").on(t.tenantId, t.createdAt)]);
+
+/**
+ * One student's go at a quiz. The deadline lives here, so refreshing or switching
+ * devices can't reset the timer; answers are saved as the student goes, so a
+ * timeout submits the latest ones even if the page was closed. Scores are worked
+ * out when the results are viewed, from the quiz's current answer key.
+ */
+export const quizAttempts = pgTable("quiz_attempts", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  /** The quiz's path (content.quizzes[].path). */
+  quizPath: text("quiz_path").notNull(),
+  /** Secret held by the student's browser; whoever has it can continue the attempt. */
+  token: text("token").notNull().unique(),
+  /** Normalized mobile number from the form, if it has one: one attempt per number. */
+  contact: text("contact"),
+  /** The quiz form's answers (name, phone...). */
+  fields: jsonb("fields").notNull(),
+  /** Answers by question number (index), as typed or chosen. */
+  answers: jsonb("answers").notNull(),
+  /** The questions as shown (text and options, no answer key), for reading the attempt later. */
+  questions: jsonb("questions").notNull(),
+  status: text("status", { enum: ["in_progress", "submitted", "timed_out"] }).notNull().default("in_progress"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  deadlineAt: timestamp("deadline_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (t) => [
+  index("quiz_attempts_quiz_idx").on(t.tenantId, t.quizPath, t.startedAt),
+  uniqueIndex("quiz_attempts_contact_idx").on(t.tenantId, t.quizPath, t.contact).where(sql`${t.contact} is not null`),
+]);

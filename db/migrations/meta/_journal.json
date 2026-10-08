@@ -29,6 +29,13 @@
       "when": 1791395696420,
       "tag": "0003_submissions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791477898896,
+      "tag": "0004_quizzes",
+      "breakpoints": true
     }
   ]
 }

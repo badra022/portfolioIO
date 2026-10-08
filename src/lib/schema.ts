@@ -331,6 +331,52 @@ const Popup = z.object({
   remindAfterHours: z.number().min(0).max(24 * 60).default(5),
 });
 
+/* ---------- quizzes ---------- */
+
+/** Paths a quiz can't use, because the site already answers them. */
+export const RESERVED_PATHS = ["admin", "api", "upload", "t", "robots.txt", "sitemap.xml", "local-assets", "favicon.ico"];
+
+const QuizQuestion = z.object({
+  text: z.string().optional(),
+  image: OptionalImageRef.optional(),
+  type: z.enum(["choice", "text"]).default("choice"),
+  /** Choices for "choice" questions. */
+  options: z.array(z.string()).default([]),
+  /**
+   * Accepted answers, never sent to students. "choice": the right option(s).
+   * "text": every accepted way of writing it (compared without extra spaces, case
+   * or Arabic diacritics). Empty = not graded.
+   */
+  correct: z.array(z.string()).default([]),
+  points: z.number().min(0).max(100).default(1),
+});
+
+/**
+ * A timed quiz on its own page (/<path>). Students fill the quiz's form first,
+ * then answer; results go to the admin panel only (students don't see scores).
+ */
+export const Quiz = z.object({
+  /** The page address: teacher.com/<path>. */
+  path: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة، مثل exam-oct" }),
+  title: z.string(),
+  intro: z.string().optional(),
+  image: OptionalImageRef.optional(),
+  /** Details asked before the quiz starts (name, phone...). Empty = starts directly. */
+  form: FormRef.optional(),
+  /** Minutes allowed. 0 = no timer (only the end date). */
+  durationMinutes: z.number().min(0).max(600).default(30),
+  /** auto = open between the start and end dates; open = open now; closed = closed now. */
+  state: z.enum(["auto", "open", "closed"]).default("auto"),
+  startsAt: StartDate.optional(),
+  endsAt: EndDate.optional(),
+  /** Percentage that counts as passing, for the results page. */
+  passPercent: z.number().min(0).max(100).default(50),
+  startLabel: z.string().default("ابدأ الاختبار"),
+  submitLabel: z.string().default("سلّم الإجابات"),
+  doneMessage: z.string().default("تم تسليم إجاباتك. بالتوفيق!"),
+  questions: z.array(QuizQuestion).default([]),
+});
+
 /* ---------- content.json ---------- */
 
 export const ContentSchema = z.object({
@@ -380,6 +426,7 @@ export const ContentSchema = z.object({
   final: Final.optional(),
   popup: Popup.optional(),
   forms: z.array(LeadForm).default([]),
+  quizzes: z.array(Quiz).default([]),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),
   sticky: z.object({ secondary: LinkCta.optional(), cta: ChatCta }),
   labels: z.object({
@@ -393,6 +440,12 @@ export const ContentSchema = z.object({
     formIds.add(f.id);
   });
   // Every button that points at a form must point at one that exists.
+  const paths = new Set<string>();
+  c.quizzes.forEach((q, i) => {
+    if (RESERVED_PATHS.includes(q.path)) ctx.addIssue({ code: "custom", path: ["quizzes", i, "path"], message: "الاسم ده محجوز للموقع، اختار اسم تاني." });
+    if (paths.has(q.path)) ctx.addIssue({ code: "custom", path: ["quizzes", i, "path"], message: "في اختبار تاني بنفس العنوان." });
+    paths.add(q.path);
+  });
   const walk = (v: unknown, path: (string | number)[]) => {
     if (Array.isArray(v)) v.forEach((x, i) => walk(x, [...path, i]));
     else if (v && typeof v === "object") {
@@ -458,5 +511,6 @@ export type RichTextT = z.infer<typeof RichText>;
 export type ChatCtaT = z.infer<typeof ChatCta>;
 export type ActionT = z.infer<typeof Action>;
 export type LeadFormT = z.infer<typeof LeadForm>;
+export type QuizT = z.infer<typeof Quiz>;
 export type SocialT = z.infer<typeof Social>;
 export type DayKeyT = z.infer<typeof DayKey>;

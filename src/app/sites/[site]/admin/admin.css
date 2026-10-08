@@ -239,3 +239,27 @@
 .rq-actions .btn-sm { min-height: 34px; padding: 4px 12px; font-size: 13px; }
 .rq-pages { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; }
 .a-count { display: inline-block; min-width: 20px; padding: 0 6px; margin-inline-start: 6px; border-radius: 99px; background: #fff; color: var(--a-primary); font-size: 12px; text-align: center; }
+
+/* ---------- quizzes (/admin/quizzes) ---------- */
+.qz-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.qz-item { margin-top: 0; display: grid; gap: 8px; }
+.qz-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.qz-head b { font-size: 17px; }
+.qz-actions, .qz-state { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.qz-state form { display: inline; }
+.qz-qtable { display: grid; gap: 8px; margin-top: 10px; }
+.qz-qrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 12px; border: 1px solid var(--a-line); border-radius: 10px; }
+.qz-qtext { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.qz-wrong { flex-basis: 100%; }
+.qz-rank { font-size: 16px; }
+.qz-score { font-size: 15px; padding: 2px 10px; border-radius: 99px; }
+.qz-score.pass { background: #e8f7ee; color: var(--a-ok); }
+.qz-score.fail { background: #fdf0ef; color: var(--a-bad); }
+.qz-answers summary { cursor: pointer; color: var(--a-muted); font-size: 14px; }
+.qz-answers ol { margin: 8px 0 0; padding-inline-start: 22px; display: grid; gap: 6px; font-size: 14px; }
+.qz-answers li { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.qz-answers li.ok b { color: var(--a-ok); }
+.qz-answers li.bad b { color: var(--a-bad); }
+.qz-answers li span:last-child { color: var(--a-muted); }
+.a-h2 { margin: 20px 0 8px; }
+.rq-ctx-head { grid-column: 1 / -1; font-size: 12px; color: var(--a-muted); border-top: 1px dashed var(--a-line); padding-top: 6px; }
