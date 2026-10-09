@@ -17,6 +17,8 @@ import { mapImages } from "@/lib/content-utils";
 import * as repo from "@/lib/server/repo";
 import * as submissionsRepo from "@/lib/server/submissions";
 import * as quizRepo from "@/lib/server/quiz-attempts";
+import * as siteFiles from "@/lib/server/site-files";
+import { MAX_SITE_FILE } from "@/lib/site-files";
 
 type Fail = { ok: false; reason: "forbidden" | "missing" | "error"; message?: string };
 
@@ -256,5 +258,41 @@ export async function deleteAttemptAction(site: string, path: string, ids: numbe
   const ctx = await teacherContext(site);
   if ("ok" in ctx) throw new ForbiddenError();
   await quizRepo.deleteAttempts(ctx.slug, path, ids.filter(Number.isInteger));
+  refresh();
+}
+
+/* ------------------------------------------------------------------ */
+/* Site files (super admin): verification files etc. at the site root  */
+/* ------------------------------------------------------------------ */
+
+/** Upload files (or one pasted file: name + content) for a teacher. */
+export async function putSiteFilesAction(slug: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {
+  const p = await requireSuper(PLATFORM);
+  const items: { name: string; content: string }[] = [];
+  for (const f of form.getAll("files")) {
+    if (f instanceof File && f.size > 0) {
+      if (f.size > MAX_SITE_FILE) return { ok: false, message: `${f.name}: الملف أكبر من 64 كيلوبايت.` };
+      items.push({ name: f.name, content: await f.text() });
+    }
+  }
+  const pastedName = String(form.get("name") ?? "").trim();
+  if (pastedName) items.push({ name: pastedName, content: String(form.get("content") ?? "") });
+  if (!items.length) return { ok: false, message: "اختار ملف أو اكتب اسم الملف ومحتواه." };
+  const lines: string[] = [];
+  try {
+    for (const it of items) lines.push(`/${await siteFiles.putSiteFile(slug, it.name, it.content, principalName(p))}`);
+  } catch (e) {
+    if (e instanceof siteFiles.SiteFileError) return { ok: false, message: e.message, lines };
+    throw e;
+  }
+  updateTag(siteFiles.filesTag(slug));
+  refresh();
+  return { ok: true, message: "تم الحفظ. الملفات متاحة الآن على:", lines };
+}
+
+export async function deleteSiteFileAction(slug: string, name: string): Promise<void> {
+  await requireSuper(PLATFORM);
+  await siteFiles.deleteSiteFile(slug, name);
+  updateTag(siteFiles.filesTag(slug));
   refresh();
 }

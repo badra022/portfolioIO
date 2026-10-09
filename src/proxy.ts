@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { isAdminPath, route } from "@/lib/routing";
 import { authenticate, teacherSlugFor } from "@/lib/server/auth";
+import { isSiteFileName } from "@/lib/site-files";
 
 /**
  * Every request is mapped by its host name to /sites/<site>/... (see lib/routing.ts).
@@ -36,7 +37,10 @@ export async function proxy(request: NextRequest) {
   }
 
   const url = request.nextUrl.clone();
-  url.pathname = `/sites/${encodeURIComponent(r.site)}${r.rest === "/" ? "" : r.rest}`;
+  // Site files (verification files, ads.txt, .well-known/…) are served from the database.
+  const file = r.rest.slice(1);
+  const rest = isSiteFileName(file) ? `/files/${file}` : r.rest;
+  url.pathname = `/sites/${encodeURIComponent(r.site)}${rest === "/" ? "" : rest}`;
   url.search = search;
   const res = NextResponse.rewrite(url);
   if (isAdminPath(r.rest)) {
