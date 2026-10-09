@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ContentSchema, DeploySchema, ThemeSchema } from "../src/lib/schema.ts";
+import { checkStructuredData, structuredData } from "../src/lib/structured-data.ts";
 
 const dir = path.resolve(import.meta.dirname, "..", "tenants");
 const tenants = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith("_")).map((d) => d.name);
@@ -33,6 +34,10 @@ for (const slug of tenants) {
     for (const f of files) {
       const base = path.join(dir, slug, "assets", f);
       if (!fs.existsSync(base) && !fs.existsSync(`${base}.b64`) && !fs.existsSync(`${base}.b64.001`)) errors.push(`missing asset: assets/${f}`);
+    }
+    // Structured data (JSON-LD) the page will carry, with and without a main domain.
+    for (const canonical of ["https://example.com", null]) {
+      for (const p of checkStructuredData(structuredData(c, { canonical }))) errors.push(`structured data${canonical ? "" : " (preview)"}: ${p}`);
     }
   }
   if (errors.length) { failed = true; console.error(`✗ ${slug}\n  ${errors.join("\n  ")}`); }

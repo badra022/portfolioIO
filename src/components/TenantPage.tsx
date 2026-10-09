@@ -16,6 +16,7 @@ import { Services } from "./Services";
 import { Popup } from "./Popup";
 import { DevCredit } from "./DevCredit";
 import { Tracker } from "./Tracker";
+import { jsonLdScript, structuredData } from "@/lib/structured-data";
 import { LeadForms } from "./LeadForms";
 import { Footer, StickyBar } from "./Footer";
 
@@ -32,7 +33,7 @@ function hash(value: unknown): string {
 }
 
 /** The public teacher page. Content arrives with image URLs resolved and expired items (exams, pop-up) removed. */
-export function TenantPage({ c, base }: { c: Content; base: string }) {
+export function TenantPage({ c, base, canonical }: { c: Content; base: string; canonical: string | null }) {
   const chat = chatConfig(c);
   const render: Record<Content["sections"][number], () => React.ReactNode> = {
     hero: () => <Hero c={c} chat={chat} />,
@@ -72,6 +73,8 @@ export function TenantPage({ c, base }: { c: Content; base: string }) {
       <Footer c={c} />
       <DevCredit siteName={c.profile.fullTitle} />
       <StickyBar c={c} chat={chat} />
+      {/* Machine-readable description of the teacher, classes, exams, book and videos (lib/structured-data.ts). */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData(c, { canonical })) }} />
       <Tracker slug={c.slug} base={base} />
       {c.forms.length > 0 && <LeadForms forms={c.forms} slug={c.slug} base={base} />}
       {c.popup && <Popup data={c.popup} chat={chat} storageKey={`popup:${c.slug}:${hash(c.popup)}`} closeLabel="إغلاق" />}
