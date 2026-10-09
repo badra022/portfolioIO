@@ -108,3 +108,17 @@ export const quizAttempts = pgTable("quiz_attempts", {
   index("quiz_attempts_quiz_idx").on(t.tenantId, t.quizPath, t.startedAt),
   uniqueIndex("quiz_attempts_contact_idx").on(t.tenantId, t.quizPath, t.contact).where(sql`${t.contact} is not null`),
 ]);
+
+/**
+ * Small text files a teacher's site serves from its root (lib/site-files.ts):
+ * search-engine verification files, IndexNow keys, ads.txt, .well-known/…
+ * Managed by the super admin only.
+ */
+export const tenantFiles = pgTable("tenant_files", {
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  /** Path without the leading slash, e.g. "google123.html" or ".well-known/security.txt". */
+  name: text("name").notNull(),
+  content: text("content").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text("updated_by"),
+}, (t) => [primaryKey({ columns: [t.tenantId, t.name] })]);

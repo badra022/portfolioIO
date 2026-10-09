@@ -82,6 +82,10 @@ Attempts live in `quiz_attempts` (run `db/migrations/0004_quizzes.sql` once on a
 - **Share image**: without an uploaded one (SEO → share image), `/og.png` builds one from the teacher's photo, logo and colors (1200×630, no text). Its URL changes with every save, so WhatsApp/Facebook pick up changes.
 - **Sitemap** lists the home page and the quizzes switched to "show in Google", with the last-save date. **robots.txt** keeps `/admin`, `/api/` and `/upload` out of search. Quiz pages are hidden from Google unless switched on per quiz, and only ever indexed on the teacher's main domain.
 
+## Site files (Search Console verification and similar)
+
+Small text files a teacher's site serves from its root, managed by you only: console → teacher → **إدارة** → **ملفات الموقع** (Site files), or Claude's `manage_site_files` tool. Use it for Google Search Console's HTML-file verification (upload `google….html` exactly as downloaded, then press Verify), Bing's `BingSiteAuth.xml`, IndexNow keys, `ads.txt`, or `.well-known/…` files. Stored in the `tenant_files` table (run `db/migrations/0005_site_files.sql` once on an existing database), never in the repo; live within seconds on the teacher's domain(s) and preview address. Names: letters/digits/`._-` with `.html`, `.txt`, `.xml` or `.json`, or anything under `.well-known/`; up to 64 KB of text. `robots.txt`, `sitemap.xml`, `og.png` and `favicon.ico` are reserved. HTML files are served sandboxed (no scripts run on the teacher's domain).
+
 ## Analytics (built in, $0 extra)
 
 Each teacher sees **الإحصائيات** ("Analytics") in their `/admin`; you see every teacher (this month + all time) on the platform console, with a link to each teacher's dashboard.

@@ -1,7 +1,7 @@
 -- portfolioIO: one-time database setup for Supabase.
 -- Open Supabase > SQL Editor > New query, paste EVERYTHING in this file (the SQL text itself, not the file name), then click Run.
--- Safe to run once on an empty project. Generated from db/migrations/0000 to 0004.
--- Already set up earlier? Run only the db/migrations files added since (0002_analytics.sql, 0003_submissions.sql, 0004_quizzes.sql), in order.
+-- Safe to run once on an empty project. Generated from db/migrations/0000 to 0005.
+-- Already set up earlier? Run only the db/migrations files added since (0002_analytics.sql, 0003_submissions.sql, 0004_quizzes.sql, 0005_site_files.sql), in order.
 
 CREATE TABLE "admin_users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -109,3 +109,15 @@ CREATE TABLE "quiz_attempts" (
 );
 ALTER TABLE "quiz_attempts" ADD CONSTRAINT "quiz_attempts_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;CREATE INDEX "quiz_attempts_quiz_idx" ON "quiz_attempts" USING btree ("tenant_id","quiz_path","started_at");CREATE UNIQUE INDEX "quiz_attempts_contact_idx" ON "quiz_attempts" USING btree ("tenant_id","quiz_path","contact") WHERE "quiz_attempts"."contact" is not null;-- Same lock-down as 0001: only the app's own connection can read or write quiz attempts.
 ALTER TABLE "quiz_attempts" ENABLE ROW LEVEL SECURITY;REVOKE ALL ON "quiz_attempts" FROM anon, authenticated;
+
+-- Site files (0005): verification files etc. served from each teacher's site root.
+CREATE TABLE "tenant_files" (
+	"tenant_id" uuid NOT NULL,
+	"name" text NOT NULL,
+	"content" text NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_by" text,
+	CONSTRAINT "tenant_files_tenant_id_name_pk" PRIMARY KEY("tenant_id","name")
+);
+ALTER TABLE "tenant_files" ADD CONSTRAINT "tenant_files_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;-- Same lock-down as 0001: only the app's own connection can read or write site files.
+ALTER TABLE "tenant_files" ENABLE ROW LEVEL SECURITY;REVOKE ALL ON "tenant_files" FROM anon, authenticated;

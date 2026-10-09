@@ -18,6 +18,7 @@ import { makeUploadLink } from "../upload-link";
 import { RANGES, report } from "../analytics";
 import { STATUSES, listSubmissions, setStatus } from "../submissions";
 import { listAttempts, quizMetrics } from "../quiz-attempts";
+import { SiteFileError, deleteSiteFile, filesTag, listSiteFiles, putSiteFile } from "../site-files";
 import { applyOps, contentOutline, deepMerge, schemaFor, type Op } from "./content-ops";
 import { fetchImage } from "./fetch-image";
 
@@ -373,6 +374,39 @@ export function buildMcpServer(origin: string): McpServer {
     const u = await loginUrlFor(slug);
     return u.startsWith("/") ? `${origin}${u}` : u;
   };
+
+  server.registerTool("manage_site_files", {
+    title: "Site files (verification)",
+    description: "Small text files served at the root of the teacher's site: Google Search Console / Bing verification files (e.g. google123abc.html), IndexNow keys, ads.txt, .well-known/… list / put (add or replace) / delete. For Search Console's HTML-file method, put the file with exactly Google's name and content, then press Verify in Search Console.",
+    inputSchema: {
+      slug: slugArg,
+      action: z.enum(["list", "put", "delete"]),
+      name: z.string().optional().describe("File path without the leading slash, e.g. \"google8dd000c502756500.html\" or \".well-known/security.txt\"."),
+      content: z.string().optional().describe("Text content (for put), up to 64 KB."),
+    },
+    annotations: { destructiveHint: true },
+  }, safe(async ({ slug, action, name, content }) => {
+    const t = await repo.getTenant(slug);
+    if (!t) return fail(`No teacher "${slug}".`);
+    const site = t.domains.find((d) => d.isPrimary)?.domain ?? t.domains[0]?.domain;
+    const at = (n: string) => (site ? `https://${site}/${n}` : `${origin}/t/${slug}/${n}`);
+    if (action === "list") return ok((await listSiteFiles(slug)).map((f) => ({ ...f, url: at(f.name) })));
+    if (!name) return fail("name is required.");
+    try {
+      if (action === "put") {
+        if (content === undefined) return fail("content is required for put.");
+        const saved = await putSiteFile(slug, name, content, AUTHOR);
+        revalidateTag(filesTag(slug), { expire: 0 });
+        return ok({ saved, url: at(saved) });
+      }
+      await deleteSiteFile(slug, name.replace(/^\/+/, ""));
+      revalidateTag(filesTag(slug), { expire: 0 });
+      return ok({ deleted: name });
+    } catch (e) {
+      if (e instanceof SiteFileError) return fail(e.message);
+      throw e;
+    }
+  }));
 
   /* ----- form requests ----- */
 

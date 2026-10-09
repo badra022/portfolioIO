@@ -5,8 +5,9 @@ import { getTenant, listUsers } from "@/lib/server/repo";
 import { formatWhen } from "@/lib/admin/format";
 import {
   addDomainAction, createUserAction, deleteUserAction, primaryDomainAction, removeDomainAction,
-  resetPasswordAction, setStatusAction, setUserDisabledAction,
+  resetPasswordAction, setStatusAction, setUserDisabledAction, putSiteFilesAction, deleteSiteFileAction,
 } from "../../actions";
+import { listSiteFiles } from "@/lib/server/site-files";
 import { ActionForm } from "@/components/admin/ConsoleForms";
 
 export default async function ManageTenant({ params }: PageProps<"/sites/[site]/admin/tenants/[slug]">) {
@@ -14,9 +15,12 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
   const site = decodeURIComponent(raw);
   if (site !== "_platform") notFound();
   await requireSuper(site);
-  const [t, users] = await Promise.all([getTenant(slug), listUsers(slug)]);
+  const [t, users, files] = await Promise.all([getTenant(slug), listUsers(slug), listSiteFiles(slug)]);
   if (!t) notFound();
   const active = t.status === "active";
+  // Where the files are visible: the main domain, else the preview address on this host.
+  const primary = t.domains.find((d) => d.isPrimary)?.domain ?? t.domains[0]?.domain;
+  const siteBase = primary ? `https://${primary}` : null;
 
   return (
     <>
@@ -72,6 +76,37 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
         </ul>
         <ActionForm action={createUserAction.bind(null, t.slug)} submit="إنشاء حساب" className="a-form inline">
           <input name="username" dir="ltr" placeholder="mohamed" required pattern="[a-z0-9._\-]{3,32}" />
+        </ActionForm>
+      </section>
+
+      <section className="a-panel">
+        <h2>ملفات الموقع</h2>
+        <p className="a-sub">
+          ملفات نصية صغيرة بتظهر على جذر موقع المدرس: ملف التحقق من Google Search Console أو Bing، ads.txt، أو ملفات .well-known.
+          ارفع الملف زي ما نزل من جوجل، أو اكتب اسمه ومحتواه.
+        </p>
+        <ul className="a-list">
+          {files.map((f) => {
+            const where = siteBase ? `${siteBase}/${f.name}` : `/t/${t.slug}/${f.name}`;
+            return (
+              <li key={f.name}>
+                <a dir="ltr" href={where} target="_blank" rel="noopener"><code>/{f.name}</code></a>
+                <span className="a-sub">{f.size} بايت · {formatWhen(f.updatedAt)}</span>
+                <form action={deleteSiteFileAction.bind(null, t.slug, f.name)}><button className="f-link danger">حذف</button></form>
+              </li>
+            );
+          })}
+        </ul>
+        {files.length === 0 && <p className="a-sub">مفيش ملفات.</p>}
+        <ActionForm action={putSiteFilesAction.bind(null, t.slug)} submit="حفظ" className="a-form">
+          <input type="file" name="files" multiple accept=".html,.htm,.txt,.xml,.json,text/*" />
+          <details className="a-confirm">
+            <summary className="f-link">أو اكتب الاسم والمحتوى</summary>
+            <div className="a-form">
+              <input name="name" dir="ltr" placeholder="google1234567890abcdef.html" />
+              <textarea name="content" dir="ltr" rows={3} placeholder="google-site-verification: google1234567890abcdef.html" />
+            </div>
+          </details>
         </ActionForm>
       </section>
     </>

@@ -36,6 +36,13 @@
       "when": 1791477898896,
       "tag": "0004_quizzes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791566733075,
+      "tag": "0005_site_files",
+      "breakpoints": true
     }
   ]
 }
