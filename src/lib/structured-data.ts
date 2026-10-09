@@ -53,7 +53,6 @@ const intlPhone = (v: string) => {
   return /^01\d{9}$/.test(d) ? `+2${d}` : /^20\d{10}$/.test(d) ? `+${d}` : d;
 };
 
-const youtubeId = (v: string) => (/^[\w-]{11}$/.test(v) ? v : v.match(/(?:v=|youtu\.be\/|shorts\/|embed\/|live\/)([\w-]{11})/)?.[1] ?? null);
 
 export type StructuredDataOptions = {
   /** Absolute URL of the teacher's main address ("https://teacher.com"), or null on previews. */
@@ -62,10 +61,14 @@ export type StructuredDataOptions = {
 
 /**
  * The page's knowledge graph: the website and page, the teacher (Person) and
- * their classes (EducationalOrganization), each subject/grade as a Course with
- * its weekly groups, upcoming exams as EducationEvents, the book, and the
- * featured videos. Entities link to each other by @id.
+ * their classes (EducationalOrganization, with each subject/grade and its weekly
+ * groups in a catalog), upcoming exams as EducationEvents, and the book.
+ * Entities link to each other by @id. Only types whose Google requirements the
+ * content can meet are used, so Google's Rich Results Test shows no invalid items.
  */
+const isOnline = (mode: string | undefined) => /أونلاين|اونلاين|online/i.test(mode ?? "");
+const place = (name: string): Node => ({ "@type": "Place", name, address: { "@type": "PostalAddress", streetAddress: name, addressCountry: "EG" } });
+
 export function structuredData(c: Content, { canonical }: StructuredDataOptions): JsonLd {
   const root = canonical ? `${canonical}/` : "";
   const id = (frag: string) => `${root}#${frag}`;
@@ -127,47 +130,48 @@ export function structuredData(c: Content, { canonical }: StructuredDataOptions)
     telephone: phones,
     founder: { "@id": id("teacher") },
     areaServed: areas.map((a) => ({ "@type": "Place", name: a })),
-    location: defaultPlace ? { "@type": "Place", name: defaultPlace } : undefined,
+    location: defaultPlace ? place(defaultPlace) : undefined,
     sameAs,
   }));
 
-  // Courses: every subject/grade from the grades section and the schedule; the
-  // schedule's groups for that grade and subject become its weekly sessions.
+  // What the teacher teaches: every subject/grade from the grades section and the
+  // schedule, as a catalog of services on the organization, with each group's days,
+  // time and place. (Not schema.org Course: Google's course rich result requires a
+  // price, duration and number of sessions, which the site doesn't have, and flags
+  // a Course without them as invalid.)
   const courses = new Map<string, { grade: string; subject: string }>();
   for (const st of c.grades?.stages ?? []) for (const it of st.items) courses.set(`${it.name}|${it.subject}`, { grade: it.name, subject: it.subject });
   for (const s of c.schedule?.slots ?? []) courses.set(`${s.grade}|${s.subject}`, { grade: s.grade, subject: s.subject });
   let n = 0;
+  const catalog: Node[] = [];
   for (const [k, course] of courses) {
     n++;
     const groups = (c.schedule?.slots ?? []).filter((s) => `${s.grade}|${s.subject}` === k);
-    graph.push(clean({
-      "@type": "Course",
-      "@id": id(`course-${n}`),
-      name: `${course.subject} — ${course.grade}`,
-      description: `${course.subject} ${course.grade} مع ${p.fullTitle}`,
-      educationalLevel: course.grade,
-      about: course.subject,
-      inLanguage: lang,
-      provider: { "@id": id("organization") },
-      instructor: { "@id": id("teacher") },
-      hasCourseInstance: groups.map((g) => {
-        const place = g.center?.trim() || defaultPlace;
-        const online = /أونلاين|اونلاين|online/i.test(g.mode ?? "");
-        return clean({
-          "@type": "CourseInstance",
-          courseMode: online ? "Online" : "Onsite",
-          location: online ? undefined : clean({ "@type": "Place", name: [g.area?.trim(), place].filter(Boolean).join(" - ") || undefined }),
-          instructor: { "@id": id("teacher") },
-          courseSchedule: g.days.length ? clean({
-            "@type": "Schedule",
-            repeatFrequency: "P1W",
-            byDay: g.days.map((d) => `https://schema.org/${DAY[d]}`),
-            startTime: g.time ?? undefined,
-            scheduleTimezone: "Africa/Cairo",
-          }) : undefined,
-        });
+    const online = groups.length > 0 && groups.every((g) => isOnline(g.mode));
+    const places = [...new Set(groups.filter((g) => !isOnline(g.mode)).map((g) => [g.area?.trim(), g.center?.trim() || defaultPlace].filter(Boolean).join(" - ")).filter(Boolean))];
+    catalog.push({
+      "@type": "Offer",
+      itemOffered: clean({
+        "@type": "Service",
+        "@id": id(`class-${n}`),
+        name: `${course.subject} — ${course.grade}`,
+        serviceType: course.subject,
+        description: `${course.subject} ${course.grade} مع ${p.fullTitle}`,
+        audience: { "@type": "EducationalAudience", educationalRole: "student", educationalLevel: course.grade },
+        provider: { "@id": id("organization") },
+        availableChannel: online ? { "@type": "ServiceChannel", name: "Online" } : undefined,
+        areaServed: places.map((name) => ({ "@type": "Place", name })),
+        hoursAvailable: groups.filter((g) => g.days.length && g.time).map((g) => ({
+          "@type": "OpeningHoursSpecification",
+          dayOfWeek: g.days.map((d) => `https://schema.org/${DAY[d]}`),
+          opens: `${g.time}:00`,
+        })),
       }),
-    }));
+    });
+  }
+  if (catalog.length) {
+    const org = graph.find((x) => x["@type"] === "EducationalOrganization")!;
+    org.hasOfferCatalog = { "@type": "OfferCatalog", name: `${p.fullTitle} — المواد والصفوف`, itemListElement: catalog };
   }
 
   // Exams still shown on the page (past ones are already removed before rendering).
@@ -181,7 +185,9 @@ export function structuredData(c: Content, { canonical }: StructuredDataOptions)
       startDate: eventDate(e.date),
       eventStatus: "https://schema.org/EventScheduled",
       eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-      location: { "@type": "Place", name: e.place?.trim() || defaultPlace || p.fullTitle },
+      // Google requires an address on an event's place; the place text is all there is.
+      location: place(e.place?.trim() || defaultPlace || p.fullTitle),
+      image: img(p.photo),
       organizer: { "@id": id("organization") },
       performer: { "@id": id("teacher") },
       inLanguage: lang,
@@ -202,21 +208,9 @@ export function structuredData(c: Content, { canonical }: StructuredDataOptions)
     }));
   }
 
-  for (const v of c.youtube?.videos ?? []) {
-    const vid = youtubeId(v.id);
-    if (!vid) continue;
-    graph.push(clean({
-      "@type": "VideoObject",
-      "@id": id(`video-${vid}`),
-      name: v.title,
-      description: v.caption || v.title,
-      thumbnailUrl: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
-      embedUrl: `https://www.youtube-nocookie.com/embed/${vid}`,
-      contentUrl: `https://www.youtube.com/watch?v=${vid}`,
-      inLanguage: lang,
-      creator: { "@id": id("teacher") },
-    }));
-  }
+  // Featured YouTube videos are not described: Google requires an upload date on a
+  // VideoObject (and marks it invalid without one), and the site doesn't store it.
+  // The channel is linked from the teacher and organization (sameAs).
 
   return { "@context": "https://schema.org", "@graph": graph };
 }
@@ -231,11 +225,11 @@ const REQUIRED: Record<string, string[]> = {
   WebPage: ["name"],
   Person: ["name"],
   EducationalOrganization: ["name"],
-  Course: ["name", "description", "provider"],
-  CourseInstance: ["courseMode"],
+  Service: ["name", "provider"],
+  Offer: [],
   EducationEvent: ["name", "startDate", "location"],
+  Place: ["name"],
   Book: ["name", "author"],
-  VideoObject: ["name", "description", "thumbnailUrl"],
 };
 
 /** Problems in a graph (empty = fine). Used by scripts/validate.ts in CI. */
@@ -256,6 +250,7 @@ export function checkStructuredData(data: JsonLd): string[] {
     const type = o["@type"] as string | undefined;
     if (type) {
       for (const k of REQUIRED[type] ?? []) if (o[k] === undefined || o[k] === "") problems.push(`${where} (${type}): missing ${k}`);
+      if (type === "EducationEvent" && !(o.location as Node | undefined)?.address) problems.push(`${where}: event place has no address (Google requires one)`);
       if (type === "EducationEvent" && typeof o.startDate === "string" && Number.isNaN(Date.parse(o.startDate))) problems.push(`${where}: bad startDate ${o.startDate}`);
     }
     if (typeof o["@id"] === "string") {
