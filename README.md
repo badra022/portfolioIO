@@ -76,6 +76,12 @@ Timed quizzes on their own page, e.g. `teacher.com/exam-oct`, managed from `/adm
 
 Attempts live in `quiz_attempts` (run `db/migrations/0004_quizzes.sql` once on an existing database). Claude can create and edit quizzes through the connector and read results with `quiz_results`. Don't reorder questions after students start: answers are stored by question number.
 
+## Images and search basics
+
+- **Every upload is compressed** (admin panel, photo upload links, Claude): `sharp` turns it upright, scales it to at most 1600px (tall screenshots 2600px), re-encodes it as WebP (quality 80) and drops all metadata, including phone GPS locations. Phone photos are first scaled down in the browser (canvas, no library) so they fit the ~4 MB request limit; from a link (Claude) up to 20 MB is accepted. Images uploaded before this change are left as they were.
+- **Share image**: without an uploaded one (SEO → share image), `/og.png` builds one from the teacher's photo, logo and colors (1200×630, no text). Its URL changes with every save, so WhatsApp/Facebook pick up changes.
+- **Sitemap** lists the home page and the quizzes switched to "show in Google", with the last-save date. **robots.txt** keeps `/admin`, `/api/` and `/upload` out of search. Quiz pages are hidden from Google unless switched on per quiz, and only ever indexed on the teacher's main domain.
+
 ## Analytics (built in, $0 extra)
 
 Each teacher sees **الإحصائيات** ("Analytics") in their `/admin`; you see every teacher (this month + all time) on the platform console, with a link to each teacher's dashboard.
@@ -219,7 +225,7 @@ npm run typecheck
 | 6 | **Admin and public site share one origin** | Any script injection on a teacher page can act as the logged-in admin | Serve the console only on `admin.<your-domain>` (`PLATFORM_HOSTS`); add a CSP and `frame-ancestors 'none'` |
 | 7 | **No security headers** (CSP, X-Frame-Options, Referrer-Policy, Permissions-Policy) | Clickjacking of `/admin`, weaker defense-in-depth | `headers()` in `next.config.ts`; strict CSP for `/admin` |
 | 8 | **Powerful secrets** (`SUPABASE_SECRET_KEY`, `DATABASE_URL` as the table owner) | A leak exposes and allows changing every teacher's data | Mark them Sensitive in Vercel; use a least-privilege Postgres role for the app (no DDL); rotate keys; never prefix with `NEXT_PUBLIC_` |
-| 9 | **Uploaded images are public and not re-encoded** | EXIF metadata (e.g. GPS from phone photos) is published; crafted files are stored as-is; no storage quota | Re-encode/strip metadata with `sharp`, per-teacher quotas, delete images no revision uses |
+| 9 | **Uploaded images are public**, no storage quota | Anyone with a link can view them; storage only grows (images are now re-encoded with `sharp` and stripped of metadata, see "Images") | Per-teacher quotas, delete images no revision uses |
 | 10 | **Tenant isolation lives in app code** | A future bug in a query could leak across teachers | Keep the end-to-end isolation tests; add per-tenant RLS policies with the tenant id set per request |
 | 11 | **Domains are added to Vercel by hand** | A domain removed from one side and not the other can be left dangling | Automate with the Vercel Domains API and check DNS ownership |
 | 12 | **No backups on Supabase Free**, no monitoring | Data loss; problems go unnoticed | Supabase Pro (daily backups), scheduled `pg_dump`, Vercel log drains/alerts |

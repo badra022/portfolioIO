@@ -269,7 +269,7 @@ export function buildMcpServer(origin: string): McpServer {
 
   server.registerTool("upload_image", {
     title: "Upload an image",
-    description: "Stores an image in the teacher's folder from a public link (https; Google Drive/Dropbox share links are converted) or base64 data. JPG, PNG, WEBP, GIF or AVIF, up to 4 MB. Returns the key to put in image fields.",
+    description: "Stores an image in the teacher's folder from a public link (https; Google Drive/Dropbox share links are converted) or base64 data. JPG, PNG, WEBP, GIF or AVIF, up to 20 MB; stored compressed as WebP (scaled to 1600px, metadata removed). Returns the key to put in image fields.",
     inputSchema: {
       slug: slugArg,
       source_url: z.string().url().optional(),
@@ -288,7 +288,7 @@ export function buildMcpServer(origin: string): McpServer {
       const stored = await storeImage(slug, bytes, undefined, name);
       return ok({ ...stored, url: abs(stored.url) });
     } catch (e) {
-      if (e instanceof ImageError) return fail(`Not an accepted image (JPG, PNG, WEBP, GIF, AVIF up to 4 MB). ${source_url ? "If this is a share page rather than the image itself, ask for a direct link or use create_upload_link." : ""}`);
+      if (e instanceof ImageError) return fail(`Not an accepted image (JPG, PNG, WEBP, GIF, AVIF up to 20 MB). ${source_url ? "If this is a share page rather than the image itself, ask for a direct link or use create_upload_link." : ""}`);
       throw e;
     }
   }));

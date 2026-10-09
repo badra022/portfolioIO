@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { env } from "@/lib/env";
 import { assetUrl } from "./assets";
 import { putObject } from "./storage";
+import { optimizeImage, type Optimized } from "./images";
 import * as repo from "./repo";
 
 /**
@@ -37,7 +38,8 @@ export const IMAGE_TYPES: Record<string, { ext: string; magic: (b: Uint8Array) =
   "image/gif": { ext: "gif", magic: (b) => String.fromCharCode(...b.slice(0, 4)) === "GIF8" },
   "image/avif": { ext: "avif", magic: (b) => String.fromCharCode(...b.slice(4, 8)) === "ftyp" },
 };
-export const MAX_UPLOAD = 4 * 1024 * 1024;
+/** Largest original accepted. Images are compressed before storing (lib/server/images.ts), so the stored file is far smaller. */
+export const MAX_INPUT = 20 * 1024 * 1024;
 
 /** The image type of some bytes, by their first bytes (the declared type is not trusted). */
 export function sniffImage(bytes: Uint8Array): string | null {
@@ -47,17 +49,20 @@ export function sniffImage(bytes: Uint8Array): string | null {
 export class ImageError extends Error {}
 
 /**
- * Validates and stores an image in the teacher's folder. Returns the key to put
- * in an image field (and its public URL). Messages are Arabic for the admin panel.
+ * Validates, compresses (WebP, scaled down, metadata stripped) and stores an image
+ * in the teacher's folder. Returns the key to put in an image field (and its
+ * public URL). Messages are Arabic for the admin panel.
  */
 export async function storeImage(slug: string, bytes: Uint8Array, declaredType?: string, name?: string): Promise<{ key: string; url: string }> {
   if (declaredType && !IMAGE_TYPES[declaredType]) throw new ImageError("الصيغ المسموحة: JPG, PNG, WEBP, GIF, AVIF.");
-  if (bytes.byteLength > MAX_UPLOAD) throw new ImageError("الحد الأقصى لحجم الصورة 4 ميجابايت.");
+  if (bytes.byteLength > MAX_INPUT) throw new ImageError("الحد الأقصى لحجم الصورة 20 ميجابايت.");
   const type = sniffImage(bytes);
   if (!type || (declaredType && declaredType !== type)) throw new ImageError("الملف ليس صورة صالحة.");
   // The original file name (made safe) stays in the key, so a list of uploads is readable.
   const label = (name ?? "").replace(/\.[a-z0-9]+$/i, "").normalize("NFKD").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase().slice(0, 40);
-  const key = `uploads/${Date.now().toString(36)}-${randomBytes(3).toString("hex")}${label ? `-${label}` : ""}.${IMAGE_TYPES[type].ext}`;
-  await putObject(slug, key, bytes, type);
+  let out: Optimized;
+  try { out = await optimizeImage(bytes); } catch { throw new ImageError("الملف ليس صورة صالحة."); }
+  const key = `uploads/${Date.now().toString(36)}-${randomBytes(3).toString("hex")}${label ? `-${label}` : ""}.webp`;
+  await putObject(slug, key, out.bytes, out.type);
   return { key, url: assetUrl(slug, key) };
 }

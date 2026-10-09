@@ -24,6 +24,10 @@ export type SiteData =
       indexable: boolean;
       /** Prefix for links inside the site ("" or "/t/<slug>"). */
       base: string;
+      /** Last save (ISO), for sitemaps. */
+      updatedAt: string | null;
+      /** Changes with every save; added to generated URLs (share image) so caches refresh. */
+      version: number;
     };
 
 /** Resolves a site key (from routing.ts) to the slug it serves, or null. */
@@ -65,5 +69,7 @@ export async function getSiteData(site: string): Promise<SiteData> {
     canonical: canonicalHost ? `https://${canonicalHost}` : null,
     indexable: Boolean(canonicalHost && servedHost === canonicalHost),
     base: baseForSite(site),
+    updatedAt: t.updatedAt,
+    version: t.version,
   };
 }
