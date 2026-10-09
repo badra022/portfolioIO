@@ -1,7 +1,7 @@
 import "server-only";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { MAX_UPLOAD } from "../admin-ops";
+import { MAX_INPUT } from "../admin-ops";
 
 /**
  * Downloads an image from a public link for the MCP server. The server must never
@@ -50,7 +50,7 @@ export async function fetchImage(raw: string): Promise<Uint8Array> {
       continue;
     }
     if (!res.ok || !res.body) throw new Error(`Download failed (HTTP ${res.status}).`);
-    if (Number(res.headers.get("content-length") ?? 0) > MAX_UPLOAD) throw new Error("Image is larger than 4 MB.");
+    if (Number(res.headers.get("content-length") ?? 0) > MAX_INPUT) throw new Error("Image is larger than 20 MB.");
     const reader = res.body.getReader();
     const chunks: Uint8Array[] = [];
     let size = 0;
@@ -58,7 +58,7 @@ export async function fetchImage(raw: string): Promise<Uint8Array> {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > MAX_UPLOAD) { await reader.cancel(); throw new Error("Image is larger than 4 MB."); }
+      if (size > MAX_INPUT) { await reader.cancel(); throw new Error("Image is larger than 20 MB."); }
       chunks.push(value);
     }
     const out = new Uint8Array(size);

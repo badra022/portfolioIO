@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { shrinkForUpload } from "@/lib/shrink-image";
 
 type Result = { name: string; key?: string; url?: string; error?: string };
 
@@ -18,7 +19,7 @@ export function Uploader({ slug, exp, sig }: { slug: string; exp: string; sig: s
       for (const f of files) {
         const form = new FormData();
         form.set("t", slug); form.set("e", exp); form.set("s", sig);
-        form.append("file", f);
+        form.append("file", await shrinkForUpload(f));
         const res = await fetch("/api/upload", { method: "POST", body: form });
         const data = await res.json().catch(() => ({ error: "خطأ غير متوقع." }));
         if (!res.ok) { setError(data.error ?? "تعذّر الرفع."); break; }
@@ -39,7 +40,7 @@ export function Uploader({ slug, exp, sig }: { slug: string; exp: string; sig: s
         <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple disabled={busy}
           onChange={(e) => { send(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
         <strong>{busy ? "جاري الرفع…" : "اختار صور أو اسحبها هنا"}</strong>
-        <span className="a-sub">JPG, PNG, WEBP · حتى 4 ميجا للصورة</span>
+        <span className="a-sub">JPG, PNG, WEBP · صور الموبايل الكبيرة بتتصغّر تلقائياً</span>
       </label>
       {error && <div className="a-result bad"><p>{error}</p></div>}
       {results.length > 0 && (

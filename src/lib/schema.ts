@@ -374,6 +374,8 @@ export const Quiz = z.object({
   startLabel: z.string().default("ابدأ الاختبار"),
   submitLabel: z.string().default("سلّم الإجابات"),
   doneMessage: z.string().default("تم تسليم إجاباتك. بالتوفيق!"),
+  /** Let Google list the quiz page (it's in the sitemap). Off: only people with the link find it. */
+  indexable: z.boolean().default(false),
   questions: z.array(QuizQuestion).default([]),
 });
 

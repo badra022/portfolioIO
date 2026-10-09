@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { defaultFor, isComplex, kindOf, unwrap, type JS } from "@/lib/admin/schema-tools";
 import { enumLabel, hintFor, labelFor, sectionEnumLabel } from "@/lib/admin/labels";
+import { shrinkForUpload } from "@/lib/shrink-image";
 
 export type UploadResult = { ok: true; key: string; url: string } | { ok: false; error: string };
 export type FormCtx = {
@@ -382,9 +383,10 @@ function ImageInput({ value, onChange, required, ctx }: { value: string | undefi
               const f = e.target.files?.[0];
               e.target.value = "";
               if (!f) return;
-              if (f.size > 4 * 1024 * 1024) { setError("الحد الأقصى لحجم الصورة 4 ميجابايت."); return; }
               setBusy(true);
-              const r = await ctx.upload(f).catch(() => ({ ok: false as const, error: "تعذّر رفع الصورة." }));
+              const small = await shrinkForUpload(f);
+              if (small.size > 4 * 1024 * 1024) { setBusy(false); setError("الصورة كبيرة جداً. جرّب صورة تانية."); return; }
+              const r = await ctx.upload(small).catch(() => ({ ok: false as const, error: "تعذّر رفع الصورة." }));
               setBusy(false);
               if (r.ok) { setError(""); onChange(r.key); } else setError(r.error);
             }} />

@@ -9,7 +9,8 @@ export async function generateMetadata({ params }: PageProps<"/sites/[site]">): 
   const data = await getSiteData(decodeURIComponent((await params).site));
   if (data.kind !== "tenant") return { title: "portfolioIO", robots: { index: false, follow: false } };
   const { content: c, canonical, indexable } = data;
-  const og = c.seo.ogImage;
+  // Uploaded share image, else one generated from the teacher's photo and colors (og.png).
+  const og = c.seo.ogImage ?? `${canonical ?? ""}${data.base}/og.png?v=${data.version}`;
   return {
     metadataBase: canonical ? new URL(canonical) : undefined,
     alternates: canonical ? { canonical: `${canonical}/` } : undefined,
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: PageProps<"/sites/[site]">): 
       type: "website",
       url: canonical ? `${canonical}/` : undefined,
       locale: c.locale.replace("-", "_"),
-      images: og ? [{ url: og, width: 600, height: 315 }] : undefined,
+      images: c.seo.ogImage ? [{ url: og, width: 600, height: 315 }] : [{ url: og, width: 1200, height: 630 }],
     },
     twitter: { card: "summary_large_image", title: c.seo.title, description: c.seo.description, images: og ? [og] : undefined },
     icons: c.profile.avatar ? { icon: c.profile.avatar } : undefined,

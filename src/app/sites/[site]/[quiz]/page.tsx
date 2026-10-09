@@ -17,7 +17,17 @@ async function load(params: Props["params"]) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const r = await load(params);
   if (!r) return { robots: { index: false, follow: false } };
-  return { title: `${r.quiz.title} | ${r.data.content.profile.fullTitle}`, description: r.quiz.intro, robots: { index: false, follow: false } };
+  const { data, quiz } = r;
+  // Indexed only when the teacher switched it on, and only on the main address (like the home page).
+  const index = quiz.indexable && data.indexable;
+  const url = data.canonical ? `${data.canonical}/${quiz.path}` : undefined;
+  return {
+    title: `${quiz.title} | ${data.content.profile.fullTitle}`,
+    description: quiz.intro,
+    robots: index ? { index: true, follow: true } : { index: false, follow: true },
+    alternates: url ? { canonical: url } : undefined,
+    openGraph: { title: quiz.title, description: quiz.intro, url, type: "website", images: quiz.image ? [quiz.image] : undefined },
+  };
 }
 
 /** A teacher's quiz on its own page: teacher.com/<path> (lib/schema.ts Quiz). */
