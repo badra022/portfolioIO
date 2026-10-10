@@ -1,4 +1,5 @@
 import "server-only";
+import type { SiteEnv } from "@/lib/environments";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
@@ -62,11 +63,11 @@ export function checkAnswers(form: LeadFormT, values: Record<string, string>): {
  * Stores a submission. The same student sending the same thing again within ten
  * minutes (double tap, retry) is stored once.
  */
-export async function saveSubmission(tenantId: string, s: { formId: string; source: string; place: string; fields: Record<string, string>; context: Record<string, string> }): Promise<void> {
+export async function saveSubmission(tenantId: string, s: { formId: string; source: string; place: string; fields: Record<string, string>; context: Record<string, string>; env: SiteEnv }): Promise<void> {
   const d = db();
   const recent = await d.select({ fields: submissions.fields, context: submissions.context, source: submissions.source })
     .from(submissions)
-    .where(and(eq(submissions.tenantId, tenantId), eq(submissions.formId, s.formId), gte(submissions.createdAt, new Date(Date.now() - 10 * 60_000))))
+    .where(and(eq(submissions.tenantId, tenantId), eq(submissions.env, s.env), eq(submissions.formId, s.formId), gte(submissions.createdAt, new Date(Date.now() - 10 * 60_000))))
     .limit(50);
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   if (recent.some((r) => r.source === s.source && same(r.fields, s.fields) && same(r.context, s.context))) return;
@@ -83,7 +84,7 @@ export type SubmissionRow = {
   status: StatusT; createdAt: string;
 };
 
-export type Filter = { form?: string; status?: StatusT; q?: string; limit?: number; offset?: number };
+export type Filter = { env?: SiteEnv; form?: string; status?: StatusT; q?: string; limit?: number; offset?: number };
 
 async function tenantIdOf(slug: string): Promise<string | null> {
   return (await db().select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1))[0]?.id ?? null;
@@ -92,6 +93,7 @@ async function tenantIdOf(slug: string): Promise<string | null> {
 function where(tenantId: string, f: Filter) {
   return and(
     eq(submissions.tenantId, tenantId),
+    eq(submissions.env, f.env ?? "production"),
     f.form ? eq(submissions.formId, f.form) : undefined,
     f.status ? eq(submissions.status, f.status) : undefined,
     // Search phone/name/answers: the JSON text of fields and context.
@@ -124,11 +126,11 @@ export async function listSubmissions(slug: string, f: Filter = {}): Promise<{ r
 }
 
 /** New (unhandled) submissions, for the badge on the admin home. */
-export async function countNew(slug: string): Promise<number> {
+export async function countNew(slug: string, env: SiteEnv = "production"): Promise<number> {
   if (!hasDb()) return 0;
   const id = await tenantIdOf(slug);
   if (!id) return 0;
-  return (await db().select({ n: sql<number>`count(*)::int` }).from(submissions).where(and(eq(submissions.tenantId, id), eq(submissions.status, "new"))))[0]?.n ?? 0;
+  return (await db().select({ n: sql<number>`count(*)::int` }).from(submissions).where(and(eq(submissions.tenantId, id), eq(submissions.env, env), eq(submissions.status, "new"))))[0]?.n ?? 0;
 }
 
 export async function setStatus(slug: string, ids: number[], status: StatusT): Promise<void> {

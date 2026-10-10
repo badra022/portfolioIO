@@ -4,7 +4,8 @@ import { hasDb } from "@/lib/env";
 import { baseForSite } from "@/lib/routing";
 import { requireAdmin } from "@/lib/server/auth";
 import { slugForSite } from "@/lib/server/site";
-import { getTenant } from "@/lib/server/repo";
+import { copyFor, getTenant } from "@/lib/server/repo";
+import { adminEnv } from "@/lib/server/admin-env";
 import { listSubmissions, STATUSES, type StatusT } from "@/lib/server/submissions";
 import { formatWhen } from "@/lib/admin/format";
 import { PLACE } from "@/lib/admin/places";
@@ -34,8 +35,9 @@ export default async function Requests({ params, searchParams }: PageProps<"/sit
   const form = one(q.form) || undefined;
   const search = one(q.q).trim().slice(0, 60) || undefined;
   const page = Math.max(1, Number(one(q.page)) || 1);
-  const { rows, total, counts } = await listSubmissions(slug, { form, status, q: search, limit: PAGE, offset: (page - 1) * PAGE });
-  const forms = t.content.forms;
+  const env = await adminEnv();
+  const { rows, total, counts } = await listSubmissions(slug, { env, form, status, q: search, limit: PAGE, offset: (page - 1) * PAGE });
+  const forms = copyFor(t, env).content.forms;
   const formOf = new Map(forms.map((f) => [f.id, f]));
   const base = baseForSite(site);
   const qs = (patch: Record<string, string | undefined>) => {

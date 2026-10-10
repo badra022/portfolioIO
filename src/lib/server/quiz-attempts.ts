@@ -1,4 +1,5 @@
 import "server-only";
+import type { SiteEnv } from "@/lib/environments";
 import { randomBytes } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
@@ -68,7 +69,7 @@ export type StartResult =
  * form, the same number gets its existing attempt back (continue, or "already
  * submitted") instead of a new one, on any device.
  */
-export async function startAttempt(tenantId: string, quiz: QuizT, form: LeadFormT | undefined, values: Record<string, string>): Promise<StartResult> {
+export async function startAttempt(tenantId: string, env: SiteEnv, quiz: QuizT, form: LeadFormT | undefined, values: Record<string, string>): Promise<StartResult> {
   let fields: Record<string, string> = {};
   if (form) {
     const checked = checkAnswers(form, values);
@@ -80,7 +81,7 @@ export async function startAttempt(tenantId: string, quiz: QuizT, form: LeadForm
   const d = db();
   if (contact) {
     const existing = (await d.select().from(quizAttempts)
-      .where(and(eq(quizAttempts.tenantId, tenantId), eq(quizAttempts.quizPath, quiz.path), eq(quizAttempts.contact, contact))).limit(1))[0];
+      .where(and(eq(quizAttempts.tenantId, tenantId), eq(quizAttempts.env, env), eq(quizAttempts.quizPath, quiz.path), eq(quizAttempts.contact, contact))).limit(1))[0];
     if (existing) {
       const r = existing.status === "in_progress" && expired(existing, quiz) ? await finishTimedOut(existing) : existing;
       return { ok: true, attempt: stateOf(r), resumed: true };
@@ -91,11 +92,11 @@ export async function startAttempt(tenantId: string, quiz: QuizT, form: LeadForm
   const now = Date.now();
   const deadline = attemptDeadline(quiz, now);
   const [row] = await d.insert(quizAttempts).values({
-    tenantId, quizPath: quiz.path, token: randomBytes(24).toString("base64url"), contact,
+    tenantId, env, quizPath: quiz.path, token: randomBytes(24).toString("base64url"), contact,
     fields, answers: {}, questions: publicQuestions(quiz),
     startedAt: new Date(now), deadlineAt: deadline === null ? null : new Date(deadline),
   }).onConflictDoNothing().returning();
-  if (!row) return startAttempt(tenantId, quiz, form, values); // the same number started at the same moment: resume it
+  if (!row) return startAttempt(tenantId, env, quiz, form, values); // the same number started at the same moment: resume it
   return { ok: true, attempt: stateOf(row), resumed: false };
 }
 
@@ -163,13 +164,13 @@ async function closeExpired(tenantId: string, quiz: QuizT): Promise<void> {
     .where(and(base, isNotNull(quizAttempts.deadlineAt), lt(quizAttempts.deadlineAt, new Date(Date.now() - GRACE_MS))));
 }
 
-export async function listAttempts(slug: string, quiz: QuizT): Promise<AttemptRow[]> {
+export async function listAttempts(slug: string, quiz: QuizT, env: SiteEnv = "production"): Promise<AttemptRow[]> {
   if (!hasDb()) return [];
   const id = await tenantIdOf(slug);
   if (!id) return [];
   await closeExpired(id, quiz);
   const rows = await db().select().from(quizAttempts)
-    .where(and(eq(quizAttempts.tenantId, id), eq(quizAttempts.quizPath, quiz.path)))
+    .where(and(eq(quizAttempts.tenantId, id), eq(quizAttempts.env, env), eq(quizAttempts.quizPath, quiz.path)))
     .orderBy(desc(quizAttempts.startedAt)).limit(5000);
   return rows.map((r) => ({
     id: r.id,
@@ -185,7 +186,7 @@ export async function listAttempts(slug: string, quiz: QuizT): Promise<AttemptRo
 }
 
 /** Attempt counts per quiz path, for the admin overview. */
-export async function attemptCounts(slug: string): Promise<Record<string, { total: number; finished: number }>> {
+export async function attemptCounts(slug: string, env: SiteEnv = "production"): Promise<Record<string, { total: number; finished: number }>> {
   if (!hasDb()) return {};
   const id = await tenantIdOf(slug);
   if (!id) return {};
@@ -193,7 +194,7 @@ export async function attemptCounts(slug: string): Promise<Record<string, { tota
     path: quizAttempts.quizPath,
     total: sql<number>`count(*)::int`,
     finished: sql<number>`count(*) filter (where ${quizAttempts.status} <> 'in_progress')::int`,
-  }).from(quizAttempts).where(eq(quizAttempts.tenantId, id)).groupBy(quizAttempts.quizPath);
+  }).from(quizAttempts).where(and(eq(quizAttempts.tenantId, id), eq(quizAttempts.env, env))).groupBy(quizAttempts.quizPath);
   return Object.fromEntries(rows.map((r) => [r.path, { total: r.total, finished: r.finished }]));
 }
 

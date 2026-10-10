@@ -1,4 +1,5 @@
 import "server-only";
+import type { SiteEnv } from "@/lib/environments";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
@@ -62,16 +63,16 @@ export function toCounters(body: unknown): Map<string, number> {
   return out;
 }
 
-/** Adds the counters to today's row for the teacher (Cairo day), all in one statement. */
-export async function record(tenantId: string, counters: Map<string, number>, at = new Date()): Promise<void> {
+/** Adds the counters to today's row for the teacher (Cairo day) and environment, all in one statement. */
+export async function record(tenantId: string, counters: Map<string, number>, env: SiteEnv = "production", at = new Date()): Promise<void> {
   if (!counters.size) return;
   const day = cairoDay(at);
   const rows = [...counters].map(([k, value]) => {
     const [metric, key] = k.split("\u0000");
-    return { tenantId, day, metric, key, value };
+    return { tenantId, env, day, metric, key, value };
   });
   await db().insert(analyticsDaily).values(rows).onConflictDoUpdate({
-    target: [analyticsDaily.tenantId, analyticsDaily.day, analyticsDaily.metric, analyticsDaily.key],
+    target: [analyticsDaily.tenantId, analyticsDaily.env, analyticsDaily.day, analyticsDaily.metric, analyticsDaily.key],
     set: { value: sql`${analyticsDaily.value} + excluded.value` },
   });
 }
@@ -113,11 +114,11 @@ export function rangeOf(range: RangeT, now = new Date()): { from: string | null;
 
 export type Totals = Map<string, Map<string, number>>;
 
-async function sums(tenantId: string, from: string | null, to: string): Promise<Totals> {
+async function sums(tenantId: string, env: SiteEnv, from: string | null, to: string): Promise<Totals> {
   const rows = await db()
     .select({ metric: analyticsDaily.metric, key: analyticsDaily.key, value: sql<number>`sum(${analyticsDaily.value})::bigint` })
     .from(analyticsDaily)
-    .where(and(eq(analyticsDaily.tenantId, tenantId), from ? gte(analyticsDaily.day, from) : undefined, lte(analyticsDaily.day, to)))
+    .where(and(eq(analyticsDaily.tenantId, tenantId), eq(analyticsDaily.env, env), from ? gte(analyticsDaily.day, from) : undefined, lte(analyticsDaily.day, to)))
     .groupBy(analyticsDaily.metric, analyticsDaily.key);
   const out: Totals = new Map();
   for (const r of rows) {
@@ -147,12 +148,12 @@ const sorted = (m: Map<string, number> | undefined) =>
   [...(m ?? new Map<string, number>())].map(([key, value]) => ({ key, value })).filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
 
 /** Everything the dashboard shows for one teacher. Null when there is no database. */
-export async function report(slug: string, range: RangeT, now = new Date()): Promise<Report | null> {
+export async function report(slug: string, range: RangeT, env: SiteEnv = "production", now = new Date()): Promise<Report | null> {
   if (!hasDb()) return null;
   const row = (await db().select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1))[0];
   if (!row) return null;
   const { from, to, period } = rangeOf(range, now);
-  const [t, daily] = await Promise.all([sums(row.id, from, to), dailySeries(row.id, now)]);
+  const [t, daily] = await Promise.all([sums(row.id, env, from, to), dailySeries(row.id, env, now)]);
   const one = (metric: string, key = "") => t.get(metric)?.get(key) ?? 0;
   const n = one("dwell_n");
   return {
@@ -174,7 +175,7 @@ export async function report(slug: string, range: RangeT, now = new Date()): Pro
 }
 
 /** The last 30 days, one entry per day (zeros included) for the chart. */
-async function dailySeries(tenantId: string, now: Date): Promise<Report["daily"]> {
+async function dailySeries(tenantId: string, env: SiteEnv, now: Date): Promise<Report["daily"]> {
   const days: string[] = [];
   for (let i = 29; i >= 0; i--) days.push(cairoDay(new Date(now.getTime() - i * 86_400_000)));
   const rows = await db()
@@ -182,6 +183,7 @@ async function dailySeries(tenantId: string, now: Date): Promise<Report["daily"]
     .from(analyticsDaily)
     .where(and(
       eq(analyticsDaily.tenantId, tenantId),
+      eq(analyticsDaily.env, env),
       gte(analyticsDaily.day, days[0]),
       inArray(analyticsDaily.metric, ["views", "visitors", "converted"]),
       inArray(analyticsDaily.key, ["", "d", "contact:d"]),
@@ -213,7 +215,8 @@ export async function overview(now = new Date()): Promise<Overview[]> {
       allTimeVisitors: sql<number>`coalesce(sum(${analyticsDaily.value}) filter (where ${analyticsDaily.metric} = 'visitors' and ${analyticsDaily.key} = 'e'), 0)::bigint`,
     })
     .from(tenants)
-    .leftJoin(analyticsDaily, eq(analyticsDaily.tenantId, tenants.id))
+    // Real visitors only: the private preview's numbers stay out of the overview.
+    .leftJoin(analyticsDaily, and(eq(analyticsDaily.tenantId, tenants.id), eq(analyticsDaily.env, "production")))
     .groupBy(tenants.slug, tenants.name)
     .orderBy(tenants.name);
   return rows.map((r) => ({ ...r, views: Number(r.views), visitors: Number(r.visitors), contacts: Number(r.contacts), allTimeVisitors: Number(r.allTimeVisitors) }));

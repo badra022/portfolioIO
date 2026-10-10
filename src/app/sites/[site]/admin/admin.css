@@ -277,3 +277,15 @@
 .rs-mode .f-check { font-weight: 400; }
 details.a-panel > summary { cursor: pointer; }
 details.a-result summary { cursor: pointer; font-weight: 600; }
+
+/* ---------- environment switch (lib/environments.ts) ---------- */
+.a-env { display: inline-flex; align-items: center; gap: 8px; }
+.a-env select { min-height: 30px !important; width: auto !important; padding: 2px 10px !important; font-size: 13px !important; border-radius: 99px !important; border: 0 !important; background: #ffffff1f !important; color: #fff !important; }
+.a-env select option { color: var(--a-text); }
+.a-env.preview select { background: #f5c518 !important; color: #1a1400 !important; font-weight: 700; }
+.a-env a { font-size: 13px; color: #f5c518 !important; }
+.a-envnote { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: #fff6cc; border: 1px solid #f0d36b; font-size: 14px; }
+.a-pending { border-color: #f0d36b; background: #fffbea; }
+.a-pending ul { margin: 6px 0 10px; padding-inline-start: 18px; }
+.a-chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: #fff0b3; color: #6b5300; font-weight: 600; margin-inline-start: 6px; }
+.a-chip.prod { background: #e6f4ea; color: #1d7a46; }

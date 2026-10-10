@@ -86,6 +86,21 @@ Under the upcoming exams, the exams section gets a **نتايج الامتحان
 
 Stored in `exam_results` (run `db/migrations/0006_exam_results.sql` once on an existing database). Claude: `exam_results` and `manage_exam_results`.
 
+## Preview and production
+
+Every teacher has two copies of their page in the same deployment and database: **production** (the public site) and a private **preview** at `<their address>/preview` (e.g. `teacher.com/preview`, or `/t/<slug>/preview` on the platform host).
+
+- **Private**: the preview asks for the admin login (the same basic auth as `/admin`, so a browser that's logged into the admin opens it directly). Anyone else gets "Authentication required". It's never indexed (`noindex, nofollow` header and meta, blocked in robots.txt, no structured data) and shows a yellow "private preview" bar on every page.
+- **Editing**: every editor page has **Save to preview** and **Publish to site**. The editor always shows the preview copy (the same as the site until something is saved to preview). Publishing one page directly also puts the change into the preview copy, so the preview always shows the live site plus whatever is still unpublished.
+- **Admin home**: "View preview" and "View site" links, and while the preview has unpublished edits, a panel listing the changed pages with **Publish all to site** and **Discard preview edits**. Changed pages are marked "في المعاينة".
+- **Data per environment**: requests, quiz attempts, analytics and exam-result lookups made from the preview are stored as preview data. The switch at the top of the admin panel (**الموقع / المعاينة**) chooses which environment's data the requests, quizzes, results, analytics and home pages show. Opening and closing a quiz while on preview changes only the preview copy. A phone number that tried a quiz in preview can still take the real one. Analytics in preview always count (they're only ever you); the platform overview counts production only.
+- **Exam results** are shown in the preview and on the site separately (**Show in preview** / **Publish to site**), each with its own lookup counts.
+- **History** labels each version as site or preview; restoring a preview version only changes the preview.
+- **Super admin**: the console links each teacher's site and preview, and the same switch works inside any teacher's admin.
+- **Claude**: content edits go to the preview by default (`target: "production"` changes the live site directly); `publish_preview` publishes or discards; data tools take `env`.
+
+Run `db/migrations/0007_preview_env.sql` once on an existing database. Nothing to set up in Vercel: no second project, domain or deployment.
+
 ## Images and search basics
 
 - **Every upload is compressed** (admin panel, photo upload links, Claude): `sharp` turns it upright, scales it to at most 1600px (tall screenshots 2600px), re-encodes it as WebP (quality 80) and drops all metadata, including phone GPS locations. Phone photos are first scaled down in the browser (canvas, no library) so they fit the ~4 MB request limit; from a link (Claude) up to 20 MB is accepted. Images uploaded before this change are left as they were.

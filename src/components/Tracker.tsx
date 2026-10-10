@@ -41,10 +41,11 @@ function deviceOf(): string {
  * visitors who clicked) and time on page. Sends small batches to <base>/api/v
  * with sendBeacon, so it never delays the page or a click.
  */
-export function Tracker({ slug, base }: { slug: string; base: string }) {
+export function Tracker({ slug, base, preview = false }: { slug: string; base: string; preview?: boolean }) {
   useEffect(() => {
     let ignored = false;
-    try { ignored = localStorage.getItem(IGNORE_KEY) === "1"; } catch { /* storage blocked */ }
+    // The private preview is only ever opened by the people running the site, so it always counts (in its own numbers).
+    try { ignored = !preview && localStorage.getItem(IGNORE_KEY) === "1"; } catch { /* storage blocked */ }
     if (ignored) {
       console.info("Analytics: this browser opened /admin on this site, so its visits are not counted. Change it from the analytics page in /admin.");
       return;
@@ -53,7 +54,7 @@ export function Tracker({ slug, base }: { slug: string; base: string }) {
 
     // A neutral path: ad blockers' lists commonly block ".../track" and ".../analytics".
     const endpoint = `${base}/api/v`;
-    const memKey = `pa:${slug}`;
+    const memKey = preview ? `pa:${slug}:preview` : `pa:${slug}`;
     const host = location.hostname;
     const day = cairoDay();
     let mem: Memory = {};
@@ -158,7 +159,7 @@ export function Tracker({ slug, base }: { slug: string; base: string }) {
       window.removeEventListener("pagehide", leave);
       flush();
     };
-  }, [slug, base]);
+  }, [slug, base, preview]);
   return null;
 }
 

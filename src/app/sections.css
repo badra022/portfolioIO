@@ -336,3 +336,13 @@ button.btn { font: inherit; cursor: pointer; }
 }
 /* On a quiz page the countdown owns the top of the screen; the site header scrolls away. */
 .site:has(.quiz-wrap) .nav { position: static; }
+
+/* ---------- private preview (lib/environments.ts) ---------- */
+.preview-bar {
+  position: relative; z-index: 80; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 14px;
+  padding: 8px 14px; background: repeating-linear-gradient(-45deg, #f5c518 0 14px, #e8b800 14px 28px); color: #1a1400;
+  font: 600 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; text-align: center;
+}
+.preview-bar b { background: #1a1400; color: #f5c518; padding: 1px 10px; border-radius: 99px; }
+.preview-bar span { font-weight: 500; }
+.preview-bar a { color: inherit; text-decoration: underline; }

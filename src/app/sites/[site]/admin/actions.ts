@@ -6,6 +6,7 @@ import { env } from "@/lib/env";
 import { baseForSite, isPlatformHost } from "@/lib/routing";
 import { sectionById } from "@/lib/admin/sections";
 import type { Content, Theme } from "@/lib/schema";
+import { isEnv, type SiteEnv } from "@/lib/environments";
 import { ForbiddenError, principalName, requireAdmin, requireSuper, type Principal } from "@/lib/server/auth";
 import { DOMAINS_TAG, slugForSite, tenantTag } from "@/lib/server/site";
 import { assetUrl } from "@/lib/server/assets";
@@ -37,36 +38,93 @@ async function teacherContext(site: string): Promise<{ p: Principal; slug: strin
 /* Editor                                                              */
 /* ------------------------------------------------------------------ */
 
-export async function saveSectionAction(site: string, sectionId: string, value: unknown, baseVersion: number): Promise<repo.SaveResult | Fail> {
+export type SectionSaved = { ok: true; version: number; previewVersion: number; pending: boolean };
+
+/** Puts one editor page's value into a full content/theme (the other sections stay as they are in that copy). */
+function withSection(section: NonNullable<ReturnType<typeof sectionById>>, copy: { content: Content; theme: Theme }, value: Record<string, unknown>): { content?: unknown; theme?: unknown } {
+  if (section.theme) return { theme: value };
+  const content = { ...copy.content } as Record<string, unknown>;
+  for (const k of section.keys ?? []) {
+    if (value[k] === undefined) delete content[k];
+    else content[k] = value[k];
+  }
+  return { content };
+}
+
+/**
+ * Saves one editor page to the private preview, or to production (the public
+ * site). Saving to production also puts the same change into the preview copy, so
+ * the preview keeps showing everything that's live plus what's still unpublished.
+ */
+export async function saveSectionAction(
+  site: string,
+  sectionId: string,
+  value: unknown,
+  versions: { production: number; preview: number },
+  target: SiteEnv,
+): Promise<SectionSaved | Exclude<repo.SaveResult, { ok: true }> | Fail> {
   const ctx = await teacherContext(site);
   if ("ok" in ctx) return ctx;
   const section = sectionById(sectionId);
   if (!section) return { ok: false, reason: "missing" };
   if (section.superOnly && ctx.p.kind !== "super") return { ok: false, reason: "forbidden" };
-  if (!value || typeof value !== "object" || Array.isArray(value)) return { ok: false, reason: "error", message: "بيانات غير صالحة." };
+  if (!value || typeof value !== "object" || Array.isArray(value) || !isEnv(target)) return { ok: false, reason: "error", message: "بيانات غير صالحة." };
+  const v = value as Record<string, unknown>;
+  const author = principalName(ctx.p);
 
   try {
     const current = await repo.getTenant(ctx.slug);
     if (!current) return { ok: false, reason: "missing" };
-    let patch: { content?: unknown; theme?: unknown };
-    if (section.theme) {
-      patch = { theme: value };
-    } else {
-      const content = { ...current.content } as Record<string, unknown>;
-      const incoming = value as Record<string, unknown>;
-      for (const k of section.keys ?? []) {
-        if (incoming[k] === undefined) delete content[k];
-        else content[k] = incoming[k];
-      }
-      patch = { content };
+    if (target === "preview") {
+      const r = await repo.savePreview(ctx.slug, withSection(section, current.preview, v), versions.preview, author, section.title);
+      if (!r.ok) return r;
+      updateTag(tenantTag(ctx.slug));
+      const after = await repo.getTenant(ctx.slug);
+      return { ok: true, version: current.version, previewVersion: r.version, pending: after?.preview.pending ?? true };
     }
-    const r = await repo.saveTenant(ctx.slug, patch, baseVersion, principalName(ctx.p), section.title);
-    if (r.ok) updateTag(tenantTag(ctx.slug));
-    return r;
+    const r = await repo.saveTenant(ctx.slug, withSection(section, current, v), versions.production, author, section.title);
+    if (!r.ok) return r;
+    let previewVersion = current.preview.version;
+    if (current.preview.pending) {
+      const p = await repo.savePreview(ctx.slug, withSection(section, current.preview, v), null, author, `${section.title} (منشور على الموقع)`);
+      if (p.ok) previewVersion = p.version;
+    }
+    updateTag(tenantTag(ctx.slug));
+    const after = await repo.getTenant(ctx.slug);
+    return { ok: true, version: r.version, previewVersion, pending: after?.preview.pending ?? false };
   } catch (e) {
     console.error(e);
     return { ok: false, reason: "error", message: e instanceof repo.ReadOnlyError ? "لا توجد قاعدة بيانات متصلة." : "حدث خطأ أثناء الحفظ." };
   }
+}
+
+/** Publishes everything saved to the preview: the public site becomes what the preview shows. */
+export async function publishPreviewAction(site: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
+  try {
+    const r = await repo.publishPreview(ctx.slug, principalName(ctx.p));
+    if (!r.ok) {
+      if (r.reason === "invalid") return { ok: false, message: `المعاينة فيها بيانات محتاجة تصحيح: ${r.issues.slice(0, 3).map((i) => i.path).join("، ")}` };
+      if (r.reason === "conflict") return { ok: false, message: "حد عدّل المعاينة من شوية. حدّث الصفحة وراجعها تاني قبل النشر." };
+      return { ok: false, message: "المدرس مش موجود." };
+    }
+  } catch (e) {
+    console.error(e);
+    return { ok: false, message: "حدث خطأ أثناء النشر." };
+  }
+  updateTag(tenantTag(ctx.slug));
+  refresh();
+  return { ok: true };
+}
+
+/** Throws away what's in the preview and not published: the preview shows the public site again. */
+export async function discardPreviewAction(site: string): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  await repo.discardPreview(ctx.slug, principalName(ctx.p));
+  updateTag(tenantTag(ctx.slug));
+  refresh();
 }
 
 export async function uploadImageAction(site: string, form: FormData): Promise<{ ok: true; key: string; url: string } | { ok: false; error: string }> {
@@ -241,15 +299,24 @@ export async function deleteRequestAction(site: string, ids: number[]): Promise<
 /* ------------------------------------------------------------------ */
 
 /** Open now / close now / back to the dates. Saved like any edit (with a revision). */
-export async function setQuizStateAction(site: string, path: string, state: "auto" | "open" | "closed"): Promise<void> {
+export async function setQuizStateAction(site: string, path: string, state: "auto" | "open" | "closed", env: SiteEnv = "production"): Promise<void> {
   const ctx = await teacherContext(site);
   if ("ok" in ctx) throw new ForbiddenError();
-  if (!["auto", "open", "closed"].includes(state)) return;
+  if (!["auto", "open", "closed"].includes(state) || !isEnv(env)) return;
   const t = await repo.getTenant(ctx.slug);
-  if (!t || !t.content.quizzes.some((q) => q.path === path)) return;
-  const content = { ...t.content, quizzes: t.content.quizzes.map((q) => (q.path === path ? { ...q, state } : q)) };
-  const note = state === "open" ? "فتح اختبار" : state === "closed" ? "قفل اختبار" : "اختبار حسب التواريخ";
-  const r = await repo.saveTenant(ctx.slug, { content }, t.version, principalName(ctx.p), `${note}: ${path}`);
+  const copy = t ? repo.copyFor(t, env).content : null;
+  if (!t || !copy || !copy.quizzes.some((q) => q.path === path)) return;
+  const content = { ...copy, quizzes: copy.quizzes.map((q) => (q.path === path ? { ...q, state } : q)) };
+  const note = `${state === "open" ? "فتح اختبار" : state === "closed" ? "قفل اختبار" : "اختبار حسب التواريخ"}: ${path}`;
+  // In the preview, opening/closing a quiz only changes the preview copy.
+  const r = env === "preview"
+    ? await repo.savePreview(ctx.slug, { content }, null, principalName(ctx.p), note)
+    : await repo.saveTenant(ctx.slug, { content }, t.version, principalName(ctx.p), note);
+  // Changed on the public site: the preview copy (if any) gets the same, like any production save.
+  if (r.ok && env === "production" && t.preview.pending) {
+    const p = t.preview.content;
+    await repo.savePreview(ctx.slug, { content: { ...p, quizzes: p.quizzes.map((q) => (q.path === path ? { ...q, state } : q)) } }, null, principalName(ctx.p), note);
+  }
   if (r.ok) updateTag(tenantTag(ctx.slug));
   refresh();
 }
@@ -324,7 +391,7 @@ export async function createResultSetAction(site: string, _prev: ConsoleState, f
   redirect(`${baseForSite(site)}/admin/results/${id}`);
 }
 
-export async function updateResultMetaAction(site: string, id: number, meta: { title: string; date: string; total: string; published: boolean }): Promise<Done> {
+export async function updateResultMetaAction(site: string, id: number, meta: { title: string; date: string; total: string; published: boolean; previewPublished: boolean }): Promise<Done> {
   const ctx = await teacherContext(site);
   if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
   try {

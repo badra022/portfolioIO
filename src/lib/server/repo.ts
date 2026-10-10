@@ -3,7 +3,8 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import { ContentSchema, DeploySchema, ThemeSchema, type Content, type Theme } from "@/lib/schema";
-import { validate, type Issue } from "@/lib/content-utils";
+import { sameJson, validate, type Issue } from "@/lib/content-utils";
+import type { SiteEnv } from "@/lib/environments";
 import { listBundled, readBundledJson } from "./bundled";
 
 const { tenants, tenantDomains, adminUsers, tenantRevisions } = schema;
@@ -20,7 +21,15 @@ export type TenantRecord = {
   domains: DomainRow[];
   updatedAt: string | null;
   updatedBy: string | null;
+  /**
+   * The private preview copy (lib/environments.ts). Same as production until an
+   * edit is saved to preview; pending = it differs and waits to be published.
+   */
+  preview: { content: Content; theme: Theme; version: number; pending: boolean; updatedAt: string | null; updatedBy: string | null };
 };
+
+/** The content and theme a given environment shows. */
+export const copyFor = (t: TenantRecord, env: SiteEnv) => (env === "preview" ? t.preview : { content: t.content, theme: t.theme });
 
 export class ReadOnlyError extends Error {
   constructor() { super("No database configured (DATABASE_URL). Editing is disabled."); }
@@ -54,6 +63,7 @@ function bundledRecord(slug: string): TenantRecord | null {
     content, theme, version: 0,
     domains: deploy.domains.map((d, i) => ({ domain: d, isPrimary: i === 0 })),
     updatedAt: null, updatedBy: null,
+    preview: { content, theme, version: 0, pending: false, updatedAt: null, updatedBy: null },
   };
 }
 
@@ -80,12 +90,21 @@ export async function getTenant(slug: string): Promise<TenantRecord | null> {
     .from(tenantDomains)
     .where(eq(tenantDomains.tenantId, row.id))
     .orderBy(desc(tenantDomains.isPrimary), tenantDomains.domain);
+  const content = withDefaults<Content>(ContentSchema, row.content, `content for ${slug}`);
+  const theme = withDefaults<Theme>(ThemeSchema, row.theme, `theme for ${slug}`);
+  const pending = row.previewContent !== null || row.previewTheme !== null;
   return {
     id: row.id, slug: row.slug, name: row.name, status: row.status,
-    content: withDefaults<Content>(ContentSchema, row.content, `content for ${slug}`),
-    theme: withDefaults<Theme>(ThemeSchema, row.theme, `theme for ${slug}`),
-    version: row.version,
+    content, theme, version: row.version,
     domains, updatedAt: row.updatedAt.toISOString(), updatedBy: row.updatedBy,
+    preview: {
+      content: row.previewContent === null ? content : withDefaults<Content>(ContentSchema, row.previewContent, `preview content for ${slug}`),
+      theme: row.previewTheme === null ? theme : withDefaults<Theme>(ThemeSchema, row.previewTheme, `preview theme for ${slug}`),
+      version: row.previewVersion,
+      pending,
+      updatedAt: row.previewUpdatedAt?.toISOString() ?? null,
+      updatedBy: row.previewUpdatedBy,
+    },
   };
 }
 
@@ -131,19 +150,9 @@ export async function saveTenant(
   note: string,
 ): Promise<SaveResult> {
   const d = requireDb();
-  const issues: Issue[] = [];
-  let content: Content | undefined;
-  let theme: Theme | undefined;
-  if (patch.content !== undefined) {
-    const r = validate(ContentSchema, patch.content);
-    if (r.ok) content = r.data as Content; else issues.push(...r.issues);
-    if (r.ok && content!.slug !== slug) issues.push({ path: "slug", message: "لا يمكن تغيير المعرّف (slug)." });
-  }
-  if (patch.theme !== undefined) {
-    const r = validate(ThemeSchema, patch.theme);
-    if (r.ok) theme = r.data as Theme; else issues.push(...r.issues);
-  }
-  if (issues.length) return { ok: false, reason: "invalid", issues };
+  const checked = checkPatch(slug, patch);
+  if (!checked.ok) return { ok: false, reason: "invalid", issues: checked.issues };
+  const { content, theme } = checked;
 
   return d.transaction(async (tx) => {
     const row = (await tx.select().from(tenants).where(eq(tenants.slug, slug)).for("update").limit(1))[0];
@@ -163,12 +172,92 @@ export async function saveTenant(
   });
 }
 
-export type RevisionSummary = { id: number; version: number; author: string; note: string | null; createdAt: string };
+/** Validates a patch (content and/or theme) for a teacher. */
+function checkPatch(slug: string, patch: { content?: unknown; theme?: unknown }): { ok: true; content?: Content; theme?: Theme } | { ok: false; issues: Issue[] } {
+  const issues: Issue[] = [];
+  let content: Content | undefined;
+  let theme: Theme | undefined;
+  if (patch.content !== undefined) {
+    const r = validate(ContentSchema, patch.content);
+    if (r.ok) content = r.data as Content; else issues.push(...r.issues);
+    if (r.ok && content!.slug !== slug) issues.push({ path: "slug", message: "لا يمكن تغيير المعرّف (slug)." });
+  }
+  if (patch.theme !== undefined) {
+    const r = validate(ThemeSchema, patch.theme);
+    if (r.ok) theme = r.data as Theme; else issues.push(...r.issues);
+  }
+  return issues.length ? { ok: false, issues } : { ok: true, content, theme };
+}
+
+/**
+ * Saves to the private preview copy. baseVersion is the preview version the editor
+ * started from (null = don't check). When the result matches production again,
+ * the copy is dropped (nothing left to publish).
+ */
+export async function savePreview(
+  slug: string,
+  patch: { content?: unknown; theme?: unknown },
+  baseVersion: number | null,
+  author: string,
+  note: string,
+): Promise<SaveResult> {
+  const d = requireDb();
+  const checked = checkPatch(slug, patch);
+  if (!checked.ok) return { ok: false, reason: "invalid", issues: checked.issues };
+  return d.transaction(async (tx) => {
+    const row = (await tx.select().from(tenants).where(eq(tenants.slug, slug)).for("update").limit(1))[0];
+    if (!row) return { ok: false, reason: "missing" } as const;
+    if (baseVersion !== null && row.previewVersion !== baseVersion) return { ok: false, reason: "conflict", version: row.previewVersion } as const;
+    const content = checked.content ?? (row.previewContent ?? row.content) as Content;
+    const theme = checked.theme ?? (row.previewTheme ?? row.theme) as Theme;
+    const same = sameJson(content, row.content) && sameJson(theme, row.theme);
+    const version = row.previewVersion + 1;
+    await tx.update(tenants).set({
+      previewContent: same ? null : content, previewTheme: same ? null : theme, previewVersion: version,
+      previewUpdatedAt: new Date(), previewUpdatedBy: author,
+    }).where(eq(tenants.id, row.id));
+    await tx.insert(tenantRevisions).values({ tenantId: row.id, version, content, theme, author, note, env: "preview" });
+    return { ok: true, version } as const;
+  });
+}
+
+/** Publishes the preview copy: production becomes what preview shows, and the copy is cleared. */
+export async function publishPreview(slug: string, author: string): Promise<SaveResult> {
+  const d = requireDb();
+  const current = await getTenant(slug);
+  if (!current) return { ok: false, reason: "missing" };
+  if (!current.preview.pending) return { ok: true, version: current.version };
+  const checked = checkPatch(slug, { content: current.preview.content, theme: current.preview.theme });
+  if (!checked.ok) return { ok: false, reason: "invalid", issues: checked.issues };
+  return d.transaction(async (tx) => {
+    const row = (await tx.select().from(tenants).where(eq(tenants.slug, slug)).for("update").limit(1))[0];
+    if (!row) return { ok: false, reason: "missing" } as const;
+    // Someone saved the preview meanwhile: publish what they see now, not the older copy.
+    if (row.previewVersion !== current.preview.version) return { ok: false, reason: "conflict", version: row.previewVersion } as const;
+    const version = row.version + 1;
+    await tx.update(tenants).set({
+      content: checked.content!, theme: checked.theme!, version, name: checked.content!.profile.name, updatedAt: new Date(), updatedBy: author,
+      previewContent: null, previewTheme: null, previewVersion: row.previewVersion + 1, previewUpdatedAt: new Date(), previewUpdatedBy: author,
+    }).where(eq(tenants.id, row.id));
+    await tx.insert(tenantRevisions).values({ tenantId: row.id, version, content: checked.content!, theme: checked.theme!, author, note: "نشر تعديلات المعاينة" });
+    return { ok: true, version } as const;
+  });
+}
+
+/** Drops the preview copy: preview shows production again. */
+export async function discardPreview(slug: string, author: string): Promise<void> {
+  const d = requireDb();
+  await d.update(tenants).set({
+    previewContent: null, previewTheme: null, previewVersion: sql`${tenants.previewVersion} + 1`, previewUpdatedAt: new Date(), previewUpdatedBy: author,
+  }).where(eq(tenants.slug, slug));
+}
+
+export type RevisionSummary = { id: number; version: number; author: string; note: string | null; createdAt: string; env: SiteEnv };
 
 export async function listRevisions(slug: string, limit = 50): Promise<RevisionSummary[]> {
   if (!hasDb()) return [];
   const rows = await db()
-    .select({ id: tenantRevisions.id, version: tenantRevisions.version, author: tenantRevisions.author, note: tenantRevisions.note, createdAt: tenantRevisions.createdAt })
+    .select({ id: tenantRevisions.id, version: tenantRevisions.version, author: tenantRevisions.author, note: tenantRevisions.note, createdAt: tenantRevisions.createdAt, env: tenantRevisions.env })
     .from(tenantRevisions)
     .innerJoin(tenants, eq(tenants.id, tenantRevisions.tenantId))
     .where(eq(tenants.slug, slug))
@@ -180,12 +269,14 @@ export async function listRevisions(slug: string, limit = 50): Promise<RevisionS
 export async function restoreRevision(slug: string, revisionId: number, author: string): Promise<SaveResult> {
   const d = requireDb();
   const rev = (await d
-    .select({ content: tenantRevisions.content, theme: tenantRevisions.theme, version: tenantRevisions.version })
+    .select({ content: tenantRevisions.content, theme: tenantRevisions.theme, version: tenantRevisions.version, env: tenantRevisions.env })
     .from(tenantRevisions)
     .innerJoin(tenants, eq(tenants.id, tenantRevisions.tenantId))
     .where(and(eq(tenants.slug, slug), eq(tenantRevisions.id, revisionId)))
     .limit(1))[0];
   if (!rev) return { ok: false, reason: "missing" };
+  // A preview revision goes back into the preview; a production one into production.
+  if (rev.env === "preview") return savePreview(slug, { content: rev.content, theme: rev.theme }, null, author, `استرجاع نسخة المعاينة ${rev.version}`);
   const current = await getTenant(slug);
   if (!current) return { ok: false, reason: "missing" };
   return saveTenant(slug, { content: rev.content, theme: rev.theme }, current.version, author, `استرجاع النسخة ${rev.version}`);

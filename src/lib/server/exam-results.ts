@@ -3,6 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import { DATE_RE } from "@/lib/dates";
+import type { SiteEnv } from "@/lib/environments";
 import { MAX_ROWS, cleanRow, findResult, mergeRows, type MergeSummary, type ResultRow } from "@/lib/exam-results";
 
 const { examResults, tenants } = schema;
@@ -18,6 +19,8 @@ export type ResultSetInfo = {
   count: number;
   lookups: number;
   found: number;
+  /** The same in the private preview (lib/environments.ts). */
+  preview: { published: boolean; lookups: number; found: number };
   version: number;
   updatedAt: string;
   updatedBy: string | null;
@@ -40,8 +43,10 @@ const info = {
   published: examResults.published, count: sql<number>`jsonb_array_length(${examResults.rows})`.mapWith(Number),
   lookups: examResults.lookups, found: examResults.found, version: examResults.version,
   updatedAt: examResults.updatedAt, updatedBy: examResults.updatedBy,
+  previewPublished: examResults.previewPublished, previewLookups: examResults.previewLookups, previewFound: examResults.previewFound,
 };
-const toInfo = <T extends { updatedAt: Date }>(r: T) => ({ ...r, updatedAt: r.updatedAt.toISOString() });
+const toInfo = <T extends { updatedAt: Date; previewPublished: boolean; previewLookups: number; previewFound: number }>({ previewPublished, previewLookups, previewFound, ...r }: T) =>
+  ({ ...r, updatedAt: r.updatedAt.toISOString(), preview: { published: previewPublished, lookups: previewLookups, found: previewFound } });
 
 /** Rows as stored: re-cleaned, so whatever reaches the table has the same shape. */
 const cleanRows = (rows: unknown[]): ResultRow[] =>
@@ -93,11 +98,12 @@ async function update(w: Where, set: Partial<typeof examResults.$inferInsert>, a
   return row?.version ?? null;
 }
 
-export async function updateResultMeta(slug: string, id: number, m: { title?: unknown; date?: unknown; total?: unknown; published?: boolean }, author: string): Promise<void> {
+/** Title, date, full mark, and whether it shows on the site (published) and in the preview (previewPublished). */
+export async function updateResultMeta(slug: string, id: number, m: { title?: unknown; date?: unknown; total?: unknown; published?: boolean; previewPublished?: boolean }, author: string): Promise<void> {
   const current = await getResultSet(slug, id);
   if (!current) throw new ResultsError("الامتحان مش موجود.");
   const meta = cleanMeta({ title: m.title ?? current.title, date: m.date ?? current.date, total: m.total === undefined ? current.total : m.total });
-  await update({ slug, id }, { ...meta, published: m.published ?? current.published }, author);
+  await update({ slug, id }, { ...meta, published: m.published ?? current.published, previewPublished: m.previewPublished ?? current.preview.published }, author);
 }
 
 export type SaveRows = { ok: true; version: number; count: number } | { ok: false; reason: "conflict" | "missing" };
@@ -132,24 +138,27 @@ export async function deleteResultSet(slug: string, id: number): Promise<void> {
 /* Site                                                                */
 /* ------------------------------------------------------------------ */
 
+const publishedIn = (env: SiteEnv) => (env === "preview" ? examResults.previewPublished : examResults.published);
+
 /** Published exams, newest first, for the exams section. Cached with the teacher's page (site.ts). */
-export async function publishedExams(tenantId: string): Promise<PastExam[]> {
+export async function publishedExams(tenantId: string, env: SiteEnv): Promise<PastExam[]> {
   if (!hasDb()) return [];
   return db().select({ id: examResults.id, title: examResults.title, date: examResults.date })
-    .from(examResults).where(and(eq(examResults.tenantId, tenantId), eq(examResults.published, true)))
+    .from(examResults).where(and(eq(examResults.tenantId, tenantId), eq(publishedIn(env), true)))
     .orderBy(desc(examResults.date), desc(examResults.id)).limit(30);
 }
 
 export type LookupResult = { title: string; date: string; total: string | null; name: string; score: string; note?: string } | null;
 
 /** One student's result in a published exam, by name and phone; counts the lookup. */
-export async function lookupResult(tenantId: string, id: number, name: string, phone: string): Promise<LookupResult | "missing"> {
+export async function lookupResult(tenantId: string, env: SiteEnv, id: number, name: string, phone: string): Promise<LookupResult | "missing"> {
   const row = (await db().select({ title: examResults.title, date: examResults.date, total: examResults.total, rows: examResults.rows })
-    .from(examResults).where(and(eq(examResults.tenantId, tenantId), eq(examResults.id, id), eq(examResults.published, true))).limit(1))[0];
+    .from(examResults).where(and(eq(examResults.tenantId, tenantId), eq(examResults.id, id), eq(publishedIn(env), true))).limit(1))[0];
   if (!row) return "missing";
   const hit = findResult(cleanRows(row.rows as unknown[]), name, phone);
+  const [lookups, found] = env === "preview" ? [examResults.previewLookups, examResults.previewFound] : [examResults.lookups, examResults.found];
   await db().update(examResults)
-    .set({ lookups: sql`${examResults.lookups} + 1`, found: hit ? sql`${examResults.found} + 1` : examResults.found })
+    .set({ [env === "preview" ? "previewLookups" : "lookups"]: sql`${lookups} + 1`, ...(hit ? { [env === "preview" ? "previewFound" : "found"]: sql`${found} + 1` } : {}) })
     .where(eq(examResults.id, id));
   if (!hit) return null;
   return { title: row.title, date: row.date, total: row.total, name: hit.name, score: hit.score, note: hit.note };

@@ -3,18 +3,28 @@ import { env } from "@/lib/env";
 import { isAdminPath, route } from "@/lib/routing";
 import { authenticate, teacherSlugFor } from "@/lib/server/auth";
 import { isSiteFileName } from "@/lib/site-files";
+import { PREVIEW_PATH, siteEnv } from "@/lib/environments";
 
 /**
  * Every request is mapped by its host name to /sites/<site>/... (see lib/routing.ts).
- * /admin paths additionally require basic auth; the same check runs again inside
- * every admin page and server action.
+ * /admin paths and the private preview (/preview/...) additionally require basic
+ * auth; the same check runs again inside every admin page, server action and
+ * preview page.
  */
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const host = request.headers.get("host");
   const r = route(host, pathname, env.rootDomain, env.platformHosts);
+  const preview = siteEnv(r.site) === "preview";
 
-  if (isAdminPath(r.rest)) {
+  // One admin panel for both environments: /preview/admin is /admin.
+  if (preview && isAdminPath(r.rest)) {
+    const to = request.nextUrl.clone();
+    to.pathname = `${r.base.slice(0, -PREVIEW_PATH.length)}${r.rest}`;
+    return NextResponse.redirect(to, 307);
+  }
+
+  if (isAdminPath(r.rest) || preview) {
     const header = request.headers.get("authorization");
     const principal = await authenticate(header, r.site);
     if (!principal) {
@@ -43,7 +53,7 @@ export async function proxy(request: NextRequest) {
   url.pathname = `/sites/${encodeURIComponent(r.site)}${rest === "/" ? "" : rest}`;
   url.search = search;
   const res = NextResponse.rewrite(url);
-  if (isAdminPath(r.rest)) {
+  if (isAdminPath(r.rest) || preview) {
     res.headers.set("Cache-Control", "no-store");
     res.headers.set("X-Robots-Tag", "noindex, nofollow");
   }

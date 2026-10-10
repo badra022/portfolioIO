@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${quiz.title} | ${data.content.profile.fullTitle}`,
     description: quiz.intro,
-    robots: index ? { index: true, follow: true } : { index: false, follow: true },
+    robots: index ? { index: true, follow: true } : { index: false, follow: data.env === "production" },
     alternates: url ? { canonical: url } : undefined,
     openGraph: { title: quiz.title, description: quiz.intro, url, type: "website", images: quiz.image ? [quiz.image] : undefined },
   };
