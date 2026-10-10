@@ -263,3 +263,17 @@
 .qz-answers li span:last-child { color: var(--a-muted); }
 .a-h2 { margin: 20px 0 8px; }
 .rq-ctx-head { grid-column: 1 / -1; font-size: 12px; color: var(--a-muted); border-top: 1px dashed var(--a-line); padding-top: 6px; }
+
+/* ---------- exam results (/admin/results) ---------- */
+.rs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.rs-grid > * { min-width: 0; }
+.rs-table { margin-top: 10px; }
+.rs-table input { min-height: 38px !important; padding: 6px 8px !important; font-size: 15px !important; }
+.rs-table td b { font-size: 15px; }
+.rs-editing { background: #fffbea; }
+.rs-search { margin-top: 10px; }
+.rs-warn { color: var(--a-bad); font-size: 12px; font-weight: 700; }
+.rs-mode { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.rs-mode .f-check { font-weight: 400; }
+details.a-panel > summary { cursor: pointer; }
+details.a-result summary { cursor: pointer; font-weight: 600; }

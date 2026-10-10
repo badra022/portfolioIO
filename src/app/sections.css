@@ -269,6 +269,35 @@ button.btn { font: inherit; cursor: pointer; }
   .lead-layer .pop { max-height: 88dvh; }
 }
 
+/* ---------- past exams' results (ExamResults) ---------- */
+.exr { margin-top: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.exams + .exr { padding-top: 24px; border-top: 1px dashed var(--line); }
+.exr-intro { color: var(--muted); margin: 0; }
+.exr > .btn svg { width: 20px; height: 20px; }
+.exr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.exr-list button {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: start;
+  padding: 14px 16px; border-radius: var(--r-control); border: 1px solid var(--line); background: var(--raised); color: var(--text);
+  font: inherit; cursor: pointer;
+}
+.exr-list button:hover, .exr-list button:focus-visible { border-color: var(--accent); outline: none; }
+.exr-list button:disabled { opacity: .6; cursor: progress; }
+.exr-list span { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.exr-wait { color: var(--muted); text-align: center; }
+.exr-score { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 16px; border-radius: var(--r-card); background: var(--accent-12); border: 1px solid var(--accent-35); }
+.exr-name { font-weight: 700; font-size: 17px; }
+.exr-num { display: flex; align-items: baseline; gap: 8px; }
+.exr-num b { font-size: 56px; line-height: 1; color: var(--accent-hot); }
+.exr-num span { font-size: 22px; color: var(--muted); }
+.exr-bar { position: relative; width: 100%; max-width: 320px; height: 10px; margin-bottom: 20px; border-radius: 5px; background: var(--raised); }
+.exr-bar i { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 5px; background: var(--accent); }
+.exr-bar small { position: absolute; top: 14px; inset-inline: 0; text-align: center; color: var(--muted); font-size: 13px; }
+
+.exr-note { margin: 0; font-weight: 600; color: var(--text) !important; }
+.exr-miss { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: var(--r-control); background: var(--raised); border: 1px solid var(--line); }
+.exr-miss span { color: var(--muted); font-size: 14px; }
+.lead-form > .lead-edit { align-self: center; }
+
 /* ---------- quiz pages (/<quiz path>) ---------- */
 .site:has(.quiz-wrap) { padding-bottom: 24px; }
 .quiz-who { color: var(--muted); font-size: 15px; }

@@ -33,6 +33,7 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
           <a className="btn-sm primary" href={`${base}/admin/requests`}>الطلبات{newRequests > 0 && <span className="a-count">{newRequests}</span>}</a>
           <a className="btn-sm primary" href={`${base}/admin/analytics`}>الإحصائيات</a>
           <a className="btn-sm primary" href={`${base}/admin/quizzes`}>الاختبارات</a>
+          <a className="btn-sm primary" href={`${base}/admin/results`}>نتايج الامتحانات</a>
           <a className="btn-sm ghost" href={`${base}/admin/history`}>سجل التعديلات</a>
         </div>
       </div>

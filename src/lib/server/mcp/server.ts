@@ -18,6 +18,7 @@ import { makeUploadLink } from "../upload-link";
 import { RANGES, report } from "../analytics";
 import { STATUSES, listSubmissions, setStatus } from "../submissions";
 import { listAttempts, quizMetrics } from "../quiz-attempts";
+import * as examResults from "../exam-results";
 import { SiteFileError, deleteSiteFile, filesTag, listSiteFiles, putSiteFile } from "../site-files";
 import { applyOps, contentOutline, deepMerge, schemaFor, type Op } from "./content-ops";
 import { fetchImage } from "./fetch-image";
@@ -37,6 +38,8 @@ Onboarding a new teacher:
 Forms: any WhatsApp button can open a form instead (the student leaves name/phone/etc. for the teacher). Define forms in content "forms" (get_schema part "forms"), then set "form": "<form id>" on the button (hero.primaryCta, navCta, sticky.cta, final.cta, students.cta, schedule.form, book.order.form, exams.items[].form, challenge.form, services/popup cta.form). Fields with remember=true (name, phone) are asked once per device; the button's own details (challenge answer, chosen group, exam) are attached automatically. Submissions: list_requests / update_requests.
 
 Quizzes: content "quizzes" (get_schema part "quizzes"): each has a page at /<path>, an optional form asked before starting, a timer, start/end dates, state (auto/open/closed) and questions (text and/or image, choice or written, optional correct answers that students never see). Results: quiz_results.
+
+Exam results: students look up their grade in past exams on the site (exams section → past exams' results) with their name and phone. Results live outside the content: exam_results to read, manage_exam_results to create one exam's results, add rows ({name, phone, score, note?}; a student already there with the same phone without country code and same first name gets the new score), edit title/date/full mark, publish (shown on the site) or delete. Never invent grades: only add what the user gives you (e.g. a pasted sheet).
 
 Rules for content: match the tone and language of the example (Egyptian Arabic) unless told otherwise. WhatsApp numbers are international digits only (2010...). "sections" is the page order and every listed section needs its data. Messages may use placeholders listed in each field's description (e.g. {grade}, {date}). Pass expected_version from get_teacher when editing, so a change made meanwhile in the admin panel isn't overwritten.`;
 
@@ -440,6 +443,61 @@ export function buildMcpServer(origin: string): McpServer {
     if (!quiz) return fail(`No quiz "${path}" for ${slug}.`);
     const rows = await listAttempts(slug, quiz);
     return ok({ metrics: quizMetrics(quiz, rows), ...(attempts === false ? {} : { attempts: rows.map(({ questions: _q, ...r }) => r) }) });
+  }));
+
+  server.registerTool("exam_results", {
+    title: "Exam results",
+    description: "Without id: every exam's results (title, date, full mark, published, students, how many looked up / found their result). With id: also every row {name, phone, score, note}.",
+    inputSchema: { slug: slugArg, id: z.number().int().optional() },
+    annotations: { readOnlyHint: true },
+  }, safe(async ({ slug, id }) => {
+    if (id === undefined) return ok(await examResults.listResultSets(slug));
+    const set = await examResults.getResultSet(slug, id);
+    return set ? ok(set) : fail(`No exam results ${id} for ${slug}.`);
+  }));
+
+  server.registerTool("manage_exam_results", {
+    title: "Manage exam results",
+    description: "create (title, date YYYY-MM-DD, optional total and exam_id from content.exams.items) → returns id; add_rows (rows; mode merge = update students already there by phone + first name, replace = start over); update (title/date/total/published); delete. Publishing shows the exam in the site's past-exams list; students then see only their own row.",
+    inputSchema: {
+      slug: slugArg,
+      action: z.enum(["create", "add_rows", "update", "delete"]),
+      id: z.number().int().optional().describe("Exam results id (all actions but create)."),
+      title: z.string().optional(),
+      date: z.string().optional().describe("YYYY-MM-DD"),
+      total: z.string().optional().describe("Full mark, e.g. \"50\"."),
+      exam_id: z.string().optional(),
+      published: z.boolean().optional(),
+      rows: z.array(z.object({ name: z.string(), phone: z.string(), score: z.union([z.string(), z.number()]), note: z.string().optional() })).optional(),
+      mode: z.enum(["merge", "replace"]).optional(),
+    },
+  }, safe(async (a) => {
+    try {
+      if (a.action === "create") {
+        const id = await examResults.createResultSet(a.slug, { examId: a.exam_id, title: a.title, date: a.date, total: a.total }, AUTHOR);
+        if (a.rows?.length) await examResults.importRows(a.slug, id, a.rows, "merge", AUTHOR);
+        if (a.published) await examResults.updateResultMeta(a.slug, id, { published: true }, AUTHOR);
+        if (a.published) refreshTeacher(a.slug);
+        return ok({ created: id, ...(await examResults.getResultSet(a.slug, id).then((s) => ({ students: s?.rows.length ?? 0 }))) });
+      }
+      if (a.id === undefined) return fail("id is required.");
+      if (a.action === "add_rows") {
+        if (!a.rows?.length) return fail("rows is required.");
+        const r = await examResults.importRows(a.slug, a.id, a.rows, a.mode ?? "merge", AUTHOR);
+        return ok({ ...r.summary, students: r.count });
+      }
+      if (a.action === "update") {
+        await examResults.updateResultMeta(a.slug, a.id, { title: a.title, date: a.date, total: a.total, published: a.published }, AUTHOR);
+        refreshTeacher(a.slug);
+        return ok({ updated: a.id });
+      }
+      await examResults.deleteResultSet(a.slug, a.id);
+      refreshTeacher(a.slug);
+      return ok({ deleted: a.id });
+    } catch (e) {
+      if (e instanceof examResults.ResultsError) return fail(e.message);
+      throw e;
+    }
   }));
 
   /* ----- history and analytics ----- */

@@ -3,7 +3,7 @@
 import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { env } from "@/lib/env";
-import { isPlatformHost } from "@/lib/routing";
+import { baseForSite, isPlatformHost } from "@/lib/routing";
 import { sectionById } from "@/lib/admin/sections";
 import type { Content, Theme } from "@/lib/schema";
 import { ForbiddenError, principalName, requireAdmin, requireSuper, type Principal } from "@/lib/server/auth";
@@ -18,6 +18,7 @@ import * as repo from "@/lib/server/repo";
 import * as submissionsRepo from "@/lib/server/submissions";
 import * as quizRepo from "@/lib/server/quiz-attempts";
 import * as siteFiles from "@/lib/server/site-files";
+import * as results from "@/lib/server/exam-results";
 import { MAX_SITE_FILE } from "@/lib/site-files";
 
 type Fail = { ok: false; reason: "forbidden" | "missing" | "error"; message?: string };
@@ -295,4 +296,74 @@ export async function deleteSiteFileAction(slug: string, name: string): Promise<
   await siteFiles.deleteSiteFile(slug, name);
   updateTag(siteFiles.filesTag(slug));
   refresh();
+}
+
+/* ------------------------------------------------------------------ */
+/* Exam results (/admin/results)                                       */
+/* ------------------------------------------------------------------ */
+
+type Done<T = object> = ({ ok: true } & T) | { ok: false; message: string };
+const failed = (e: unknown): { ok: false; message: string } => {
+  if (e instanceof results.ResultsError) return { ok: false, message: e.message };
+  if (e instanceof repo.ReadOnlyError) return { ok: false, message: "لا توجد قاعدة بيانات متصلة، الحفظ معطّل." };
+  console.error("results", e);
+  return { ok: false, message: "حصلت مشكلة، حاول تاني." };
+};
+
+/** New exam results (title/date copied from an exam on the page, or typed), then opens it. */
+export async function createResultSetAction(site: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
+  let id: number;
+  try {
+    id = await results.createResultSet(ctx.slug, {
+      examId: String(form.get("examId") ?? "") || null,
+      title: form.get("title"), date: form.get("date"), total: form.get("total"),
+    }, principalName(ctx.p));
+  } catch (e) { return failed(e); }
+  redirect(`${baseForSite(site)}/admin/results/${id}`);
+}
+
+export async function updateResultMetaAction(site: string, id: number, meta: { title: string; date: string; total: string; published: boolean }): Promise<Done> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
+  try {
+    await results.updateResultMeta(ctx.slug, id, meta, principalName(ctx.p));
+  } catch (e) { return failed(e); }
+  // The exams section lists published exams.
+  updateTag(tenantTag(ctx.slug));
+  refresh();
+  return { ok: true };
+}
+
+export async function importResultsAction(site: string, id: number, rows: unknown[], mode: "merge" | "replace"): Promise<Done<{ summary: import("@/lib/exam-results").MergeSummary; set: results.ResultSet }>> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
+  if (!Array.isArray(rows) || (mode !== "merge" && mode !== "replace")) return { ok: false, message: "بيانات غير صالحة." };
+  try {
+    const r = await results.importRows(ctx.slug, id, rows, mode, principalName(ctx.p));
+    const set = await results.getResultSet(ctx.slug, id);
+    if (!set) return { ok: false, message: "الامتحان مش موجود." };
+    return { ok: true, summary: r.summary, set };
+  } catch (e) { return failed(e); }
+}
+
+export async function saveResultRowsAction(site: string, id: number, rows: unknown[], baseVersion: number): Promise<Done<{ set: results.ResultSet }>> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
+  if (!Array.isArray(rows)) return { ok: false, message: "بيانات غير صالحة." };
+  try {
+    const r = await results.saveRows(ctx.slug, id, rows, baseVersion, principalName(ctx.p));
+    if (!r.ok) return { ok: false, message: r.reason === "conflict" ? "حد تاني عدّل النتايج دي من شوية. حدّث الصفحة وكرر تعديلك." : "الامتحان مش موجود." };
+    const set = await results.getResultSet(ctx.slug, id);
+    return set ? { ok: true, set } : { ok: false, message: "الامتحان مش موجود." };
+  } catch (e) { return failed(e); }
+}
+
+export async function deleteResultSetAction(site: string, id: number): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  await results.deleteResultSet(ctx.slug, id);
+  updateTag(tenantTag(ctx.slug));
+  redirect(`${baseForSite(site)}/admin/results`);
 }

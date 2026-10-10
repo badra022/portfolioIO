@@ -6,6 +6,7 @@ import { withLiveContent } from "@/lib/content-utils";
 import type { Content, Theme } from "@/lib/schema";
 import { findSlugByDomain, getTenant } from "./repo";
 import { resolveImages } from "./assets";
+import { publishedExams, type PastExam } from "./exam-results";
 
 export const tenantTag = (slug: string) => `tenant:${slug}`;
 export const DOMAINS_TAG = "domains";
@@ -28,6 +29,8 @@ export type SiteData =
       updatedAt: string | null;
       /** Changes with every save; added to generated URLs (share image) so caches refresh. */
       version: number;
+      /** Past exams whose results students can look up (published in /admin/results). */
+      pastExams: PastExam[];
     };
 
 /** Resolves a site key (from routing.ts) to the slug it serves, or null. */
@@ -71,5 +74,7 @@ export async function getSiteData(site: string): Promise<SiteData> {
     base: baseForSite(site),
     updatedAt: t.updatedAt,
     version: t.version,
+    // Publishing results refreshes this through the same tag (tenantTag).
+    pastExams: t.id ? await publishedExams(t.id).catch((e) => { console.error("past exams", e); return []; }) : [],
   };
 }

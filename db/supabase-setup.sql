@@ -1,7 +1,7 @@
 -- portfolioIO: one-time database setup for Supabase.
 -- Open Supabase > SQL Editor > New query, paste EVERYTHING in this file (the SQL text itself, not the file name), then click Run.
--- Safe to run once on an empty project. Generated from db/migrations/0000 to 0005.
--- Already set up earlier? Run only the db/migrations files added since (0002_analytics.sql, 0003_submissions.sql, 0004_quizzes.sql, 0005_site_files.sql), in order.
+-- Safe to run once on an empty project. Generated from db/migrations/0000 to 0006.
+-- Already set up earlier? Run only the db/migrations files added since (0002_analytics.sql, 0003_submissions.sql, 0004_quizzes.sql, 0005_site_files.sql, 0006_exam_results.sql), in order.
 
 CREATE TABLE "admin_users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -121,3 +121,23 @@ CREATE TABLE "tenant_files" (
 );
 ALTER TABLE "tenant_files" ADD CONSTRAINT "tenant_files_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;-- Same lock-down as 0001: only the app's own connection can read or write site files.
 ALTER TABLE "tenant_files" ENABLE ROW LEVEL SECURITY;REVOKE ALL ON "tenant_files" FROM anon, authenticated;
+
+-- Exam results (0006): grades students look up on the site by name and phone.
+CREATE TABLE "exam_results" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"tenant_id" uuid NOT NULL,
+	"exam_id" text,
+	"title" text NOT NULL,
+	"date" text NOT NULL,
+	"total" text,
+	"published" boolean DEFAULT false NOT NULL,
+	"rows" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"version" integer DEFAULT 1 NOT NULL,
+	"lookups" integer DEFAULT 0 NOT NULL,
+	"found" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_by" text
+);
+ALTER TABLE "exam_results" ADD CONSTRAINT "exam_results_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;CREATE INDEX "exam_results_tenant_idx" ON "exam_results" USING btree ("tenant_id","date");-- Same lock-down as 0001: only the app's own connection can read or write exam results.
+ALTER TABLE "exam_results" ENABLE ROW LEVEL SECURITY;REVOKE ALL ON "exam_results" FROM anon, authenticated;

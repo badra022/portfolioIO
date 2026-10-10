@@ -9,6 +9,7 @@ import { Book } from "./Book";
 import { Students } from "./Students";
 import { Challenge } from "./Challenge";
 import { Announcement, Exams } from "./Exams";
+import type { PastExamItem } from "./ExamResults";
 import { Youtube } from "./Youtube";
 import { Final } from "./Final";
 import { Reviews } from "./Reviews";
@@ -32,9 +33,20 @@ function hash(value: unknown): string {
   return h.toString(36);
 }
 
+/** The ids the teacher's forms use for the student's name and phone, so remembered answers are shared. */
+function contactIds(c: Content): { nameId: string; phoneId: string } {
+  const kept = c.forms.flatMap((f) => f.fields).filter((f) => f.remember);
+  const phoneId = kept.find((f) => f.type === "tel")?.id ?? "phone";
+  const nameId = kept.find((f) => f.id === "name")?.id
+    ?? kept.find((f) => f.type === "text" && /name|اسم/i.test(`${f.id} ${f.label}`))?.id
+    ?? "name";
+  return { nameId, phoneId };
+}
+
 /** The public teacher page. Content arrives with image URLs resolved and expired items (exams, pop-up) removed. */
-export function TenantPage({ c, base, canonical }: { c: Content; base: string; canonical: string | null }) {
+export function TenantPage({ c, base, canonical, pastExams }: { c: Content; base: string; canonical: string | null; pastExams: PastExamItem[] }) {
   const chat = chatConfig(c);
+  const results = { exams: pastExams, slug: c.slug, base, ...contactIds(c) };
   const render: Record<Content["sections"][number], () => React.ReactNode> = {
     hero: () => <Hero c={c} chat={chat} />,
     grades: () => <Grades data={c.grades!} />,
@@ -51,7 +63,7 @@ export function TenantPage({ c, base, canonical }: { c: Content; base: string; c
     book: () => <Book data={c.book!} chat={chat} />,
     students: () => <Students data={c.students!} chat={chat} />,
     challenge: () => <Challenge data={c.challenge!} chat={chat} />,
-    exams: () => <Exams data={c.exams!} locale={c.locale} chat={chat} />,
+    exams: () => <Exams data={c.exams!} locale={c.locale} chat={chat} results={results} />,
     youtube: () => <Youtube data={c.youtube!} avatar={c.profile.avatar} socials={c.socials} />,
     reviews: () => <Reviews data={c.reviews!} />,
     services: () => <Services data={c.services!} chat={chat} />,

@@ -76,6 +76,16 @@ Timed quizzes on their own page, e.g. `teacher.com/exam-oct`, managed from `/adm
 
 Attempts live in `quiz_attempts` (run `db/migrations/0004_quizzes.sql` once on an existing database). Claude can create and edit quizzes through the connector and read results with `quiz_results`. Don't reorder questions after students start: answers are stored by question number.
 
+## Exam results (students look up their grade)
+
+Under the upcoming exams, the exams section gets a **نتايج الامتحانات اللي فاتت** button (text editable in the exams section) once at least one exam's results are published. The student picks an exam (title and date), types their name and phone, and sees their score (out of the full mark, with a percentage and the teacher's note). They see only their own row; nothing else leaves the server.
+
+- **Same form as the buttons**: the name and phone are the student's remembered answers from the form buttons (same device storage, same field ids), so a student who already filled any form gets their result in one tap ("not you? edit"). A found result remembers them for next time.
+- **Matching**: the phone is compared without the country code or leading zero (`+20 100…`, `0100…`, `100…` written by Excel and Arabic digits all match), and the **first name** with spelling noise removed (diacritics, أ/إ/آ, ة/ه, ى/ي, punctuation, extra spaces; "عبد الله" counts as one name). Brothers sharing a parent's number are told apart by first name. A miss doesn't say which part was wrong. Lookups are limited per visitor to stop guessing numbers.
+- **Admin** → **نتايج الامتحانات**: new results for an exam on the page (title and date filled in) or any other; full mark optional. **Add from Excel**: an `.xlsx`, `.csv`, or cells copied from Excel and pasted (or typed `name, phone, score` lines). Columns are recognised from their headers or values (a seat-number column isn't mistaken for the phone) and can be changed; a preview and a list of rows to check (missing or unclear numbers) come first. Importing again *adds and updates*: a student already there (same phone + first name) gets the new score, keeping their fuller name and note; or *replace all*. Then edit, add or delete rows by hand, test a name/phone as a student would, and **Publish** / hide. Each exam shows how many students looked up their result and how many found it. Excel files are read in the browser with no extra package (old `.xls` files: save as `.xlsx`, or copy-paste).
+
+Stored in `exam_results` (run `db/migrations/0006_exam_results.sql` once on an existing database). Claude: `exam_results` and `manage_exam_results`.
+
 ## Images and search basics
 
 - **Every upload is compressed** (admin panel, photo upload links, Claude): `sharp` turns it upright, scales it to at most 1600px (tall screenshots 2600px), re-encodes it as WebP (quality 80) and drops all metadata, including phone GPS locations. Phone photos are first scaled down in the browser (canvas, no library) so they fit the ~4 MB request limit; from a link (Claude) up to 20 MB is accepted. Images uploaded before this change are left as they were.
