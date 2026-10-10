@@ -122,3 +122,32 @@ export const tenantFiles = pgTable("tenant_files", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by"),
 }, (t) => [primaryKey({ columns: [t.tenantId, t.name] })]);
+
+/**
+ * Results of one exam, entered or imported by the teacher (/admin/results).
+ * Students look theirs up on the site with their name and phone
+ * (lib/exam-results.ts); the rows are never sent to the browser as a whole.
+ */
+export const examResults = pgTable("exam_results", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  /** The exam on the page this belongs to (content.exams.items[].id), if any. */
+  examId: text("exam_id"),
+  title: text("title").notNull(),
+  /** YYYY-MM-DD. */
+  date: text("date").notNull(),
+  /** Full mark, e.g. "50". Optional. */
+  total: text("total"),
+  /** Shown on the site (in the exams section) only when published. */
+  published: boolean("published").notNull().default(false),
+  /** [{ name, phone, score, note? }] (lib/exam-results.ts ResultRow). */
+  rows: jsonb("rows").notNull().default(sql`'[]'::jsonb`),
+  /** Bumped on every change, so two people editing at once don't overwrite each other. */
+  version: integer("version").notNull().default(1),
+  /** Students who looked up a result, and how many found theirs. */
+  lookups: integer("lookups").notNull().default(0),
+  found: integer("found").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text("updated_by"),
+}, (t) => [index("exam_results_tenant_idx").on(t.tenantId, t.date)]);

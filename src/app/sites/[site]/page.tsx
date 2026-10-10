@@ -52,5 +52,5 @@ async function SiteBody({ params }: { params: Promise<{ site: string }> }) {
   const data = await getSiteData(decodeURIComponent((await params).site));
   if (data.kind === "platform") return <PlatformHome />;
   if (data.kind === "missing") notFound();
-  return <TenantPage c={data.content} base={data.base} canonical={data.canonical} />;
+  return <TenantPage c={data.content} base={data.base} canonical={data.canonical} pastExams={data.pastExams} />;
 }

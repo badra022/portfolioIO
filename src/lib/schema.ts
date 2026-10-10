@@ -263,6 +263,10 @@ const Exams = z.object({
     message: z.string(),
     form: FormRef.optional(),
   })),
+  /** Button under the exams that opens past exams' results (published in the admin panel → نتايج الامتحانات). */
+  resultsLabel: z.string().default("نتايج الامتحانات اللي فاتت"),
+  /** Optional line above that button. */
+  resultsIntro: z.string().optional(),
   /** Top announcement bar for the featured exam. {date} is filled in. */
   announcement: z.string().optional(),
   /** The bar starts showing on this date. Empty = right away. */
