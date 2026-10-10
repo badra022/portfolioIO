@@ -100,3 +100,12 @@ export function validate<T>(schema: z.ZodType<T>, value: unknown): { ok: true; d
   if (r.success) return { ok: true, data: r.data };
   return { ok: false, issues: r.error.issues.map((i) => ({ path: i.path.map(String).join("."), message: i.message })) };
 }
+
+/** Deep equality of JSON values, ignoring key order (Postgres jsonb reorders keys). */
+export function sameJson(a: unknown, b: unknown): boolean {
+  const norm = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(norm)
+      : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([, x]) => x !== undefined).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)).map(([k, x]) => [k, norm(x)]))
+        : v;
+  return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
+}

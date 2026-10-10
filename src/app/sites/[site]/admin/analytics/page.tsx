@@ -7,6 +7,7 @@ import { slugForSite } from "@/lib/server/site";
 import { getTenant } from "@/lib/server/repo";
 import { RANGES, report, type RangeT } from "@/lib/server/analytics";
 import { AnalyticsView } from "@/components/admin/AnalyticsView";
+import { adminEnv } from "@/lib/server/admin-env";
 import { CountThisBrowser } from "@/components/admin/CountThisBrowser";
 
 export const metadata: Metadata = { title: "الإحصائيات" };
@@ -22,7 +23,7 @@ export default async function Analytics({ params, searchParams }: PageProps<"/si
   if (!t) notFound();
   const q = (await searchParams).range;
   const range: RangeT = RANGES.includes(q as RangeT) ? (q as RangeT) : "month";
-  const r = await report(slug, range);
+  const r = await report(slug, range, await adminEnv());
   const base = baseForSite(site);
 
   return (

@@ -13,6 +13,15 @@ export const tenants = pgTable("tenants", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by"),
+  /**
+   * The private preview copy (lib/environments.ts): edits saved "to preview" land
+   * here until they are published. Null = preview shows production.
+   */
+  previewContent: jsonb("preview_content"),
+  previewTheme: jsonb("preview_theme"),
+  previewVersion: integer("preview_version").notNull().default(0),
+  previewUpdatedAt: timestamp("preview_updated_at", { withTimezone: true }),
+  previewUpdatedBy: text("preview_updated_by"),
 });
 
 /** Custom domains that serve a teacher. Each must also be added to the Vercel project. */
@@ -43,6 +52,8 @@ export const tenantRevisions = pgTable("tenant_revisions", {
   theme: jsonb("theme").notNull(),
   author: text("author").notNull(),
   note: text("note"),
+  /** Which copy was saved: production or the preview. */
+  env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("tenant_revisions_tenant_idx").on(t.tenantId, t.createdAt)]);
 
@@ -56,7 +67,9 @@ export const analyticsDaily = pgTable("analytics_daily", {
   metric: text("metric").notNull(),
   key: text("key").notNull().default(""),
   value: bigint("value", { mode: "number" }).notNull().default(0),
-}, (t) => [primaryKey({ columns: [t.tenantId, t.day, t.metric, t.key] })]);
+  /** Where it came from: the public site or the private preview (lib/environments.ts). */
+  env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
+}, (t) => [primaryKey({ columns: [t.tenantId, t.env, t.day, t.metric, t.key] })]);
 
 /**
  * What students sent through a form button (name, phone... plus what they picked:
@@ -76,6 +89,8 @@ export const submissions = pgTable("submissions", {
   /** What the button carried: { "السؤال": "...", "الإجابة": "..." }. */
   context: jsonb("context").notNull(),
   status: text("status", { enum: ["new", "contacted", "done"] }).notNull().default("new"),
+  /** Where it came from: the public site or the private preview (lib/environments.ts). */
+  env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("submissions_tenant_created_idx").on(t.tenantId, t.createdAt)]);
 
@@ -104,9 +119,12 @@ export const quizAttempts = pgTable("quiz_attempts", {
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   deadlineAt: timestamp("deadline_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
+  /** Where it came from: the public site or the private preview (lib/environments.ts). */
+  env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
 }, (t) => [
   index("quiz_attempts_quiz_idx").on(t.tenantId, t.quizPath, t.startedAt),
-  uniqueIndex("quiz_attempts_contact_idx").on(t.tenantId, t.quizPath, t.contact).where(sql`${t.contact} is not null`),
+  // One attempt per number and environment: trying a quiz in preview doesn't use up the real one.
+  uniqueIndex("quiz_attempts_contact_idx").on(t.tenantId, t.env, t.quizPath, t.contact).where(sql`${t.contact} is not null`),
 ]);
 
 /**
@@ -147,6 +165,10 @@ export const examResults = pgTable("exam_results", {
   /** Students who looked up a result, and how many found theirs. */
   lookups: integer("lookups").notNull().default(0),
   found: integer("found").notNull().default(0),
+  /** The same for the private preview: shown there when published to preview, with its own counts. */
+  previewPublished: boolean("preview_published").notNull().default(false),
+  previewLookups: integer("preview_lookups").notNull().default(0),
+  previewFound: integer("preview_found").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by"),

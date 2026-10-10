@@ -338,7 +338,7 @@ const Popup = z.object({
 /* ---------- quizzes ---------- */
 
 /** Paths a quiz can't use, because the site already answers them. */
-export const RESERVED_PATHS = ["admin", "api", "upload", "t", "robots.txt", "sitemap.xml", "local-assets", "favicon.ico"];
+export const RESERVED_PATHS = ["admin", "api", "upload", "t", "preview", "robots.txt", "sitemap.xml", "local-assets", "favicon.ico"];
 
 const QuizQuestion = z.object({
   text: z.string().optional(),

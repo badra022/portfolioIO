@@ -34,7 +34,7 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/f"
   try {
     const tenantId = await activeTenantId(data.slug);
     if (!tenantId) return json({ ok: false, error: "not found" }, 404);
-    await saveSubmission(tenantId, { formId: form.id, source: incoming.source, place: incoming.place, fields: checked.fields, context: incoming.context });
+    await saveSubmission(tenantId, { formId: form.id, source: incoming.source, place: incoming.place, fields: checked.fields, context: incoming.context, env: data.env });
   } catch (e) {
     console.error("submission", e);
     return json({ ok: false, error: "حصلت مشكلة، حاول تاني." }, 500);

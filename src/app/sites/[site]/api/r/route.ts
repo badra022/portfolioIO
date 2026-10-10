@@ -50,7 +50,7 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/r"
   try {
     const tenantId = await activeTenantId(data.slug);
     if (!tenantId) return json({ ok: false, error: "not found" }, 404);
-    const r = await lookupResult(tenantId, id, name, phone);
+    const r = await lookupResult(tenantId, data.env, id, name, phone);
     if (r === "missing") return json({ ok: false, error: "النتيجة دي مش متاحة دلوقتي." }, 404);
     return json(r ? { ok: true, found: true, result: r } : { ok: true, found: false });
   } catch (e) {

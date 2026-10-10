@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { hasDb } from "@/lib/env";
 import { slugForSite } from "@/lib/server/site";
 import { activeTenantId, record, toCounters } from "@/lib/server/analytics";
+import { siteEnv } from "@/lib/environments";
 
 // Link-preview fetchers never run the page's JavaScript, so only scripted browsers need catching here.
 // Keep this narrow: in-app browsers (Facebook, Instagram, TikTok...) carry their app's name in the user agent.
@@ -29,7 +30,7 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/v"
   try {
     const slug = await slugForSite(site);
     const tenantId = slug ? await activeTenantId(slug) : null;
-    if (tenantId) await record(tenantId, toCounters(body));
+    if (tenantId) await record(tenantId, toCounters(body), siteEnv(site));
   } catch (e) {
     console.error("analytics", e);
   }

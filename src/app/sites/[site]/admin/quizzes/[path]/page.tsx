@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { baseForSite } from "@/lib/routing";
 import { requireAdmin } from "@/lib/server/auth";
 import { slugForSite } from "@/lib/server/site";
-import { getTenant } from "@/lib/server/repo";
+import { copyFor, getTenant } from "@/lib/server/repo";
+import { adminEnv } from "@/lib/server/admin-env";
 import { listAttempts, quizMetrics } from "@/lib/server/quiz-attempts";
 import { availability } from "@/lib/quiz";
 import { deadline } from "@/lib/dates";
@@ -27,10 +28,12 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
   await requireAdmin(site);
   const slug = await slugForSite(site);
   const t = slug ? await getTenant(slug) : null;
-  const quiz = t?.content.quizzes.find((q) => q.path === decodeURIComponent(path));
-  if (!slug || !t || !quiz) notFound();
-  const form = quiz.form ? t.content.forms.find((f) => f.id === quiz.form) : undefined;
-  const rows = await listAttempts(slug, quiz);
+  const env = await adminEnv();
+  const content = t ? copyFor(t, env).content : null;
+  const quiz = content?.quizzes.find((q) => q.path === decodeURIComponent(path));
+  if (!slug || !t || !content || !quiz) notFound();
+  const form = quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined;
+  const rows = await listAttempts(slug, quiz, env);
   const m = quizMetrics(quiz, rows);
   const sort = (await searchParams).sort === "score" ? "score" : "time";
   const sorted = sort === "score"
@@ -56,7 +59,7 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
           {quiz.endsAt && quiz.state === "auto" ? ` · ينتهي ${formatWhen(deadline(quiz.endsAt).toISOString())}` : ""}
         </p>
         <div className="a-actions">
-          <QuizStateButtons site={site} path={quiz.path} state={quiz.state} />
+          <QuizStateButtons site={site} path={quiz.path} state={quiz.state} env={env} />
           <a className="btn-sm ghost" href={`${base}/admin/edit/quizzes`}>تعديل الأسئلة</a>
           <a className="btn-sm ghost" href={`${base}/admin/quizzes/${quiz.path}/export`}>تنزيل Excel (CSV)</a>
         </div>

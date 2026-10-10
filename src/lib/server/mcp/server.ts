@@ -22,6 +22,7 @@ import * as examResults from "../exam-results";
 import { SiteFileError, deleteSiteFile, filesTag, listSiteFiles, putSiteFile } from "../site-files";
 import { applyOps, contentOutline, deepMerge, schemaFor, type Op } from "./content-ops";
 import { fetchImage } from "./fetch-image";
+import { ENVS, type SiteEnv } from "@/lib/environments";
 
 const AUTHOR = "Claude (MCP)";
 
@@ -41,6 +42,8 @@ Quizzes: content "quizzes" (get_schema part "quizzes"): each has a page at /<pat
 
 Exam results: students look up their grade in past exams on the site (exams section → past exams' results) with their name and phone. Results live outside the content: exam_results to read, manage_exam_results to create one exam's results, add rows ({name, phone, score, note?}; a student already there with the same phone without country code and same first name gets the new score), edit title/date/full mark, publish (shown on the site) or delete. Never invent grades: only add what the user gives you (e.g. a pasted sheet).
 
+Preview and production: every teacher has a private preview copy at <site>/preview (behind the admin login; the admin panel shows it too). Content edits (update_content, edit_content, update_theme) go to the preview by default (target "preview"): send the user preview_url to check, then publish_preview publishes everything in the preview to the public site (or discards it). Pass target "production" only when the user asks to change the live site directly; that also applies the change to the preview copy. get_teacher returns the production copy, or the preview copy with env "preview". Collected data is per environment too: list_requests, quiz_results and get_analytics take env (default production).
+
 Rules for content: match the tone and language of the example (Egyptian Arabic) unless told otherwise. WhatsApp numbers are international digits only (2010...). "sections" is the page order and every listed section needs its data. Messages may use placeholders listed in each field's description (e.g. {grade}, {date}). Pass expected_version from get_teacher when editing, so a change made meanwhile in the admin panel isn't overwritten.`;
 
 /* ------------------------------------------------------------------ */
@@ -54,6 +57,20 @@ function refreshTeacher(slug: string, domains = false) {
 }
 
 const slugArg = z.string().describe("Teacher id (slug), e.g. \"mohamed-ali\". See list_teachers.");
+const targetArg = z.enum(ENVS).optional().describe("preview (default): save to the private preview copy; production: change the live site now.");
+const envArg = z.enum(ENVS).optional().describe("Data from the public site (production, default) or from the private preview.");
+
+/**
+ * Saves a full content/theme to the chosen copy. expected_version is the version
+ * of that copy (get_teacher with the same env). A production save also goes into
+ * the preview copy when the preview has unpublished edits, like in the admin panel.
+ */
+async function writeCopy(t: repo.TenantRecord, target: SiteEnv, patch: { content?: Content; theme?: Theme }, expected: number | undefined, note: string, previewPatch?: { content?: Content; theme?: Theme }): Promise<repo.SaveResult> {
+  if (target === "preview") return repo.savePreview(t.slug, patch, expected ?? t.preview.version, AUTHOR, note);
+  const r = await repo.saveTenant(t.slug, patch, expected ?? t.version, AUTHOR, note);
+  if (r.ok && t.preview.pending && previewPatch) await repo.savePreview(t.slug, previewPatch, null, AUTHOR, `${note} (published)`);
+  return r;
+}
 
 /** Wraps a tool so thrown errors come back as readable tool errors instead of protocol failures. */
 const safe = <A,>(fn: (args: A) => Promise<CallToolResult>) =>
@@ -65,8 +82,13 @@ const safe = <A,>(fn: (args: A) => Promise<CallToolResult>) =>
     }
   };
 
-function saveResult(r: repo.SaveResult, slug: string, origin: string) {
-  if (r.ok) { refreshTeacher(slug); return ok({ saved: true, version: r.version, preview_url: `${origin}/t/${slug}` }); }
+function saveResult(r: repo.SaveResult, slug: string, origin: string, target: SiteEnv = "production") {
+  if (r.ok) {
+    refreshTeacher(slug);
+    return ok(target === "preview"
+      ? { saved: "preview", preview_version: r.version, preview_url: `${origin}/t/${slug}/preview`, next: "Ask the user to check the preview, then publish_preview." }
+      : { saved: "production", version: r.version, site_url: `${origin}/t/${slug}` });
+  }
   if (r.reason === "invalid") return fail("Not saved: the content doesn't pass validation. Fix these fields and try again.", r.issues);
   if (r.reason === "conflict") return fail(`Not saved: the page changed meanwhile (now version ${r.version}). Read it again with get_teacher and redo the change.`);
   return fail("Teacher not found.");
@@ -109,17 +131,24 @@ export function buildMcpServer(origin: string): McpServer {
   server.registerTool("get_teacher", {
     title: "Get a teacher's page",
     description: "The teacher's full content (as stored: image fields hold keys, resolved against image_base), theme, version, status, domains and logins. Pass keys to fetch only some top-level content keys.",
-    inputSchema: { slug: slugArg, keys: z.array(z.string()).optional().describe("Only these top-level content keys, e.g. [\"hero\",\"schedule\"]. Add \"theme\" to include the theme.") },
+    inputSchema: {
+      slug: slugArg,
+      keys: z.array(z.string()).optional().describe("Only these top-level content keys, e.g. [\"hero\",\"schedule\"]. Add \"theme\" to include the theme."),
+      env: z.enum(ENVS).optional().describe("production (default): the live site; preview: the private preview copy (what edits with target preview change)."),
+    },
     annotations: { readOnlyHint: true },
-  }, safe(async ({ slug, keys }) => {
+  }, safe(async ({ slug, keys, env }) => {
     const t = await repo.getTenant(slug);
     if (!t) return fail(`No teacher "${slug}". See list_teachers.`);
-    const content = keys?.length ? Object.fromEntries(keys.filter((k) => k in t.content).map((k) => [k, (t.content as Record<string, unknown>)[k]])) : t.content;
+    const copy = repo.copyFor(t, env ?? "production");
+    const content = keys?.length ? Object.fromEntries(keys.filter((k) => k in copy.content).map((k) => [k, (copy.content as Record<string, unknown>)[k]])) : copy.content;
     return ok({
-      slug: t.slug, name: t.name, status: t.status, version: t.version, updated_at: t.updatedAt, updated_by: t.updatedBy,
+      slug: t.slug, name: t.name, status: t.status, env: env ?? "production",
+      version: t.version, preview_version: t.preview.version, preview_has_unpublished_edits: t.preview.pending,
+      updated_at: t.updatedAt, updated_by: t.updatedBy,
       domains: t.domains, logins: await repo.listUsers(slug),
-      preview_url: preview(slug), image_base: abs(assetBase(slug)),
-      content, ...(keys?.length && !keys.includes("theme") ? {} : { theme: t.theme }),
+      site_url: preview(slug), preview_url: `${preview(slug)}/preview`, image_base: abs(assetBase(slug)),
+      content, ...(keys?.length && !keys.includes("theme") ? {} : { theme: copy.theme }),
     });
   }));
 
@@ -195,19 +224,24 @@ export function buildMcpServer(origin: string): McpServer {
     inputSchema: {
       slug: slugArg,
       changes: z.record(z.string(), z.unknown()).describe("{ key: newValue | null }, e.g. { \"exams\": {...}, \"popup\": null }."),
-      expected_version: z.number().int().optional().describe("Version from get_teacher; the save is refused if the page changed since."),
+      target: targetArg,
+      expected_version: z.number().int().optional().describe("Version of the copy being changed (get_teacher: preview_version for preview, version for production); the save is refused if it changed since."),
       note: z.string().optional().describe("Short description for the history (Arabic or English)."),
     },
-  }, safe(async ({ slug, changes, expected_version, note }) => {
+  }, safe(async ({ slug, changes, target, expected_version, note }) => {
     const t = await repo.getTenant(slug);
     if (!t) return fail(`No teacher "${slug}".`);
     if ("slug" in changes) return fail("slug can't be changed.");
-    const content = { ...t.content } as Record<string, unknown>;
-    for (const [k, v] of Object.entries(changes)) {
-      if (v === null) delete content[k]; else content[k] = v;
-    }
-    const r = await repo.saveTenant(slug, { content }, expected_version ?? t.version, AUTHOR, note ?? `Claude: ${Object.keys(changes).join("، ")}`);
-    return saveResult(r, slug, origin);
+    const apply = (base: Content) => {
+      const content = { ...base } as Record<string, unknown>;
+      for (const [k, v] of Object.entries(changes)) {
+        if (v === null) delete content[k]; else content[k] = v;
+      }
+      return content as Content;
+    };
+    const env = target ?? "preview";
+    const r = await writeCopy(t, env, { content: apply(repo.copyFor(t, env).content) }, expected_version, note ?? `Claude: ${Object.keys(changes).join("، ")}`, { content: apply(t.preview.content) });
+    return saveResult(r, slug, origin, env);
   }));
 
   server.registerTool("edit_content", {
@@ -220,17 +254,21 @@ export function buildMcpServer(origin: string): McpServer {
         path: z.string(),
         value: z.unknown().optional(),
       })).min(1),
+      target: targetArg,
       expected_version: z.number().int().optional(),
       note: z.string().optional(),
     },
-  }, safe(async ({ slug, operations, expected_version, note }) => {
+  }, safe(async ({ slug, operations, target, expected_version, note }) => {
     const t = await repo.getTenant(slug);
     if (!t) return fail(`No teacher "${slug}".`);
     if (operations.some((o) => o.path.split(".")[0] === "slug")) return fail("slug can't be changed.");
+    const env = target ?? "preview";
     let content: Content;
-    try { content = applyOps(t.content, operations as Op[]); } catch (e) { return fail(`Not saved: ${(e as Error).message}`); }
-    const r = await repo.saveTenant(slug, { content }, expected_version ?? t.version, AUTHOR, note ?? `Claude: ${[...new Set(operations.map((o) => o.path.split(".")[0]))].join("، ")}`);
-    return saveResult(r, slug, origin);
+    try { content = applyOps(repo.copyFor(t, env).content, operations as Op[]); } catch (e) { return fail(`Not saved: ${(e as Error).message}`); }
+    let previewContent: Content | undefined;
+    try { previewContent = applyOps(t.preview.content, operations as Op[]); } catch { previewContent = undefined; }
+    const r = await writeCopy(t, env, { content }, expected_version, note ?? `Claude: ${[...new Set(operations.map((o) => o.path.split(".")[0]))].join("، ")}`, previewContent && { content: previewContent });
+    return saveResult(r, slug, origin, env);
   }));
 
   server.registerTool("update_theme", {
@@ -239,13 +277,29 @@ export function buildMcpServer(origin: string): McpServer {
     inputSchema: {
       slug: slugArg,
       theme: z.record(z.string(), z.unknown()).describe("e.g. { \"colors\": { \"accent\": \"#1e6bd6\", \"accentHot\": \"#3b82f6\" }, \"scheme\": \"light\" }"),
+      target: targetArg,
       expected_version: z.number().int().optional(),
     },
-  }, safe(async ({ slug, theme, expected_version }) => {
+  }, safe(async ({ slug, theme, target, expected_version }) => {
     const t = await repo.getTenant(slug);
     if (!t) return fail(`No teacher "${slug}".`);
-    const r = await repo.saveTenant(slug, { theme: deepMerge(t.theme, theme) }, expected_version ?? t.version, AUTHOR, "Claude: الهوية البصرية");
-    return saveResult(r, slug, origin);
+    const env = target ?? "preview";
+    const r = await writeCopy(t, env, { theme: deepMerge(repo.copyFor(t, env).theme, theme) }, expected_version, "Claude: الهوية البصرية", { theme: deepMerge(t.preview.theme, theme) });
+    return saveResult(r, slug, origin, env);
+  }));
+
+  server.registerTool("publish_preview", {
+    title: "Publish or discard the preview",
+    description: "publish: the live site becomes exactly what the private preview shows (all unpublished edits at once). discard: throw the unpublished preview edits away (the preview shows the live site again). Only after the user checked the preview and asked for it.",
+    inputSchema: { slug: slugArg, action: z.enum(["publish", "discard"]) },
+    annotations: { destructiveHint: true },
+  }, safe(async ({ slug, action }) => {
+    const t = await repo.getTenant(slug);
+    if (!t) return fail(`No teacher "${slug}".`);
+    if (!t.preview.pending) return ok({ nothing_to_do: true, note: "The preview has no unpublished edits." });
+    if (action === "discard") { await repo.discardPreview(slug, AUTHOR); refreshTeacher(slug); return ok({ discarded: true }); }
+    const r = await repo.publishPreview(slug, AUTHOR);
+    return saveResult(r, slug, origin, "production");
   }));
 
   server.registerTool("set_teacher_status", {
@@ -422,9 +476,10 @@ export function buildMcpServer(origin: string): McpServer {
       status: z.enum(STATUSES).optional(),
       search: z.string().optional().describe("Text in the answers, e.g. part of a phone number or a name."),
       limit: z.number().int().min(1).max(500).optional(),
+      env: envArg,
     },
     annotations: { readOnlyHint: true },
-  }, safe(async ({ slug, form, status, search, limit }) => ok(await listSubmissions(slug, { form, status, q: search, limit: limit ?? 50 }))));
+  }, safe(async ({ slug, form, status, search, limit, env }) => ok(await listSubmissions(slug, { env, form, status, q: search, limit: limit ?? 50 }))));
 
   server.registerTool("update_requests", {
     title: "Mark requests",
@@ -435,13 +490,13 @@ export function buildMcpServer(origin: string): McpServer {
   server.registerTool("quiz_results", {
     title: "Quiz results",
     description: "A quiz's metrics (started, finished, timed out, average/median/top score, pass rate, time, per-question correct rate and common wrong answers) and every attempt with the student's details, answers, marks and score.",
-    inputSchema: { slug: slugArg, path: z.string().describe("The quiz's path (content.quizzes[].path)."), attempts: z.boolean().optional().describe("Include each attempt (default true).") },
+    inputSchema: { slug: slugArg, path: z.string().describe("The quiz's path (content.quizzes[].path)."), attempts: z.boolean().optional().describe("Include each attempt (default true)."), env: envArg },
     annotations: { readOnlyHint: true },
-  }, safe(async ({ slug, path, attempts }) => {
+  }, safe(async ({ slug, path, attempts, env }) => {
     const t = await repo.getTenant(slug);
-    const quiz = t?.content.quizzes.find((q) => q.path === path);
+    const quiz = t && repo.copyFor(t, env ?? "production").content.quizzes.find((q) => q.path === path);
     if (!quiz) return fail(`No quiz "${path}" for ${slug}.`);
-    const rows = await listAttempts(slug, quiz);
+    const rows = await listAttempts(slug, quiz, env ?? "production");
     return ok({ metrics: quizMetrics(quiz, rows), ...(attempts === false ? {} : { attempts: rows.map(({ questions: _q, ...r }) => r) }) });
   }));
 
@@ -467,7 +522,8 @@ export function buildMcpServer(origin: string): McpServer {
       date: z.string().optional().describe("YYYY-MM-DD"),
       total: z.string().optional().describe("Full mark, e.g. \"50\"."),
       exam_id: z.string().optional(),
-      published: z.boolean().optional(),
+      published: z.boolean().optional().describe("Shown on the live site."),
+      preview_published: z.boolean().optional().describe("Shown in the private preview (to test before publishing)."),
       rows: z.array(z.object({ name: z.string(), phone: z.string(), score: z.union([z.string(), z.number()]), note: z.string().optional() })).optional(),
       mode: z.enum(["merge", "replace"]).optional(),
     },
@@ -487,7 +543,7 @@ export function buildMcpServer(origin: string): McpServer {
         return ok({ ...r.summary, students: r.count });
       }
       if (a.action === "update") {
-        await examResults.updateResultMeta(a.slug, a.id, { title: a.title, date: a.date, total: a.total, published: a.published }, AUTHOR);
+        await examResults.updateResultMeta(a.slug, a.id, { title: a.title, date: a.date, total: a.total, published: a.published, previewPublished: a.preview_published }, AUTHOR);
         refreshTeacher(a.slug);
         return ok({ updated: a.id });
       }
@@ -519,10 +575,10 @@ export function buildMcpServer(origin: string): McpServer {
   server.registerTool("get_analytics", {
     title: "Visits and conversions",
     description: "The teacher's analytics: visitors, page views, visitors who contacted them (WhatsApp/Telegram/Messenger/call) or went to their channels, clicks by destination and place, sections reached, time on page, devices, sources, and the last 30 days.",
-    inputSchema: { slug: slugArg, range: z.enum(RANGES).optional().describe("today | month (default) | lastMonth | all") },
+    inputSchema: { slug: slugArg, range: z.enum(RANGES).optional().describe("today | month (default) | lastMonth | all"), env: envArg },
     annotations: { readOnlyHint: true },
-  }, safe(async ({ slug, range }) => {
-    const r = await report(slug, range ?? "month");
+  }, safe(async ({ slug, range, env }) => {
+    const r = await report(slug, range ?? "month", env ?? "production");
     return r ? ok(r) : fail("No analytics: unknown teacher or no database.");
   }));
 

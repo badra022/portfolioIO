@@ -44,7 +44,7 @@ function contactIds(c: Content): { nameId: string; phoneId: string } {
 }
 
 /** The public teacher page. Content arrives with image URLs resolved and expired items (exams, pop-up) removed. */
-export function TenantPage({ c, base, canonical, pastExams }: { c: Content; base: string; canonical: string | null; pastExams: PastExamItem[] }) {
+export function TenantPage({ c, base, canonical, pastExams, preview = false }: { c: Content; base: string; canonical: string | null; pastExams: PastExamItem[]; preview?: boolean }) {
   const chat = chatConfig(c);
   const results = { exams: pastExams, slug: c.slug, base, ...contactIds(c) };
   const render: Record<Content["sections"][number], () => React.ReactNode> = {
@@ -86,8 +86,8 @@ export function TenantPage({ c, base, canonical, pastExams }: { c: Content; base
       <DevCredit siteName={c.profile.fullTitle} />
       <StickyBar c={c} chat={chat} />
       {/* Machine-readable description of the teacher, classes, exams, book and videos (lib/structured-data.ts). */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData(c, { canonical })) }} />
-      <Tracker slug={c.slug} base={base} />
+      {!preview && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData(c, { canonical })) }} />}
+      <Tracker slug={c.slug} base={base} preview={preview} />
       {c.forms.length > 0 && <LeadForms forms={c.forms} slug={c.slug} base={base} />}
       {c.popup && <Popup data={c.popup} chat={chat} storageKey={`popup:${c.slug}:${hash(c.popup)}`} closeLabel="إغلاق" />}
     </>

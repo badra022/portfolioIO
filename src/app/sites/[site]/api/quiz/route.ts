@@ -38,7 +38,7 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/qu
         if (!quiz) return json({ ok: false, error: "not found" }, 404);
         const form = quiz.form ? data.content.forms.find((f) => f.id === quiz.form) : undefined;
         const values = parseIncoming({ form: "x", values: body.values })?.values ?? {};
-        const r = await startAttempt(tenantId, quiz, form, values);
+        const r = await startAttempt(tenantId, data.env, quiz, form, values);
         return r.ok ? json({ ok: true, attempt: r.attempt, resumed: r.resumed }) : json({ ok: false, error: r.error, errors: r.errors }, r.errors ? 422 : 409);
       }
       case "resume": {

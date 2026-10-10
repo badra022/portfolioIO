@@ -116,20 +116,25 @@ function Meta({ site, set, onSaved }: { site: string; set: ResultSet; onSaved: (
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const save = async (published: boolean) => {
+  /** Saves the details, and where the results show: the public site and/or the private preview. */
+  const save = async (published: boolean, previewPublished: boolean, done: string) => {
     setBusy(true);
-    const r = await updateResultMetaAction(site, set.id, { title, date, total, published }).catch(() => ({ ok: false as const, message: "مفيش اتصال؟ حاول تاني." }));
+    const r = await updateResultMetaAction(site, set.id, { title, date, total, published, previewPublished }).catch(() => ({ ok: false as const, message: "مفيش اتصال؟ حاول تاني." }));
     setBusy(false);
     if (!r.ok) { setMsg({ ok: false, text: r.message }); return; }
-    onSaved({ title: title.trim(), date, total: total.trim() || null, published });
-    setMsg({ ok: true, text: published !== set.published ? (published ? "اتنشرت: الطلاب يقدروا يشوفوا نتايجهم دلوقتي من قسم الامتحانات." : "اتشالت من الموقع.") : "اتحفظ." });
+    onSaved({ title: title.trim(), date, total: total.trim() || null, published, preview: { ...set.preview, published: previewPublished } });
+    setMsg({ ok: true, text: done });
   };
+  const empty = !set.rows.length;
 
   return (
     <section className="a-panel">
       <div className="qz-head">
         <h2>بيانات الامتحان</h2>
-        <span className={`rq-badge ${set.published ? "new" : ""}`}>{set.published ? "منشورة على الموقع" : "مش منشورة"}</span>
+        <span>
+          <span className={`rq-badge ${set.published ? "new" : ""}`}>{set.published ? "على الموقع" : "مش على الموقع"}</span>{" "}
+          <span className={`rq-badge ${set.preview.published ? "contacted" : ""}`}>{set.preview.published ? "في المعاينة" : "مش في المعاينة"}</span>
+        </span>
       </div>
       <div className="a-form">
         <label className="f-field">
@@ -147,12 +152,15 @@ function Meta({ site, set, onSaved }: { site: string; set: ResultSet; onSaved: (
           </label>
         </div>
         <div className="qz-actions">
-          <button type="button" className="btn-sm ghost" disabled={busy} onClick={() => save(set.published)}>حفظ البيانات</button>
+          <button type="button" className="btn-sm ghost" disabled={busy} onClick={() => save(set.published, set.preview.published, "اتحفظ.")}>حفظ البيانات</button>
+          {set.preview.published
+            ? <button type="button" className="btn-sm ghost" disabled={busy} onClick={() => save(set.published, false, "اتشالت من المعاينة.")}>إخفاء من المعاينة</button>
+            : <button type="button" className="btn-sm ghost" disabled={busy || empty} onClick={() => save(set.published, true, "ظاهرة في المعاينة: جرّبها من رابط المعاينة قبل ما تنشرها.")}>عرض في المعاينة</button>}
           {set.published
-            ? <button type="button" className="btn-sm ghost" disabled={busy} onClick={() => save(false)}>إخفاء من الموقع</button>
-            : <button type="button" className="btn-sm primary" disabled={busy || !set.rows.length} onClick={() => save(true)}>نشر على الموقع</button>}
+            ? <button type="button" className="btn-sm ghost" disabled={busy} onClick={() => save(false, set.preview.published, "اتشالت من الموقع.")}>إخفاء من الموقع</button>
+            : <button type="button" className="btn-sm primary" disabled={busy || empty} onClick={() => save(true, true, "اتنشرت: الطلاب يقدروا يشوفوا نتايجهم دلوقتي من قسم الامتحانات.")}>نشر على الموقع</button>}
         </div>
-        {!set.published && !set.rows.length && <p className="f-hint">ضيف الدرجات الأول، وبعدين انشر.</p>}
+        {empty && <p className="f-hint">ضيف الدرجات الأول، وبعدين اعرضها في المعاينة أو انشرها.</p>}
         {msg && <div className={`a-result ${msg.ok ? "ok" : "bad"}`} role="status"><p>{msg.text}</p></div>}
       </div>
     </section>

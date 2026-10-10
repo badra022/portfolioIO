@@ -8,6 +8,8 @@ import { slugForSite } from "@/lib/server/site";
 import { getTenant } from "@/lib/server/repo";
 import { assetBase } from "@/lib/server/assets";
 import { SectionEditor } from "@/components/admin/SectionEditor";
+import { PREVIEW_PATH } from "@/lib/environments";
+import { sameJson } from "@/lib/content-utils";
 
 export default async function EditSection({ params }: PageProps<"/sites/[site]/admin/edit/[section]">) {
   const { site: raw, section } = await params;
@@ -21,10 +23,15 @@ export default async function EditSection({ params }: PageProps<"/sites/[site]/a
   if (!t) notFound();
 
   const schema: JS = def.theme ? (themeJsonSchema as JS) : pickSchema(contentJsonSchema as JS, def.keys ?? []);
-  const source = (def.theme ? t.theme : t.content) as Record<string, unknown>;
-  const initial = def.theme
-    ? structuredClone(source)
-    : Object.fromEntries((def.keys ?? []).filter((k) => source[k] !== undefined).map((k) => [k, structuredClone(source[k])]));
+  // The editor works on the preview copy (same as the public site until something is saved to preview).
+  const pick = (copy: { content: unknown; theme: unknown }) => {
+    const source = (def.theme ? copy.theme : copy.content) as Record<string, unknown>;
+    return def.theme
+      ? structuredClone(source)
+      : Object.fromEntries((def.keys ?? []).filter((k) => source[k] !== undefined).map((k) => [k, structuredClone(source[k])]));
+  };
+  const initial = pick(t.preview);
+  const pending = t.preview.pending && !sameJson(initial, pick(t));
   const base = baseForSite(site);
 
   return (
@@ -40,6 +47,9 @@ export default async function EditSection({ params }: PageProps<"/sites/[site]/a
         schema={schema}
         initial={initial}
         version={t.version}
+        previewVersion={t.preview.version}
+        pending={pending}
+        previewUrl={`${base}${PREVIEW_PATH}/`}
         assetBase={assetBase(slug)}
         viewUrl={`${base}/`}
         forms={t.content.forms.map((f) => ({ id: f.id, title: f.title }))}

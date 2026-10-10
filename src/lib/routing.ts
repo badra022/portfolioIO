@@ -1,3 +1,4 @@
+import { PREVIEW_PATH, splitSite, withEnv } from "./environments";
 /**
  * Maps an incoming (host, path) to an internal route under /sites/<site>/...
  * Pure function: used by proxy.ts and by server code that needs the same answer.
@@ -7,7 +8,11 @@
  *   p.<slug>      a teacher previewed on a platform host at /t/<slug>  (links need the /t/<slug> prefix)
  *   s.<slug>      a teacher on <slug>.<ROOT_DOMAIN>
  *   d.<domain>    a teacher on their own custom domain
+ *
+ * Any teacher key may end in "~preview": the private preview of that site at
+ * <address>/preview/... (lib/environments.ts), e.g. "d.teacher.com~preview".
  */
+
 export type Route = { site: string; rest: string; base: string };
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/;
@@ -25,6 +30,14 @@ export function isPlatformHost(host: string, rootDomain: string, platformHosts: 
 }
 
 export function route(hostRaw: string | null | undefined, pathname: string, rootDomain: string, platformHosts: string[]): Route {
+  const r = siteRoute(hostRaw, pathname, rootDomain, platformHosts);
+  if (r.site !== "_platform" && (r.rest === PREVIEW_PATH || r.rest.startsWith(`${PREVIEW_PATH}/`))) {
+    return { site: withEnv(r.site, "preview"), rest: r.rest.slice(PREVIEW_PATH.length) || "/", base: `${r.base}${PREVIEW_PATH}` };
+  }
+  return r;
+}
+
+function siteRoute(hostRaw: string | null | undefined, pathname: string, rootDomain: string, platformHosts: string[]): Route {
   const host = normalizeHost(hostRaw);
   if (isPlatformHost(host, rootDomain, platformHosts)) {
     const m = pathname.match(/^\/t\/([^/]+)(\/.*)?$/);
@@ -40,7 +53,8 @@ export function route(hostRaw: string | null | undefined, pathname: string, root
 
 export const isAdminPath = (rest: string) => rest === "/admin" || rest.startsWith("/admin/");
 
-/** The public base path for links inside a site (empty unless previewed under /t/<slug>). */
+/** The public base path for links inside a site: "" on a teacher's address, "/t/<slug>" on a platform host, plus "/preview" in preview. */
 export function baseForSite(site: string): string {
-  return site.startsWith("p.") ? `/t/${site.slice(2)}` : "";
+  const { key, env } = splitSite(site);
+  return `${key.startsWith("p.") ? `/t/${key.slice(2)}` : ""}${env === "preview" ? PREVIEW_PATH : ""}`;
 }

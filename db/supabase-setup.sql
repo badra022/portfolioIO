@@ -1,7 +1,7 @@
 -- portfolioIO: one-time database setup for Supabase.
 -- Open Supabase > SQL Editor > New query, paste EVERYTHING in this file (the SQL text itself, not the file name), then click Run.
--- Safe to run once on an empty project. Generated from db/migrations/0000 to 0006.
--- Already set up earlier? Run only the db/migrations files added since (0002_analytics.sql, 0003_submissions.sql, 0004_quizzes.sql, 0005_site_files.sql, 0006_exam_results.sql), in order.
+-- Safe to run once on an empty project. Generated from db/migrations/0000 to 0007.
+-- Already set up earlier? Run only the db/migrations files added since (0002_analytics.sql, 0003_submissions.sql, 0004_quizzes.sql, 0005_site_files.sql, 0006_exam_results.sql, 0007_preview_env.sql), in order.
 
 CREATE TABLE "admin_users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -141,3 +141,22 @@ CREATE TABLE "exam_results" (
 );
 ALTER TABLE "exam_results" ADD CONSTRAINT "exam_results_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;CREATE INDEX "exam_results_tenant_idx" ON "exam_results" USING btree ("tenant_id","date");-- Same lock-down as 0001: only the app's own connection can read or write exam results.
 ALTER TABLE "exam_results" ENABLE ROW LEVEL SECURITY;REVOKE ALL ON "exam_results" FROM anon, authenticated;
+
+-- Preview environment (lib/environments.ts): a private preview copy of each teacher's content,
+-- and an "env" on everything the site collects, so testing in preview stays out of the real numbers.
+DROP INDEX "quiz_attempts_contact_idx";
+ALTER TABLE "analytics_daily" ADD COLUMN "env" text DEFAULT 'production' NOT NULL;
+ALTER TABLE "analytics_daily" DROP CONSTRAINT "analytics_daily_tenant_id_day_metric_key_pk";
+ALTER TABLE "analytics_daily" ADD CONSTRAINT "analytics_daily_tenant_id_env_day_metric_key_pk" PRIMARY KEY("tenant_id","env","day","metric","key");
+ALTER TABLE "exam_results" ADD COLUMN "preview_published" boolean DEFAULT false NOT NULL;
+ALTER TABLE "exam_results" ADD COLUMN "preview_lookups" integer DEFAULT 0 NOT NULL;
+ALTER TABLE "exam_results" ADD COLUMN "preview_found" integer DEFAULT 0 NOT NULL;
+ALTER TABLE "quiz_attempts" ADD COLUMN "env" text DEFAULT 'production' NOT NULL;
+ALTER TABLE "submissions" ADD COLUMN "env" text DEFAULT 'production' NOT NULL;
+ALTER TABLE "tenant_revisions" ADD COLUMN "env" text DEFAULT 'production' NOT NULL;
+ALTER TABLE "tenants" ADD COLUMN "preview_content" jsonb;
+ALTER TABLE "tenants" ADD COLUMN "preview_theme" jsonb;
+ALTER TABLE "tenants" ADD COLUMN "preview_version" integer DEFAULT 0 NOT NULL;
+ALTER TABLE "tenants" ADD COLUMN "preview_updated_at" timestamp with time zone;
+ALTER TABLE "tenants" ADD COLUMN "preview_updated_by" text;
+CREATE UNIQUE INDEX "quiz_attempts_contact_idx" ON "quiz_attempts" USING btree ("tenant_id","env","quiz_path","contact") WHERE "quiz_attempts"."contact" is not null;

@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: PageProps<"/sites/[site]">): 
   return {
     metadataBase: canonical ? new URL(canonical) : undefined,
     alternates: canonical ? { canonical: `${canonical}/` } : undefined,
-    robots: indexable ? { index: true, follow: true } : { index: false, follow: true },
+    robots: indexable ? { index: true, follow: true } : { index: false, follow: data.env === "production" },
     title: c.seo.title,
     description: c.seo.description,
     openGraph: {
@@ -52,5 +52,5 @@ async function SiteBody({ params }: { params: Promise<{ site: string }> }) {
   const data = await getSiteData(decodeURIComponent((await params).site));
   if (data.kind === "platform") return <PlatformHome />;
   if (data.kind === "missing") notFound();
-  return <TenantPage c={data.content} base={data.base} canonical={data.canonical} pastExams={data.pastExams} />;
+  return <TenantPage c={data.content} base={data.base} canonical={data.canonical} pastExams={data.pastExams} preview={data.env === "preview"} />;
 }

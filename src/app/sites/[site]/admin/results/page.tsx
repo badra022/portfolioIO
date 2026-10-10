@@ -8,6 +8,7 @@ import { listResultSets } from "@/lib/server/exam-results";
 import { formatWhen } from "@/lib/admin/format";
 import { NewResultSet } from "@/components/admin/ResultsEditor";
 import { createResultSetAction } from "../actions";
+import { adminEnv } from "@/lib/server/admin-env";
 
 export const metadata: Metadata = { title: "نتايج الامتحانات" };
 
@@ -18,7 +19,7 @@ export default async function Results({ params }: PageProps<"/sites/[site]/admin
   const t = slug ? await getTenant(slug) : null;
   if (!slug || !t) notFound();
   const base = baseForSite(site);
-  const sets = await listResultSets(slug);
+  const [sets, env] = await Promise.all([listResultSets(slug), adminEnv()]);
   // Exams on the page (including finished ones still in the list), newest first, to copy title and date from.
   const exams = [...(t.content.exams?.items ?? [])]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -45,12 +46,13 @@ export default async function Results({ params }: PageProps<"/sites/[site]/admin
           {sets.map((s) => (
             <li key={s.id} className="a-panel qz-item">
               <div className="qz-head">
-                <span className={`rq-badge ${s.published ? "new" : ""}`}>{s.published ? "منشورة على الموقع" : "مش منشورة"}</span>
+                <span className={`rq-badge ${s.published ? "new" : ""}`}>{s.published ? "على الموقع" : "مش على الموقع"}</span>
+                {s.preview.published && <span className="rq-badge contacted">في المعاينة</span>}
                 <b>{s.title}</b>
                 <span className="a-sub">{s.date}</span>
               </div>
               <p className="a-sub">
-                {s.count} طالب{s.total ? ` · الدرجة من ${s.total}` : ""} · {s.lookups} بحث من الموقع ({s.found} لقوا نتيجتهم) · آخر تعديل {formatWhen(s.updatedAt)}{s.updatedBy ? ` بواسطة ${s.updatedBy}` : ""}
+                {s.count} طالب{s.total ? ` · الدرجة من ${s.total}` : ""} · {env === "preview" ? `${s.preview.lookups} بحث من المعاينة (${s.preview.found} لقوا نتيجتهم)` : `${s.lookups} بحث من الموقع (${s.found} لقوا نتيجتهم)`} · آخر تعديل {formatWhen(s.updatedAt)}{s.updatedBy ? ` بواسطة ${s.updatedBy}` : ""}
               </p>
               <div className="qz-actions"><a className="btn-sm primary" href={`${base}/admin/results/${s.id}`}>فتح وتعديل</a></div>
             </li>

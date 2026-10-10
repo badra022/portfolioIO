@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { baseForSite } from "@/lib/routing";
 import { requireAdmin } from "@/lib/server/auth";
 import { slugForSite } from "@/lib/server/site";
-import { getTenant } from "@/lib/server/repo";
+import { copyFor, getTenant } from "@/lib/server/repo";
+import { adminEnv } from "@/lib/server/admin-env";
 import { attemptCounts } from "@/lib/server/quiz-attempts";
 import { availability } from "@/lib/quiz";
 import { QuizStateButtons, quizStatus } from "@/components/admin/QuizBits";
@@ -17,8 +18,9 @@ export default async function Quizzes({ params }: PageProps<"/sites/[site]/admin
   const t = slug ? await getTenant(slug) : null;
   if (!slug || !t) notFound();
   const base = baseForSite(site);
-  const counts = await attemptCounts(slug);
-  const quizzes = t.content.quizzes;
+  const env = await adminEnv();
+  const counts = await attemptCounts(slug, env);
+  const quizzes = copyFor(t, env).content.quizzes;
   return (
     <>
       <div className="a-head">
@@ -42,7 +44,7 @@ export default async function Quizzes({ params }: PageProps<"/sites/[site]/admin
               <p className="a-sub">{q.questions.length} سؤال · {q.durationMinutes ? `${q.durationMinutes} دقيقة` : "بدون وقت"} · {c.total} بدأوا · {c.finished} سلّموا</p>
               <div className="qz-actions">
                 <a className="btn-sm primary" href={`${base}/admin/quizzes/${q.path}`}>النتايج</a>
-                <QuizStateButtons site={site} path={q.path} state={q.state} />
+                <QuizStateButtons site={site} path={q.path} state={q.state} env={env} />
               </div>
             </li>
           );

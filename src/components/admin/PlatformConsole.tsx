@@ -29,7 +29,8 @@ export async function PlatformConsole() {
               <td>{t.users}</td>
               <td>{t.updatedAt ? formatWhen(t.updatedAt) : "—"}</td>
               <td className="a-row-actions">
-                <a href={`/t/${t.slug}`} target="_blank" rel="noopener">معاينة</a>
+                <a href={`/t/${t.slug}`} target="_blank" rel="noopener">الموقع</a>
+                <a href={`/t/${t.slug}/preview`} target="_blank" rel="noopener">المعاينة</a>
                 <a href={`/t/${t.slug}/admin`}>تعديل المحتوى</a>
                 <a href={`/admin/tenants/${t.slug}`}>إدارة</a>
               </td>
