@@ -233,6 +233,7 @@ a.thumb { display: block; }
 /* ---------- form buttons (LeadForms) ---------- */
 button.btn { font: inherit; cursor: pointer; }
 .lead-layer { z-index: 70; } /* above the pop-up announcement, whose button may open a form */
+.lead-layer .pop { max-height: calc(var(--vvh, 100dvh) - 48px); }
 .lead-form, .lead-done { gap: 14px; }
 .lead-form h2, .lead-done h2 { padding-inline-end: 40px; }
 .lead-form > p { color: var(--muted); margin: 0; }
@@ -266,7 +267,8 @@ button.btn { font: inherit; cursor: pointer; }
 @media (max-width: 560px) {
   /* The form needs the keyboard and full attention: a real sheet with a dimmed page, not the passive pop-up sheet. */
   .lead-layer { pointer-events: auto; background: rgb(0 0 0 / .45); }
-  .lead-layer .pop { max-height: 88dvh; }
+  /* --vvh: the height left by the on-screen keyboard (useAboveKeyboard). */
+  .lead-layer .pop { max-height: min(88dvh, calc(var(--vvh, 100dvh) - 12px)); }
 }
 
 /* ---------- past exams' results (ExamResults) ---------- */

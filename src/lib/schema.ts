@@ -66,7 +66,7 @@ const FormField = z.object({
   label: z.string(),
   type: z.enum(["text", "tel", "number", "select", "textarea"]).default("text"),
   required: z.boolean().default(true),
-  /** Remember on the student's device and don't ask again (name, phone). Off for answers that change each time. */
+  /** Remember on the student's device and don't ask again. Name and phone (tel) are always remembered. Off for answers that change each time. */
   remember: z.boolean().default(true),
   /** Choices for "select". */
   options: z.array(z.string()).default([]),

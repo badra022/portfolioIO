@@ -10,6 +10,7 @@ import { Students } from "./Students";
 import { Challenge } from "./Challenge";
 import { Announcement, Exams } from "./Exams";
 import type { PastExamItem } from "./ExamResults";
+import { remembers } from "@/lib/lead";
 import { Youtube } from "./Youtube";
 import { Final } from "./Final";
 import { Reviews } from "./Reviews";
@@ -35,7 +36,7 @@ function hash(value: unknown): string {
 
 /** The ids the teacher's forms use for the student's name and phone, so remembered answers are shared. */
 function contactIds(c: Content): { nameId: string; phoneId: string } {
-  const kept = c.forms.flatMap((f) => f.fields).filter((f) => f.remember);
+  const kept = c.forms.flatMap((f) => f.fields).filter(remembers);
   const phoneId = kept.find((f) => f.type === "tel")?.id ?? "phone";
   const nameId = kept.find((f) => f.id === "name")?.id
     ?? kept.find((f) => f.type === "text" && /name|اسم/i.test(`${f.id} ${f.label}`))?.id
