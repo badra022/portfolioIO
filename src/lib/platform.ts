@@ -4,7 +4,8 @@
  */
 export const DEVELOPER = {
   name: "Ahmed Badra",
-  email: "ahmedbadra29@gmail.com",
+  /** Where prospects reach out. */
+  facebook: "https://www.facebook.com/badra069",
   phoneDisplay: "+20 115 866 7913",
   whatsapp: "201158667913",
   /** Pre-written WhatsApp message; {site} is the teacher's name. */

@@ -16,3 +16,10 @@ export type LeadTrigger = {
 export const leadAttr = (t: LeadTrigger) => ({ "data-lead": JSON.stringify(t) });
 
 export const sourceLabel = (label: string, ref?: string) => (ref ? `${label} (${ref})` : label);
+
+/**
+ * Whether a form answer is kept on the student's device and not asked again.
+ * The student's name and phone always are (they identify the student on every
+ * form, quiz and result lookup); other fields follow their "remember" switch.
+ */
+export const remembers = (f: { id: string; type: string; remember: boolean }) => f.remember || f.type === "tel" || f.id === "name";

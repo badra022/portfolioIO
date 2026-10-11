@@ -1,11 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LeadFormT } from "@/lib/schema";
-import type { LeadTrigger } from "@/lib/lead";
+import { remembers, type LeadTrigger } from "@/lib/lead";
 import { CONVERT_EVENT } from "@/lib/analytics";
 import { placeOf } from "@/lib/place";
 import { Icon } from "./Icon";
 import { FormFields, checkFields } from "./FormFields";
+import { hasFinePointer, useAboveKeyboard } from "./useAboveKeyboard";
 
 type Open = { form: LeadFormT; trigger: LeadTrigger; place: string; ask: LeadFormT["fields"]; known: Record<string, string> };
 type Toast = { text: string; tone: "ok" | "info"; edit?: Omit<Open, "ask"> };
@@ -26,6 +27,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const memKey = `lf:${slug}`;
+  const layerRef = useAboveKeyboard<HTMLDivElement>(open !== null);
 
   const remembered = useCallback((): Record<string, string> => {
     try { return JSON.parse(localStorage.getItem(memKey) ?? "{}") ?? {}; } catch { return {}; }
@@ -50,7 +52,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
       if (!res.ok) { setErrors({ _: data.error ?? "حصلت مشكلة، حاول تاني." }); return false; }
       // Remember the student's traits (not the answers) for next time.
       const keep = { ...remembered() };
-      for (const f of o.form.fields) if (f.remember && answers[f.id]) keep[f.id] = answers[f.id];
+      for (const f of o.form.fields) if (remembers(f) && answers[f.id]) keep[f.id] = answers[f.id];
       try { localStorage.setItem(memKey, JSON.stringify(keep)); } catch { /* storage blocked */ }
       window.dispatchEvent(new CustomEvent(CONVERT_EVENT, { detail: { ch: "form", at: o.place } }));
       return true;
@@ -67,7 +69,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
     if (!form) return;
     const known = remembered();
     const place = placeOf(el) ?? "other";
-    const ask = form.fields.filter((f) => !(f.remember && known[f.id]));
+    const ask = form.fields.filter((f) => !(remembers(f) && known[f.id]));
     if (ask.length === 0) {
       // Everything needed is already known: send now, confirm with a way to correct it.
       const o = { form, trigger, place, known };
@@ -83,7 +85,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
       setOpen({ form, trigger, place, ask: form.fields, known: {} });
       return;
     }
-    setValues(Object.fromEntries(form.fields.map((f) => [f.id, f.remember ? known[f.id] ?? "" : ""])));
+    setValues(Object.fromEntries(form.fields.map((f) => [f.id, remembers(f) ? known[f.id] ?? "" : ""])));
     setErrors({});
     setDone(null);
     setOpen({ form, trigger, place, ask, known });
@@ -107,7 +109,8 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
   const close = useCallback(() => { setOpen(null); setDone(null); }, []);
   useEffect(() => {
     if (!open) return;
-    document.querySelector<HTMLElement>(".lead .lead-field :is(input, select, textarea)")?.focus({ preventScroll: true });
+    // Phones: no automatic focus, so the keyboard only opens when the student taps a field.
+    if (hasFinePointer()) document.querySelector<HTMLElement>(".lead .lead-field :is(input, select, textarea)")?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -129,7 +132,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
   return (
     <>
       {open && (
-        <div className="pop-layer lead-layer" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
+        <div ref={layerRef} className="pop-layer lead-layer" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
           <div className="pop lead" role="dialog" aria-modal="true" aria-labelledby="lead-title">
             <span className="pop-grip" aria-hidden="true" />
             <button type="button" className="pop-close" aria-label="إغلاق" onClick={close}><Icon name="close" /></button>
@@ -178,7 +181,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
             <button type="button" onClick={() => {
               const o = toast.edit!;
               setToast(null);
-              setValues(Object.fromEntries(o.form.fields.map((f) => [f.id, f.remember ? o.known[f.id] ?? "" : ""])));
+              setValues(Object.fromEntries(o.form.fields.map((f) => [f.id, remembers(f) ? o.known[f.id] ?? "" : ""])));
               setErrors({});
               setDone(null);
               setOpen({ ...o, ask: o.form.fields });

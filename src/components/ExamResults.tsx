@@ -6,6 +6,7 @@ import { percentOf } from "@/lib/exam-results";
 import { dateParts } from "@/lib/format";
 import { Icon } from "./Icon";
 import { FormFields, checkFields } from "./FormFields";
+import { useAboveKeyboard } from "./useAboveKeyboard";
 
 type Field = LeadFormT["fields"][number];
 export type PastExamItem = { id: number; title: string; date: string };
@@ -33,6 +34,7 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const memKey = `lf:${slug}`;
+  const layerRef = useAboveKeyboard<HTMLDivElement>(step !== null);
 
   const fields: Field[] = [
     { id: nameId, label: "اسم الطالب", type: "text", required: true, remember: true, options: [], placeholder: "زي ما هو مكتوب عند المستر" },
@@ -109,7 +111,7 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
       </button>
       {/* At the page root, like the form buttons' dialog: inside the section it would sit under the sticky bar. */}
       {step && createPortal(
-        <div className="pop-layer lead-layer" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
+        <div ref={layerRef} className="pop-layer lead-layer" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
           <div className="pop lead" role="dialog" aria-modal="true" aria-labelledby="exr-title">
             <span className="pop-grip" aria-hidden="true" />
             <button type="button" className="pop-close" aria-label="إغلاق" onClick={close}><Icon name="close" /></button>

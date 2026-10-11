@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { remembers } from "@/lib/lead";
 import type { LeadFormT, QuizT } from "@/lib/schema";
 import { availability, type PublicQuestion } from "@/lib/quiz";
 import { instantOf } from "@/lib/dates";
@@ -81,7 +82,7 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
     try { saved = JSON.parse(localStorage.getItem(key) ?? "null"); } catch { saved = null; }
     try {
       const known = JSON.parse(localStorage.getItem(memKey) ?? "{}") ?? {};
-      if (form) setValues(Object.fromEntries(form.fields.filter((f) => f.remember && known[f.id]).map((f) => [f.id, known[f.id]])));
+      if (form) setValues(Object.fromEntries(form.fields.filter((f) => remembers(f) && known[f.id]).map((f) => [f.id, known[f.id]])));
     } catch { /* ignore */ }
     if (!saved?.token) { setPhase("intro"); return; }
     if (saved.done) { setDoneHow("already"); setPhase("done"); }
@@ -175,7 +176,7 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
         if (form) {
           try {
             const keep = JSON.parse(localStorage.getItem(memKey) ?? "{}") ?? {};
-            for (const f of form.fields) if (f.remember && values[f.id]) keep[f.id] = values[f.id];
+            for (const f of form.fields) if (remembers(f) && values[f.id]) keep[f.id] = values[f.id];
             localStorage.setItem(memKey, JSON.stringify(keep));
           } catch { /* ignore */ }
         }
