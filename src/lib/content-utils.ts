@@ -59,17 +59,13 @@ export function mapImages(content: Content, fn: (value: string) => string): Cont
 export function withLiveContent(content: Content, now: Date): Content {
   let c = content;
   if (c.exams) {
-    const items = c.exams.items.filter((e) => !isOver(endOfDay(e.date), now));
-    const barOver = c.exams.announcementEnds ? isOver(deadline(c.exams.announcementEnds), now) : false;
-    const bar = startState(c.exams.announcementStarts, now);
-    c = {
-      ...c,
-      exams: {
-        ...c.exams, items,
-        announcement: barOver || bar === "later" ? undefined : c.exams.announcement,
-        announcementStarts: bar === "soon" ? c.exams.announcementStarts : undefined,
-      },
-    };
+    c = { ...c, exams: { ...c.exams, items: c.exams.items.filter((e) => !isOver(endOfDay(e.date), now)) } };
+  }
+  if (c.bar) {
+    const items = c.bar.items
+      .filter((it) => !(it.endsAt && isOver(deadline(it.endsAt), now)) && startState(it.startsAt, now) !== "later")
+      .map((it) => ({ ...it, startsAt: startState(it.startsAt, now) === "soon" ? it.startsAt : undefined }));
+    c = { ...c, bar: { ...c.bar, items } };
   }
   if (c.popup) {
     const start = startState(c.popup.startsAt, now);
@@ -108,4 +104,22 @@ export function sameJson(a: unknown, b: unknown): boolean {
       : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([, x]) => x !== undefined).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)).map(([k, x]) => [k, norm(x)]))
         : v;
   return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
+}
+
+/**
+ * Brings content saved by an older version up to date before it is read:
+ * the exam's red bar (exams.announcement, …Starts, …Ends) became the page's own
+ * announcement bar (content.bar). Saving the content stores the new shape.
+ */
+export function upgradeContent(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const c = raw as Record<string, unknown>;
+  const exams = c.exams as Record<string, unknown> | undefined;
+  if (!exams || !("announcement" in exams || "announcementStarts" in exams || "announcementEnds" in exams)) return raw;
+  const { announcement, announcementStarts, announcementEnds, ...rest } = exams;
+  const out: Record<string, unknown> = { ...c, exams: rest };
+  if (typeof announcement === "string" && announcement.trim() && !c.bar) {
+    out.bar = { items: [{ text: announcement, icon: "megaphone", section: "exams", startsAt: announcementStarts || undefined, endsAt: announcementEnds || undefined }] };
+  }
+  return out;
 }

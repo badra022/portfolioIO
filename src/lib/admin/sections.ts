@@ -13,8 +13,9 @@ export type SectionDef = {
 export const SECTIONS: SectionDef[] = [
   { id: "quizzes", title: "الاختبارات", description: "اختبارات بصفحة خاصة، أسئلة بصور، وقت، تواريخ، وإجابات صحيحة للتصحيح.", keys: ["quizzes"] },
   { id: "forms", title: "نماذج جمع البيانات", description: "نماذج تفتحها الأزرار بدل واتساب (الاسم، الرقم...). الردود في صفحة الطلبات.", keys: ["forms"] },
+  { id: "bar", title: "الشريط الأحمر", description: "سطر إعلان أعلى الصفحة: امتحان، نتيجة، فيديو جديد... بتاريخ بداية ونهاية.", keys: ["bar"] },
   { id: "popup", title: "الإعلان المنبثق", description: "رسالة أو فيديو يظهر فوق الصفحة بعد فتحها، مع تاريخ انتهاء.", keys: ["popup"] },
-  { id: "exams", title: "الامتحانات والجوائز", description: "إضافة امتحان، التاريخ، الجائزة، والشريط الأحمر.", keys: ["exams"] },
+  { id: "exams", title: "الامتحانات والجوائز", description: "إضافة امتحان، التاريخ، الجائزة، ونتايج الامتحانات اللي فاتت.", keys: ["exams"] },
   { id: "schedule", title: "جدول المواعيد", description: "المجموعات، الأيام، الساعات، المنطقة والسنتر، ورسائل الحجز.", keys: ["schedule"] },
   { id: "book", title: "الكتاب", description: "الغلاف، صفحات من داخل الكتاب، المميزات، ونموذج الطلب.", keys: ["book"] },
   { id: "youtube", title: "قناة اليوتيوب", description: "رابط القناة، الفيديوهات، وعدد المتابعين على المنصات.", keys: ["youtube"] },

@@ -1,10 +1,7 @@
 import type { Content } from "@/lib/schema";
 import type { ChatConfig } from "@/lib/chat";
 import { dateParts, parseDate } from "@/lib/format";
-import { deadline } from "@/lib/dates";
 import { ExamCard } from "./ExamCard";
-import { Icon } from "./Icon";
-import { HideAfter } from "./HideAfter";
 import { SectionHead } from "./SectionHead";
 import { ExamResults, type PastExamItem } from "./ExamResults";
 
@@ -36,24 +33,5 @@ export function Exams({ data, locale, chat, results }: { data: Data; locale: str
         )}
       </div>
     </section>
-  );
-}
-
-export function Announcement({ data, locale }: { data: Data; locale: string }) {
-  const featured = upcomingExams(data).find((e) => e.featured);
-  if (!featured || !data.announcement) return null;
-  const text = data.announcement.replace("{date}", dateParts(featured.date, locale).short);
-  // The server drops the bar once it expires; this also hides it on a cached page.
-  const examDay = featured.date.slice(0, 10);
-  const ends = data.announcementEnds;
-  const until = ends && deadline(ends) < deadline(examDay) ? ends : examDay;
-  return (
-    <HideAfter until={until} from={data.announcementStarts}>
-      <a className="announce" href="#exams">
-        <Icon name="megaphone" />
-        <span>{text}</span>
-        <span className="announce-arrow" aria-hidden="true">←</span>
-      </a>
-    </HideAfter>
   );
 }
