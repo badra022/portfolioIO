@@ -137,6 +137,19 @@ Each teacher sees **الإحصائيات** ("Analytics") in their `/admin`; you 
 - **Cost:** about 2–4 small requests per visit to your own server and a few dozen rows per teacher per day (~30 MB/year for 10 teachers). It fits in Supabase Free (500 MB) and Vercel Pro's included usage; nothing to subscribe to.
 - **Existing database:** run `db/migrations/0002_analytics.sql` once in Supabase's SQL Editor (or `npm run db:migrate`). New setups get it from `db/supabase-setup.sql`.
 
+## Overall stats (super admin)
+
+Platform console → **الإحصائيات العامة** (`/admin/stats` on the platform host): every teacher's public site together (the private preview is left out).
+
+- **Date filter**: today, last 7 / 30 days, this month, last month, all time, or any from–to range (Cairo days).
+- **Totals**: teachers (published, added in the range), page views, unique visitors, engagements, and the share of visitors who engaged. Unique visitors are exact for a day, a calendar month and all time (summed across teachers, so one person visiting two teachers counts twice); for other ranges the page says it shows the sum of each day's unique visitors.
+- **Engagements** = contact clicks (WhatsApp, Telegram, Messenger, call) + channel clicks (YouTube, TikTok, Facebook…) + sent forms + quiz attempts + exam-result lookups, each shown on its own too, with exam bookings (forms sent from an exam card), finished quizzes, result lookups that found a grade, and video plays (not counted as engagement).
+- **Exams**: online quizzes, exam cards on the pages, exam-result sheets and the grades in them.
+- **Trend charts** for views, visitors, engagements and in-page actions (forms, quizzes, result lookups): per day, or per month for ranges over about three months, with a table view.
+- **Per-teacher table** with the same numbers and a link to each teacher's own analytics.
+
+Result lookups are counted by day from this version on (earlier lookups only exist as each exam's lifetime total).
+
 ## Claude connector (MCP): onboard and edit teachers by chat
 
 The app is also an MCP server, so Claude (claude.ai, the Claude apps, or Claude Code) can do everything the admin panel does, straight on the live database: create a teacher, fill or change any section, upload and place photos, theme, domains, logins, history and analytics. Saves go through the same validation as the admin forms, keep a full revision (and can be restored), and are live within seconds.

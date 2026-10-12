@@ -16,6 +16,7 @@ export async function PlatformConsole() {
         <h1>المدرسين</h1>
         <div className="a-actions">
           <a className="btn-sm primary" href="/admin/tenants/new">+ مدرس جديد</a>
+          <a className="btn-sm primary" href="/admin/stats">الإحصائيات العامة</a>
         </div>
       </div>
       <table className="a-table">
@@ -42,7 +43,7 @@ export async function PlatformConsole() {
 
       {stats.length > 0 && (
         <section className="a-panel">
-          <h2>الإحصائيات</h2>
+          <h2>الإحصائيات <a className="a-sub" href="/admin/stats">(كل الأرقام والرسوم ←)</a></h2>
           <p className="a-sub">
             الشهر ده: <b>{fmt(total.visitors)}</b> زائر لكل المدرسين، منهم <b>{fmt(total.contacts)}</b> تواصلوا
             ({total.visitors ? Math.round((total.contacts / total.visitors) * 1000) / 10 : 0}%). من البداية: <b>{fmt(total.all)}</b> زائر.

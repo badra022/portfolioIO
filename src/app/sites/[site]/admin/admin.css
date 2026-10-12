@@ -289,3 +289,19 @@ details.a-result summary { cursor: pointer; font-weight: 600; }
 .a-pending ul { margin: 6px 0 10px; padding-inline-start: 18px; }
 .a-chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: #fff0b3; color: #6b5300; font-weight: 600; margin-inline-start: 6px; }
 .a-chip.prod { background: #e6f4ea; color: #1d7a46; }
+
+/* ---------- platform stats (/admin/stats) ---------- */
+.ps-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font-size: 14px; }
+.ps-dates label { display: inline-flex; align-items: center; gap: 6px; }
+.ps-dates input { width: auto !important; min-height: 36px !important; padding: 4px 10px !important; font-size: 14px !important; }
+.ps-trend-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ps-trend-head b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.ps-trend svg { margin-top: 6px; }
+.ps-scroll { overflow-x: auto; }
+
+/* The per-teacher table stays a table on phones (scrolls sideways), so every number keeps its column name. */
+.ps-scroll .a-table { display: table; min-width: 640px; }
+.ps-scroll .a-table thead { display: table-header-group; }
+.ps-scroll .a-table tbody { display: table-row-group; }
+.ps-scroll .a-table tr { display: table-row; padding: 0; }
+.ps-scroll .a-table td, .ps-scroll .a-table th { display: table-cell; padding: 8px 10px; border-bottom: 1px solid var(--a-line); white-space: nowrap; }
