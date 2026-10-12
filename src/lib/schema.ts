@@ -267,12 +267,6 @@ const Exams = z.object({
   resultsLabel: z.string().default("نتايج الامتحانات اللي فاتت"),
   /** Optional line above that button. */
   resultsIntro: z.string().optional(),
-  /** Top announcement bar for the featured exam. {date} is filled in. */
-  announcement: z.string().optional(),
-  /** The bar starts showing on this date. Empty = right away. */
-  announcementStarts: StartDate.optional(),
-  /** The bar stops showing after this date (it also goes once the featured exam's day is over). */
-  announcementEnds: EndDate.optional(),
 });
 
 const Youtube = z.object({
@@ -314,6 +308,26 @@ const Services = z.object({
     image: OptionalImageRef.optional(),
     cta: Action.optional(),
     socials: z.array(Social).default([]),
+  })).default([]),
+});
+
+/**
+ * The red bar at the very top of the page (above the menu): short promotions of
+ * anything (an exam, results, a new video, a book). One message shows at a time:
+ * the first in the list whose dates are current. Not part of the section order.
+ */
+export const BAR_ICONS = ["megaphone", "trophy", "play", "calendar", "star", "book", "bolt"] as const;
+const AnnouncementBar = z.object({
+  items: z.array(z.object({
+    /** {date} = the date of the featured upcoming exam (the message then hides once that exam is over). */
+    text: z.string(),
+    icon: z.enum(BAR_ICONS).default("megaphone"),
+    /** Tapping goes to this section of the page... */
+    section: SectionKey.optional(),
+    /** ...or to this link instead: a page of the site ("/exam-oct"), a YouTube video, any website. */
+    url: z.string().optional(),
+    startsAt: StartDate.optional(),
+    endsAt: EndDate.optional(),
   })).default([]),
 });
 
@@ -431,6 +445,7 @@ export const ContentSchema = z.object({
   services: Services.optional(),
   final: Final.optional(),
   popup: Popup.optional(),
+  bar: AnnouncementBar.optional(),
   forms: z.array(LeadForm).default([]),
   quizzes: z.array(Quiz).default([]),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),

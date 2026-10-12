@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import { ContentSchema, DeploySchema, ThemeSchema, type Content, type Theme } from "@/lib/schema";
-import { sameJson, validate, type Issue } from "@/lib/content-utils";
+import { sameJson, upgradeContent, validate, type Issue } from "@/lib/content-utils";
 import type { SiteEnv } from "@/lib/environments";
 import { listBundled, readBundledJson } from "./bundled";
 
@@ -90,7 +90,7 @@ export async function getTenant(slug: string): Promise<TenantRecord | null> {
     .from(tenantDomains)
     .where(eq(tenantDomains.tenantId, row.id))
     .orderBy(desc(tenantDomains.isPrimary), tenantDomains.domain);
-  const content = withDefaults<Content>(ContentSchema, row.content, `content for ${slug}`);
+  const content = withDefaults<Content>(ContentSchema, upgradeContent(row.content), `content for ${slug}`);
   const theme = withDefaults<Theme>(ThemeSchema, row.theme, `theme for ${slug}`);
   const pending = row.previewContent !== null || row.previewTheme !== null;
   return {
@@ -98,7 +98,7 @@ export async function getTenant(slug: string): Promise<TenantRecord | null> {
     content, theme, version: row.version,
     domains, updatedAt: row.updatedAt.toISOString(), updatedBy: row.updatedBy,
     preview: {
-      content: row.previewContent === null ? content : withDefaults<Content>(ContentSchema, row.previewContent, `preview content for ${slug}`),
+      content: row.previewContent === null ? content : withDefaults<Content>(ContentSchema, upgradeContent(row.previewContent), `preview content for ${slug}`),
       theme: row.previewTheme === null ? theme : withDefaults<Theme>(ThemeSchema, row.previewTheme, `preview theme for ${slug}`),
       version: row.previewVersion,
       pending,

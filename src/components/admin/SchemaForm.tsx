@@ -28,7 +28,7 @@ type FieldProps = {
 };
 
 const HIDDEN = new Set(["$schema", "slug"]);
-const LONG_TEXT = new Set(["text", "intro", "message", "description", "note", "caption", "question", "announcement", "replyNote"]);
+const LONG_TEXT = new Set(["text", "intro", "message", "description", "note", "caption", "question", "replyNote"]);
 const LTR = new Set(["whatsapp", "telegram", "messenger", "id", "ref", "locale", "href", "url", "channelUrl", "googleFontsHref", "refLabel", "display", "body", "numeric", "card", "control", "pill", "notePhone"]);
 const TIME_PATTERN = "^\\d{2}:\\d{2}$";
 

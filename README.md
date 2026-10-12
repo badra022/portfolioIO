@@ -16,7 +16,7 @@ ahmedhassan.com ┼─▶ Vercel (one project) ──┤
 2. **The public page** loads that teacher's content and theme from the database through one cached function (`src/lib/server/site.ts`, `"use cache"` + `cacheTag`). Pages are rendered on the server, so Google and AI crawlers get the full HTML. After the first visit a page is served from Vercel's cache.
 3. **`/admin`** is protected with basic auth, which is checked in the proxy and again inside every admin page and server action. A save is validated against the Zod schemas (`src/lib/schema.ts`), written to the database with a full revision, and then `updateTag("tenant:<slug>")` clears only that teacher's cached page. The next visitor sees the change.
 4. **The admin forms are generated from the Zod schemas.** A new field in `schema.ts` automatically gets a form input; give it an Arabic label in `src/lib/admin/labels.ts`.
-5. **Things with a date disappear on their own** (Cairo time): finished exams, the red exam bar (after its end date or the featured exam's day), and the pop-up announcement (after its end date). Cached pages refresh at least hourly, and the bar and pop-up also check their end date in the visitor's browser.
+5. **Things with a date disappear on their own** (Cairo time): finished exams, red-bar messages (after their end date, or the featured exam's day for messages with {date}), and the pop-up announcement (after its end date). Cached pages refresh at least hourly, and the bar and pop-up also check their end date in the visitor's browser.
 
 ### Page pieces the teacher manages from `/admin`
 
@@ -52,6 +52,10 @@ tenants/<slug>/                      seed data for each teacher (imported from t
 
 Without `DATABASE_URL` the app reads `tenants/*` directly in read-only mode. This is handy for `npm run dev`.
 
+## The red bar (announcements at the top)
+
+Its own editor page (**الشريط الأحمر**), not part of the exams any more: a short list of messages for anything worth promoting (an exam, results are out, a new video, the book). Each message has its text, an icon, where tapping goes (a section of the page, or a link: a page of the site like `/exam-oct`, a YouTube video, any website) and optional start/end dates. One message shows at a time, the first in the list whose dates are current, so promotions can be lined up and swap on their own. `{date}` in a message is the featured upcoming exam's date; such a message ends with that exam's day and isn't shown without one. Sites saved before this change are converted automatically when read (the exam's bar becomes the first message, pointing at the exams section); the next save stores the new shape.
+
 ## Form buttons: collect students' details instead of WhatsApp messages
 
 Any WhatsApp button can open a form instead, so the teacher gets a list to call back rather than hundreds of unread chats (a challenge with many answers, bookings, book orders...).
@@ -63,7 +67,7 @@ Any WhatsApp button can open a form instead, so the teacher gets a list to call 
 
 Submissions live in the `submissions` table (run `db/migrations/0003_submissions.sql` once on an existing database). Only the questions the form defines are stored; a hidden honeypot field and duplicate-within-10-minutes check keep out bots and double taps. Phone numbers are personal data: delete requests you no longer need.
 
-**Start dates:** the pop-up (`startsAt`) and the red exam bar (`announcementStarts`) can start later; empty means right away. Together with the end dates they show only inside their window, switching on and off on time even on a cached page.
+**Start dates:** the pop-up (`startsAt`) and each red-bar message (`bar.items[].startsAt`) can start later; empty means right away. Together with the end dates they show only inside their window, switching on and off on time even on a cached page.
 
 ## Quizzes
 

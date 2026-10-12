@@ -8,9 +8,12 @@ import { Method } from "./Method";
 import { Book } from "./Book";
 import { Students } from "./Students";
 import { Challenge } from "./Challenge";
-import { Announcement, Exams } from "./Exams";
+import { Exams, upcomingExams } from "./Exams";
+import { AnnouncementBar, type BarMessage } from "./AnnouncementBar";
+import { dateParts } from "@/lib/format";
 import type { PastExamItem } from "./ExamResults";
 import { remembers } from "@/lib/lead";
+import { deadline } from "@/lib/dates";
 import { Youtube } from "./Youtube";
 import { Final } from "./Final";
 import { Reviews } from "./Reviews";
@@ -44,6 +47,33 @@ function contactIds(c: Content): { nameId: string; phoneId: string } {
   return { nameId, phoneId };
 }
 
+/**
+ * The red bar's messages, resolved for this page: {date} becomes the featured
+ * upcoming exam's date (and the message ends with that exam's day; without one
+ * it isn't shown), and the target becomes a link.
+ */
+function barMessages(c: Content, base: string): BarMessage[] {
+  const featured = c.exams ? upcomingExams(c.exams).find((e) => e.featured) : undefined;
+  return (c.bar?.items ?? []).flatMap((it): BarMessage[] => {
+    let text = it.text.trim();
+    let until = it.endsAt;
+    if (text.includes("{date}")) {
+      if (!featured) return [];
+      text = text.replaceAll("{date}", dateParts(featured.date, c.locale).short);
+      const examDay = featured.date.slice(0, 10);
+      if (!until || deadline(examDay) < deadline(until)) until = examDay;
+    }
+    if (!text) return [];
+    // A page of the site ("/exam-oct"), or a website typed with or without https://.
+    const url = it.url?.trim();
+    const external = !!url && !url.startsWith("/") && !url.startsWith("#");
+    const href = url
+      ? url.startsWith("/") ? `${base}${url}` : external && !/^https?:\/\//i.test(url) ? `https://${url}` : url
+      : it.section && c.sections.includes(it.section) ? `#${it.section}` : undefined;
+    return [{ text, icon: it.icon, href, external, from: it.startsAt, until }];
+  });
+}
+
 /** The public teacher page. Content arrives with image URLs resolved and expired items (exams, pop-up) removed. */
 export function TenantPage({ c, base, canonical, pastExams, preview = false }: { c: Content; base: string; canonical: string | null; pastExams: PastExamItem[]; preview?: boolean }) {
   const chat = chatConfig(c);
@@ -73,7 +103,7 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
 
   return (
     <>
-      {c.exams && <Announcement data={c.exams} locale={c.locale} />}
+      {c.bar && <AnnouncementBar messages={barMessages(c, base)} />}
       <Nav c={c} chat={chat} />
       <main>
         {c.sections.map((key, i) => (
