@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { hasDb } from "@/lib/env";
 import { getSiteData } from "@/lib/server/site";
-import { activeTenantId } from "@/lib/server/analytics";
+import { activeTenantId, record } from "@/lib/server/analytics";
 import { lookupResult } from "@/lib/server/exam-results";
 import { firstNameKey, isPhoneKey, phoneKey } from "@/lib/exam-results";
 
@@ -52,6 +52,8 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/r"
     if (!tenantId) return json({ ok: false, error: "not found" }, 404);
     const r = await lookupResult(tenantId, data.env, id, name, phone);
     if (r === "missing") return json({ ok: false, error: "النتيجة دي مش متاحة دلوقتي." }, 404);
+    // Dated counts for the dashboards (the exam's own counters have no dates).
+    await record(tenantId, new Map([["lookup\u0000", 1], ...(r ? [["lookup_found\u0000", 1] as [string, number]] : [])]), data.env).catch(() => {});
     return json(r ? { ok: true, found: true, result: r } : { ok: true, found: false });
   } catch (e) {
     console.error("result lookup", e);
