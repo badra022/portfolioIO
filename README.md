@@ -24,7 +24,8 @@ ahmedhassan.com ┼─▶ Vercel (one project) ──┤
 |---|---|
 | Pop-up announcement (`popup`) | Title, text, optional YouTube video or image, optional button, end date. Shown a moment after the page opens: a centered card on tablet/desktop, a bottom sheet on phones (no full-screen interstitial, which Google ranks down). Once closed it stays hidden on that device for `remindAfterHours` (default 5); editing it shows it to everyone again. |
 | Student reviews (`reviews`) | Headline number + stars over a wall of review screenshots; long walls fold behind "show all"; any review opens full size. |
-| Sections menu (`menu`) | Every visible section in one list, so visitors see what the site has without scrolling it all: a sidebar on computers (≥1100px), a slim rail of icons on tablets, and on phones a **الأقسام** button in the top bar that opens a full-screen menu. The section being read is highlighted. On by default; the teacher can switch it off, rename it, or list their own names and order (admin → ترتيب الأقسام والقوائم). Shown when there are at least 3 sections. |
+| Sections menu (`menu`) | Every visible section in one list. The header's menu button (on the right in Arabic; the logo moves to the left) opens and closes it on every screen: docked at the side and open by default on computers (≥1100px; closing it is remembered on the device), sliding over the page on tablets and phones. The section being read is highlighted. On by default; the teacher can switch it off, rename it, or list their own names and order (admin → ترتيب الأقسام والقوائم). Shown when there are at least 3 sections. |
+| Schedule | Four or more groups (after the visitor's filters) swipe as a carousel; three or fewer stay as cards. Automatic, not a setting. |
 | Display of lists (`display`) | Exams, videos, method, services, featured cards and reviews each choose **auto** (swipe on phones; on bigger screens the usual grid, or swiping when there are more cards than fit in a row), **carousel** (swipe with arrows and dots everywhere), **grid**, or **list** (one under the other). |
 | Featured (`featured`) | Offers, new courses, videos, announcements: cards with a badge, title, text, YouTube video or image, check-mark points, price and crossed-out old price, a countdown to the end date, and up to two buttons (any channel or a form). Each card shows between its start and end dates; the first card can span the full width. |
 | FAQ (`faq`) | Questions and answers that open one at a time (no script), first one open, an optional "still have a question?" button. Described to search engines as a `FAQPage`. |
@@ -84,6 +85,15 @@ Timed quizzes on their own page, e.g. `teacher.com/exam-oct`, managed from `/adm
 - **Results** (one page per quiz): started / finished / timed out / in progress, completion rate, average, median and top score, pass rate, average time, score distribution, questions from hardest with their most common wrong answers, every student ranked by score with their answers marked, tap to call/WhatsApp, delete (lets them retake), and CSV export for Excel. Scores are worked out from the current answer key, so fixing a key updates past results.
 
 Attempts live in `quiz_attempts` (run `db/migrations/0004_quizzes.sql` once on an existing database). Claude can create and edit quizzes through the connector and read results with `quiz_results`. Don't reorder questions after students start: answers are stored by question number.
+
+## Votes (anonymous polls)
+
+Admin → **التصويتات**. A vote has its own page (`teacher.com/<path>`, like quizzes) so the teacher can paste the link in a story or a group; it isn't part of the main page and isn't listed by search engines.
+
+- **Set up** (admin → edit votes): the question, an optional description and images, two or more choices (each with an optional image), the duration in hours, the button text, the thank-you message, and whether students see the results after voting.
+- **One countdown for everyone**: the vote runs from its start for its duration. A vote saved without a start starts when it's saved; **ابدأ العداد من دلوقتي** restarts it. If a 4-hour vote has been running for 3h50m, anyone opening the link sees 10 minutes left. The page uses the server's clock, so a wrong phone clock doesn't matter. **Open now** / **Close now** override the timer.
+- **Anonymous**: students only pick a choice. Only a count per choice is stored (`poll_votes`); a cookie on the device ("voted", no id) keeps the same browser from voting twice. Votes are counted by choice position, so don't reorder choices once voting starts.
+- **Results**: votes per choice with percentages, the share link with a copy button, and a reset. Claude: `poll_results`.
 
 ## Exam results (students look up their grade)
 

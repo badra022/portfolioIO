@@ -4,6 +4,7 @@ import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import { ContentSchema, DeploySchema, ThemeSchema, type Content, type Theme } from "@/lib/schema";
 import { sameJson, upgradeContent, validate, type Issue } from "@/lib/content-utils";
+import { stampPolls } from "@/lib/poll";
 import type { SiteEnv } from "@/lib/environments";
 import { listBundled, readBundledJson } from "./bundled";
 
@@ -179,7 +180,8 @@ function checkPatch(slug: string, patch: { content?: unknown; theme?: unknown })
   let theme: Theme | undefined;
   if (patch.content !== undefined) {
     const r = validate(ContentSchema, patch.content);
-    if (r.ok) content = r.data as Content; else issues.push(...r.issues);
+    // A vote's countdown starts when it's saved, unless it has its own start.
+    if (r.ok) content = stampPolls(r.data as Content); else issues.push(...r.issues);
     if (r.ok && content!.slug !== slug) issues.push({ path: "slug", message: "لا يمكن تغيير المعرّف (slug)." });
   }
   if (patch.theme !== undefined) {

@@ -18,6 +18,8 @@ import { makeUploadLink } from "../upload-link";
 import { RANGES, report } from "../analytics";
 import { STATUSES, listSubmissions, setStatus } from "../submissions";
 import { GradeError, approveAll, listAttempts, quizMetrics, reviewAttempt } from "../quiz-attempts";
+import { resultsFor as pollResultsFor } from "../polls";
+import { pollStatus, pollTimes } from "@/lib/poll";
 import * as examResults from "../exam-results";
 import { SiteFileError, deleteSiteFile, filesTag, listSiteFiles, putSiteFile } from "../site-files";
 import { applyOps, contentOutline, deepMerge, schemaFor, type Op } from "./content-ops";
@@ -501,6 +503,23 @@ export function buildMcpServer(origin: string): McpServer {
     const form = quiz.form ? t.content.forms.find((f) => f.id === quiz.form) : undefined;
     const rows = await listAttempts(slug, quiz, env ?? "production", form);
     return ok({ metrics: quizMetrics(quiz, rows), ...(attempts === false ? {} : { attempts: rows.map(({ questions: _q, ...r }) => r) }) });
+  }));
+
+  server.registerTool("poll_results", {
+    title: "Vote results",
+    description: "Anonymous votes (content.polls, each on its own page /<path>): per vote, whether it's open, when its countdown ends, and the number of votes per choice. Votes are counts only; nothing about voters is stored. Create or edit votes with edit_content on \"polls\".",
+    inputSchema: { slug: slugArg, env: envArg },
+    annotations: { readOnlyHint: true },
+  }, safe(async ({ slug, env }) => {
+    const t = await repo.getTenant(slug);
+    if (!t) return fail(`No teacher ${slug}.`);
+    const e = env ?? "production";
+    const polls = repo.copyFor(t, e).content.polls;
+    return ok(await Promise.all(polls.map(async (p) => {
+      const r = await pollResultsFor(slug, e, p);
+      const { end } = pollTimes(p);
+      return { path: p.path, title: p.title, status: pollStatus(p), endsAt: end ? new Date(end).toISOString() : null, total: r.total, choices: p.choices.map((c, i) => ({ label: c.label, votes: r.counts[i] })) };
+    })));
   }));
 
   server.registerTool("grade_quiz", {

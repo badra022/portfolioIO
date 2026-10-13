@@ -6,6 +6,7 @@ import { formatTime } from "@/lib/format";
 import { Icon } from "./Icon";
 import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
+import { Carousel } from "./Carousel";
 
 type Props = {
   data: NonNullable<Content["schedule"]>;
@@ -74,7 +75,8 @@ export function Schedule({ data, stages, dayLabels, joiner, chat }: Props) {
           {!perGroupPlaces && <span className="place"><Icon name="pin" />{data.location}</span>}
         </div>
 
-        <div className="sched">
+        {/* Four groups or more swipe (with arrows and dots) instead of filling the page; fewer stay as cards. */}
+        <Carousel key={`${stage}|${day}|${area}`} display={visible.length >= 4 ? "carousel" : "grid"} className="sched" label={data.eyebrow}>
           {visible.map((s) => {
             const t = s.time ? formatTime(s.time, L.am, L.pm) : null;
             const days = s.days.map((d) => dayLabels[d]).join(joiner);
@@ -104,8 +106,8 @@ export function Schedule({ data, stages, dayLabels, joiner, chat }: Props) {
               </article>
             );
           })}
-          {visible.length === 0 && <p className="empty">{L.empty}</p>}
-        </div>
+        </Carousel>
+        {visible.length === 0 && <p className="empty">{L.empty}</p>}
       </div>
     </section>
   );

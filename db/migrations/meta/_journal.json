@@ -64,6 +64,13 @@
       "when": 1791923028919,
       "tag": "0008_quiz_grading",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791927520519,
+      "tag": "0009_poll_votes",
+      "breakpoints": true
     }
   ]
 }

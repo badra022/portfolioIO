@@ -20,6 +20,8 @@ import * as submissionsRepo from "@/lib/server/submissions";
 import * as quizRepo from "@/lib/server/quiz-attempts";
 import * as siteFiles from "@/lib/server/site-files";
 import * as results from "@/lib/server/exam-results";
+import * as pollsRepo from "@/lib/server/polls";
+import { cairoNow } from "@/lib/poll";
 import { MAX_SITE_FILE } from "@/lib/site-files";
 import { adminEnv } from "@/lib/server/admin-env";
 
@@ -360,6 +362,43 @@ export async function approveAllAction(site: string, path: string, env: SiteEnv 
   if (!content || !quiz) return;
   await quizRepo.approveAll(ctx.slug, quiz, env, quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined, principalName(ctx.p));
   updateTag(tenantTag(ctx.slug));
+  refresh();
+}
+
+/* ------------------------------------------------------------------ */
+/* Votes (/admin/polls)                                                */
+/* ------------------------------------------------------------------ */
+
+/** Open now / close now / back to its timer, or restart the timer from now. Saved like any edit. */
+export async function updatePollAction(site: string, path: string, change: "open" | "closed" | "auto" | "restart", env: SiteEnv = "production"): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!["open", "closed", "auto", "restart"].includes(change) || !isEnv(env)) return;
+  const t = await repo.getTenant(ctx.slug);
+  if (!t) return;
+  const apply = (c: Content): Content => ({
+    ...c,
+    polls: c.polls.map((p) => (p.path !== path ? p : change === "restart" ? { ...p, state: "auto" as const, startsAt: cairoNow() } : { ...p, state: change })),
+  });
+  const copy = repo.copyFor(t, env).content;
+  if (!copy.polls.some((p) => p.path === path)) return;
+  const note = `${change === "restart" ? "بداية جديدة لتصويت" : change === "open" ? "فتح تصويت" : change === "closed" ? "قفل تصويت" : "تصويت حسب الوقت"}: ${path}`;
+  const r = env === "preview"
+    ? await repo.savePreview(ctx.slug, { content: apply(copy) }, null, principalName(ctx.p), note)
+    : await repo.saveTenant(ctx.slug, { content: apply(copy) }, t.version, principalName(ctx.p), note);
+  if (r.ok && env === "production" && t.preview.pending) {
+    await repo.savePreview(ctx.slug, { content: apply(t.preview.content) }, null, principalName(ctx.p), note);
+  }
+  if (r.ok) updateTag(tenantTag(ctx.slug));
+  refresh();
+}
+
+/** Starts a vote's counts from zero. */
+export async function resetVotesAction(site: string, path: string, env: SiteEnv = "production"): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!isEnv(env)) return;
+  await pollsRepo.resetVotes(ctx.slug, env, path);
   refresh();
 }
 

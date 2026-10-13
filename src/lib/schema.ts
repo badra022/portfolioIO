@@ -467,6 +467,33 @@ export const Quiz = z.object({
   questions: z.array(QuizQuestion).default([]),
 });
 
+/* ---------- votes (polls) ---------- */
+
+/**
+ * An anonymous vote on its own page (/<path>), to share in a story or a group:
+ * "how was the last exam?", "what prize do you want?". Students only pick a
+ * choice; nothing about them is asked or kept. The countdown is the same for
+ * everyone: it runs from the start time for durationHours.
+ */
+export const Poll = z.object({
+  /** The page address: teacher.com/<path>. */
+  path: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة، مثل vote-prize" }),
+  title: z.string(),
+  description: z.string().optional(),
+  images: z.array(z.object({ image: ImageRef })).default([]),
+  choices: z.array(z.object({ label: z.string(), image: OptionalImageRef.optional() })).min(2, { error: "اكتب اختيارين على الأقل." }),
+  /** How long the vote stays open, from its start. 0 = no end (close it by hand). */
+  durationHours: z.number().min(0).max(24 * 60).default(24),
+  /** When the countdown starts. Empty = when it's saved. */
+  startsAt: StartDate.optional(),
+  /** auto = open from the start for the duration; open = open now (no end); closed = closed now. */
+  state: z.enum(["auto", "open", "closed"]).default("auto"),
+  submitLabel: z.string().default("ابعت صوتك"),
+  doneMessage: z.string().default("شكراً! صوتك اتسجل."),
+  /** After voting, show everyone's results (percentages). */
+  showResults: z.boolean().default(true),
+});
+
 /* ---------- content.json ---------- */
 
 export const ContentSchema = z.object({
@@ -521,6 +548,7 @@ export const ContentSchema = z.object({
   menu: Menu.default({ enabled: true, title: "محتوى الصفحة", items: [] }),
   forms: z.array(LeadForm).default([]),
   quizzes: z.array(Quiz).default([]),
+  polls: z.array(Poll).default([]),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),
   sticky: z.object({ secondary: LinkCta.optional(), cta: ChatCta }),
   labels: z.object({
@@ -535,10 +563,11 @@ export const ContentSchema = z.object({
   });
   // Every button that points at a form must point at one that exists.
   const paths = new Set<string>();
-  c.quizzes.forEach((q, i) => {
-    if (RESERVED_PATHS.includes(q.path)) ctx.addIssue({ code: "custom", path: ["quizzes", i, "path"], message: "الاسم ده محجوز للموقع، اختار اسم تاني." });
-    if (paths.has(q.path)) ctx.addIssue({ code: "custom", path: ["quizzes", i, "path"], message: "في اختبار تاني بنفس العنوان." });
-    paths.add(q.path);
+  // Quizzes and votes share the site's page addresses.
+  [...c.quizzes.map((q, i) => ["quizzes", i, q.path] as const), ...c.polls.map((q, i) => ["polls", i, q.path] as const)].forEach(([list, i, p]) => {
+    if (RESERVED_PATHS.includes(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "الاسم ده محجوز للموقع، اختار اسم تاني." });
+    if (paths.has(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "في اختبار أو تصويت تاني بنفس العنوان." });
+    paths.add(p);
   });
   const walk = (v: unknown, path: (string | number)[]) => {
     if (Array.isArray(v)) v.forEach((x, i) => walk(x, [...path, i]));
@@ -606,5 +635,6 @@ export type ChatCtaT = z.infer<typeof ChatCta>;
 export type ActionT = z.infer<typeof Action>;
 export type LeadFormT = z.infer<typeof LeadForm>;
 export type QuizT = z.infer<typeof Quiz>;
+export type PollT = z.infer<typeof Poll>;
 export type SocialT = z.infer<typeof Social>;
 export type DayKeyT = z.infer<typeof DayKey>;
