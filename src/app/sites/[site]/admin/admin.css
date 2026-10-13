@@ -319,3 +319,8 @@ details.a-result summary { cursor: pointer; font-weight: 600; }
 .gr-who summary { cursor: pointer; font-size: 13px; color: var(--a-muted); }
 .gr-who .rs-grid { margin-top: 8px; }
 .gr-box .a-result { margin: 0; }
+
+/* Votes (admin/polls) */
+.cl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px dashed var(--a-line); border-radius: 10px; background: #fcfbfa; }
+.cl a { font-weight: 600; overflow-wrap: anywhere; }
+.pl-admin ul { margin-top: 4px; }

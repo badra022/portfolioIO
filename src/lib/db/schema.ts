@@ -190,3 +190,16 @@ export const examResults = pgTable("exam_results", {
   index("exam_results_tenant_idx").on(t.tenantId, t.date),
   uniqueIndex("exam_results_quiz_idx").on(t.tenantId, t.quizPath).where(sql`${t.quizPath} is not null`),
 ]);
+
+/**
+ * Anonymous votes (content.polls): only a count per choice, nothing about who
+ * voted. Choices are counted by their position in the poll.
+ */
+export const pollVotes = pgTable("poll_votes", {
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  /** The public site or the private preview (lib/environments.ts). */
+  env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
+  pollPath: text("poll_path").notNull(),
+  choice: integer("choice").notNull(),
+  votes: integer("votes").notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.tenantId, t.env, t.pollPath, t.choice] })]);
