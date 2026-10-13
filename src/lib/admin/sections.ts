@@ -20,6 +20,8 @@ export const SECTIONS: SectionDef[] = [
   { id: "book", title: "الكتاب", description: "الغلاف، صفحات من داخل الكتاب، المميزات، ونموذج الطلب.", keys: ["book"] },
   { id: "youtube", title: "قناة اليوتيوب", description: "رابط القناة، الفيديوهات، وعدد المتابعين على المنصات.", keys: ["youtube"] },
   { id: "reviews", title: "آراء الطلاب", description: "صور رسائل وتقييمات الطلاب والرقم الكبير.", keys: ["reviews"] },
+  { id: "featured", title: "قسم مميز (عروض وإعلانات)", description: "عرض لفترة محدودة، كورس جديد، فيديو، صورة، سعر، عداد تنازلي، وأزرار تواصل.", keys: ["featured"] },
+  { id: "faq", title: "الأسئلة الشائعة", description: "أسئلة الطلاب وأولياء الأمور وإجاباتها، وزر «لسه عندك سؤال؟».", keys: ["faq"] },
   { id: "services", title: "خدمات أخرى", description: "خدمات إضافية بصورة وزر تواصل (أي رقم أو تطبيق) وروابط.", keys: ["services"] },
   { id: "profile", title: "الملف الشخصي", description: "الاسم، اللقب، الصورة، واللوجو.", keys: ["profile"] },
   { id: "contact", title: "التواصل", description: "رقم الواتساب، أرقام الهاتف، وكود التتبع.", keys: ["contact"] },

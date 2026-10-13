@@ -155,6 +155,8 @@ const BY_KEY: Record<string, string> = {
   moreLabel: "نص زر عرض الكل",
   // services
   services: "خدمات أخرى",
+  // featured / faq
+  answer: "الإجابة",
   // popup
   popup: "الإعلان المنبثق",
   enabled: "مفعّل",
@@ -260,6 +262,38 @@ const BY_PATH: Record<string, string> = {
   "services.items.cta.type": "يفتح",
   "popup.cta.message": "رسالة جاهزة (واتساب وتيليجرام فقط)",
   "services.items.cta.message": "رسالة جاهزة (واتساب وتيليجرام فقط)",
+  // featured
+  "featured": "القسم المميز",
+  "featured.items": "الكروت",
+  "featured.items.badge": "شارة صغيرة (مثل: عرض لفترة محدودة)",
+  "featured.items.title": "العنوان",
+  "featured.items.text": "الوصف",
+  "featured.items.video": "فيديو يوتيوب (بيظهر بدل الصورة)",
+  "featured.items.image": "صورة",
+  "featured.items.points": "نقاط سريعة (بعلامة صح)",
+  "featured.items.price": "السعر",
+  "featured.items.oldPrice": "السعر قبل الخصم (بيظهر متشطب)",
+  "featured.items.priceNote": "جملة جنب السعر (مثل: للترم كامل)",
+  "featured.items.startsAt": "يظهر من",
+  "featured.items.endsAt": "يختفي بعد",
+  "featured.items.countdown": "عداد تنازلي لحد تاريخ الاختفاء",
+  "featured.items.cta": "الزر الأساسي",
+  "featured.items.secondaryCta": "زر تاني",
+  "featured.items.cta.type": "يفتح",
+  "featured.items.secondaryCta.type": "يفتح",
+  "featured.items.cta.message": "رسالة جاهزة (واتساب وتيليجرام فقط)",
+  "featured.items.secondaryCta.message": "رسالة جاهزة (واتساب وتيليجرام فقط)",
+  "featured.layout": "شكل الكروت",
+  // faq
+  "faq": "الأسئلة الشائعة",
+  "faq.items": "الأسئلة",
+  "faq.items.question": "السؤال",
+  "faq.items.answer": "الإجابة",
+  "faq.openFirst": "أول إجابة مفتوحة",
+  "faq.moreText": "جملة تحت الأسئلة (مثل: لسه عندك سؤال؟)",
+  "faq.cta": "زر تحت الأسئلة",
+  "faq.cta.type": "يفتح",
+  "faq.cta.message": "رسالة جاهزة (واتساب وتيليجرام فقط)",
 };
 
 const HINTS: Record<string, string> = {
@@ -320,6 +354,16 @@ const HINTS: Record<string, string> = {
   "socials.followers": "يظهر في قسم اليوتيوب مع الرابط.",
   "reviews.images": "صور سكرين شوت لرسائل وتقييمات الطلاب. أي عدد، وتترتب لوحدها.",
   "youtube.followersTotal": "مثال: +5000 متابع على كل منصاتنا. أعداد كل منصة تتكتب في قسم السوشيال ميديا.",
+  "featured": "أي حاجة عايز تبرزها: عرض، كورس جديد، فيديو، إعلان. كل كارت ليه تاريخ ظهور واختفاء، ولو فيه فيديو بيظهر بدل الصورة. فعّل القسم من «ترتيب الأقسام».",
+  "featured.items.endsAt": "بعد التاريخ ده الكارت يختفي من الموقع لوحده. فارغ = يفضل ظاهر.",
+  "featured.items.startsAt": "فارغ = يظهر فوراً.",
+  "featured.items.countdown": "يظهر «ينتهي خلال ...» تحت السعر لو فيه تاريخ اختفاء.",
+  "featured.items.cta.to": "واتساب: رقم دولي (فارغ = رقم الموقع). تيليجرام/ماسنجر: اسم المستخدم. اتصال: رقم الهاتف. رابط: https://...",
+  "featured.items.secondaryCta.to": "واتساب: رقم دولي (فارغ = رقم الموقع). تيليجرام/ماسنجر: اسم المستخدم. اتصال: رقم الهاتف. رابط: https://...",
+  "featured.layout": "«أول كارت كبير» يخلي أول كارت بعرض الصفحة (مناسب لعرض واحد مهم).",
+  "faq": "الأسئلة اللي الطلاب وأولياء الأمور بيسألوها كتير (المواعيد، الأسعار، الحجز، الأونلاين...). بتظهر كقائمة تفتح وتقفل، وبتساعد في الظهور في جوجل. فعّل القسم من «ترتيب الأقسام».",
+  "faq.items.answer": "إجابة قصيرة وواضحة. تقدر تكتبها في أكتر من سطر.",
+  "faq.cta.to": "واتساب: رقم دولي (فارغ = رقم الموقع). تيليجرام/ماسنجر: اسم المستخدم. اتصال: رقم الهاتف. رابط: https://...",
 };
 
 const ENUMS: Record<string, string> = {
@@ -329,6 +373,7 @@ const ENUMS: Record<string, string> = {
   accent: "ملوّن", tag: "داخل إطار", strong: "عريض",
   hero: "الواجهة", grades: "الصفوف", schedule: "الجدول", method: "طريقة الشرح", book: "الكتاب", students: "الطلاب",
   challenge: "التحدي", exams: "الامتحانات", final: "الدعوة الأخيرة", reviews: "آراء الطلاب", services: "خدمات أخرى",
+  featured: "القسم المميز", faq: "الأسئلة الشائعة", big: "أول كارت كبير", grid: "كل الكروت بنفس الحجم",
   phone: "اتصال", link: "رابط",
   tel: "رقم موبايل", number: "رقم", select: "اختيار من قائمة", textarea: "نص طويل",
   text: "نص مكتوب", choice: "اختيار من متعدد",

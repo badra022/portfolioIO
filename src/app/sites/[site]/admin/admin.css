@@ -305,3 +305,17 @@ details.a-result summary { cursor: pointer; font-weight: 600; }
 .ps-scroll .a-table tbody { display: table-row-group; }
 .ps-scroll .a-table tr { display: table-row; padding: 0; }
 .ps-scroll .a-table td, .ps-scroll .a-table th { display: table-cell; padding: 8px 10px; border-bottom: 1px solid var(--a-line); white-space: nowrap; }
+
+/* Quiz grading (admin/quizzes/[path], GradeBox) */
+.gr-panel .an-tiles { margin: 12px 0; }
+.rq-badge.gr-ok { background: #e8f7ee; color: var(--a-ok); }
+.rq-badge.gr-todo { background: #fff4e0; color: #8a5a00; }
+.gr-box { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--a-line); border-radius: 12px; background: #fcfbfa; }
+.gr-box.approved { border-style: solid; border-color: #bfe3cc; background: #f6fcf8; }
+.gr-fields { display: grid; grid-template-columns: minmax(120px, 180px) 1fr; gap: 10px; }
+@media (max-width: 560px) { .gr-fields { grid-template-columns: 1fr; } }
+.gr-score-in { display: flex; align-items: center; gap: 8px; }
+.gr-score-in input { inline-size: 100%; font-size: 18px; font-weight: 700; }
+.gr-who summary { cursor: pointer; font-size: 13px; color: var(--a-muted); }
+.gr-who .rs-grid { margin-top: 8px; }
+.gr-box .a-result { margin: 0; }

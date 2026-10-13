@@ -14,18 +14,18 @@ export default async function ResultSetPage({ params }: PageProps<"/sites/[site]
   const site = decodeURIComponent(raw);
   await requireAdmin(site);
   const slug = await slugForSite(site);
-  const set = slug ? await getResultSet(slug, Number(id)) : null;
+  const env = await adminEnv();
+  const set = slug ? await getResultSet(slug, Number(id), env) : null;
   if (!set) notFound();
   const base = baseForSite(site);
-  const env = await adminEnv();
   return (
     <>
       <div className="a-head">
         <a className="a-back" href={`${base}/admin/results`}>→ كل النتايج</a>
         <h1>{set.title}</h1>
-        <p className="a-sub">{set.rows.length} طالب · {env === "preview" ? `${set.preview.lookups} بحث من المعاينة (${set.preview.found} لقوا نتيجتهم)` : `${set.lookups} بحث من الموقع (${set.found} لقوا نتيجتهم)`}</p>
+        <p className="a-sub">{set.rows.length + set.quizRows.length} طالب · {env === "preview" ? `${set.preview.lookups} بحث من المعاينة (${set.preview.found} لقوا نتيجتهم)` : `${set.lookups} بحث من الموقع (${set.found} لقوا نتيجتهم)`}</p>
       </div>
-      <ResultsEditor site={site} initial={set} />
+      <ResultsEditor site={site} initial={set} quizUrl={set.quizPath ? `${base}/admin/quizzes/${set.quizPath}` : null} />
     </>
   );
 }

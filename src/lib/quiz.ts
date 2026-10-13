@@ -69,3 +69,16 @@ export function grade(q: QuizT, answers: Record<string, string>): Graded {
   });
   return { marks, score, max, percent: max ? Math.round((score / max) * 100) : null };
 }
+
+/**
+ * The student's name and phone on an attempt, from the quiz's form: the field
+ * with id "name" (or a text field labelled name/اسم, or the first text field),
+ * and the mobile field (or the number the attempt was registered with).
+ */
+export function studentOf(form: { fields: { id: string; label: string; type: string }[] } | undefined, fields: Record<string, string>, contact: string | null): { name: string; phone: string } {
+  const list = form?.fields ?? Object.keys(fields).map((id) => ({ id, label: id, type: /phone|tel|mobile/i.test(id) ? "tel" : "text" }));
+  const text = list.filter((f) => f.type === "text");
+  const nameId = list.find((f) => f.id === "name")?.id ?? text.find((f) => /name|اسم/i.test(`${f.id} ${f.label}`))?.id ?? text[0]?.id;
+  const phoneId = list.find((f) => f.type === "tel")?.id;
+  return { name: (nameId && fields[nameId]) || "", phone: (phoneId && fields[phoneId]) || contact || "" };
+}

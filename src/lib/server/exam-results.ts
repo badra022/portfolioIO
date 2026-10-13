@@ -1,21 +1,29 @@
 import "server-only";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import { DATE_RE } from "@/lib/dates";
 import type { SiteEnv } from "@/lib/environments";
+import { cairoDay } from "@/lib/analytics";
+import type { QuizT } from "@/lib/schema";
 import { MAX_ROWS, cleanRow, findResult, mergeRows, type MergeSummary, type ResultRow } from "@/lib/exam-results";
+import { approvedRows } from "./quiz-attempts";
 
-const { examResults, tenants } = schema;
+const { examResults, quizAttempts, tenants } = schema;
 
 /** One exam's results as the admin sees them (without the rows). */
 export type ResultSetInfo = {
   id: number;
   examId: string | null;
+  /** The online quiz whose approved grades are part of these results (lib/server/quiz-attempts.ts), or null. */
+  quizPath: string | null;
+  /** Approved quiz grades (on the public site), counted in `count`. */
+  approved: number;
   title: string;
   date: string;
   total: string | null;
   published: boolean;
+  /** Students in the results: rows entered by hand plus approved quiz grades. */
   count: number;
   lookups: number;
   found: number;
@@ -25,7 +33,8 @@ export type ResultSetInfo = {
   updatedAt: string;
   updatedBy: string | null;
 };
-export type ResultSet = ResultSetInfo & { rows: ResultRow[] };
+/** rows = the ones entered by hand or imported; quizRows = the quiz's approved grades (read-only here). */
+export type ResultSet = ResultSetInfo & { rows: ResultRow[]; quizRows: ResultRow[] };
 
 /** What the site shows: a published exam students can look their result up in. */
 export type PastExam = { id: number; title: string; date: string };
@@ -38,9 +47,12 @@ async function tenantIdOf(slug: string): Promise<string> {
   return id;
 }
 
+/** Approved grades of the set's quiz on the public site. */
+const approvedCount = sql<number>`(select count(*) from ${quizAttempts} qa where qa.tenant_id = ${examResults.tenantId} and qa.quiz_path = ${examResults.quizPath} and qa.env = 'production' and qa.approved_at is not null)`.mapWith(Number);
+
 const info = {
-  id: examResults.id, examId: examResults.examId, title: examResults.title, date: examResults.date, total: examResults.total,
-  published: examResults.published, count: sql<number>`jsonb_array_length(${examResults.rows})`.mapWith(Number),
+  id: examResults.id, examId: examResults.examId, quizPath: examResults.quizPath, approved: approvedCount, title: examResults.title, date: examResults.date, total: examResults.total,
+  published: examResults.published, count: sql<number>`jsonb_array_length(${examResults.rows}) + ${approvedCount}`.mapWith(Number),
   lookups: examResults.lookups, found: examResults.found, version: examResults.version,
   updatedAt: examResults.updatedAt, updatedBy: examResults.updatedBy,
   previewPublished: examResults.previewPublished, previewLookups: examResults.previewLookups, previewFound: examResults.previewFound,
@@ -73,11 +85,48 @@ export async function listResultSets(slug: string): Promise<ResultSetInfo[]> {
   return rows.map(toInfo);
 }
 
-export async function getResultSet(slug: string, id: number): Promise<ResultSet | null> {
+/** One exam's results. quizRows are the approved grades in `env` (the admin's environment). */
+export async function getResultSet(slug: string, id: number, env: SiteEnv = "production"): Promise<ResultSet | null> {
   if (!hasDb() || !Number.isInteger(id)) return null;
-  const row = (await db().select({ ...info, rows: examResults.rows }).from(examResults).innerJoin(tenants, eq(tenants.id, examResults.tenantId))
+  const row = (await db().select({ ...info, tenantId: examResults.tenantId, rows: examResults.rows }).from(examResults).innerJoin(tenants, eq(tenants.id, examResults.tenantId))
     .where(and(eq(tenants.slug, slug), eq(examResults.id, id))).limit(1))[0];
-  return row ? { ...toInfo(row), rows: cleanRows(row.rows as unknown[]) } : null;
+  if (!row) return null;
+  const { tenantId, rows, ...rest } = row;
+  return { ...toInfo(rest), rows: cleanRows(rows as unknown[]), quizRows: rest.quizPath ? await approvedRows(tenantId, rest.quizPath, env) : [] };
+}
+
+/** The exam results of a quiz (created if missing), so grading a quiz feeds them. */
+export async function quizResultSet(slug: string, quiz: QuizT): Promise<ResultSetInfo | null> {
+  if (!hasDb()) return null;
+  await ensureQuizResultSets(slug, [quiz]);
+  const row = (await db().select(info).from(examResults).innerJoin(tenants, eq(tenants.id, examResults.tenantId))
+    .where(and(eq(tenants.slug, slug), eq(examResults.quizPath, quiz.path))).limit(1))[0];
+  return row ? toInfo(row) : null;
+}
+
+/**
+ * Every quiz gets its own exam results, created empty the first time the admin
+ * panel lists quizzes or results. They start published: students see the exam in
+ * the results list once its first grade is approved (empty results aren't listed).
+ */
+export async function ensureQuizResultSets(slug: string, quizzes: QuizT[]): Promise<void> {
+  if (!hasDb() || !quizzes.length) return;
+  const tenantId = (await db().select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1))[0]?.id;
+  if (!tenantId) return;
+  const have = new Set((await db().select({ p: examResults.quizPath }).from(examResults)
+    .where(and(eq(examResults.tenantId, tenantId), isNotNull(examResults.quizPath)))).map((r) => r.p));
+  const missing = quizzes.filter((q) => !have.has(q.path));
+  if (!missing.length) return;
+  await db().insert(examResults).values(missing.map((q) => {
+    // Every question counts toward the full mark, including those the teacher grades by hand.
+    const max = q.questions.reduce((a, x) => a + x.points, 0);
+    return {
+      tenantId, quizPath: q.path, title: q.title.slice(0, 120) || q.path,
+      date: q.startsAt?.slice(0, 10) ?? cairoDay(new Date()),
+      total: max ? String(max) : null,
+      published: true, previewPublished: true, updatedBy: "تلقائي من الاختبار",
+    };
+  })).onConflictDoNothing();
 }
 
 export async function createResultSet(slug: string, m: { examId?: string | null; title?: unknown; date?: unknown; total?: unknown }, author: string): Promise<number> {
@@ -131,7 +180,8 @@ export async function importRows(slug: string, id: number, rows: unknown[], mode
 
 export async function deleteResultSet(slug: string, id: number): Promise<void> {
   const tenantId = await tenantIdOf(slug);
-  await db().delete(examResults).where(and(eq(examResults.tenantId, tenantId), eq(examResults.id, id)));
+  // A quiz's results stay (they'd be created again); they can be hidden instead.
+  await db().delete(examResults).where(and(eq(examResults.tenantId, tenantId), eq(examResults.id, id), isNull(examResults.quizPath)));
 }
 
 /* ------------------------------------------------------------------ */
@@ -143,8 +193,10 @@ const publishedIn = (env: SiteEnv) => (env === "preview" ? examResults.previewPu
 /** Published exams, newest first, for the exams section. Cached with the teacher's page (site.ts). */
 export async function publishedExams(tenantId: string, env: SiteEnv): Promise<PastExam[]> {
   if (!hasDb()) return [];
+  // Results with nobody in them yet (a quiz not graded yet) aren't listed.
+  const hasRows = sql`(jsonb_array_length(${examResults.rows}) > 0 or exists (select 1 from ${quizAttempts} qa where qa.tenant_id = ${examResults.tenantId} and qa.quiz_path = ${examResults.quizPath} and qa.env = ${env} and qa.approved_at is not null))`;
   return db().select({ id: examResults.id, title: examResults.title, date: examResults.date })
-    .from(examResults).where(and(eq(examResults.tenantId, tenantId), eq(publishedIn(env), true)))
+    .from(examResults).where(and(eq(examResults.tenantId, tenantId), eq(publishedIn(env), true), hasRows))
     .orderBy(desc(examResults.date), desc(examResults.id)).limit(30);
 }
 
@@ -152,10 +204,12 @@ export type LookupResult = { title: string; date: string; total: string | null; 
 
 /** One student's result in a published exam, by name and phone; counts the lookup. */
 export async function lookupResult(tenantId: string, env: SiteEnv, id: number, name: string, phone: string): Promise<LookupResult | "missing"> {
-  const row = (await db().select({ title: examResults.title, date: examResults.date, total: examResults.total, rows: examResults.rows })
+  const row = (await db().select({ title: examResults.title, date: examResults.date, total: examResults.total, rows: examResults.rows, quizPath: examResults.quizPath })
     .from(examResults).where(and(eq(examResults.tenantId, tenantId), eq(examResults.id, id), eq(publishedIn(env), true))).limit(1))[0];
   if (!row) return "missing";
-  const hit = findResult(cleanRows(row.rows as unknown[]), name, phone);
+  // The quiz's approved grades first: a grade from the teacher's review wins over an older typed row.
+  const quizRows = row.quizPath ? await approvedRows(tenantId, row.quizPath, env) : [];
+  const hit = findResult([...quizRows, ...cleanRows(row.rows as unknown[])], name, phone);
   const [lookups, found] = env === "preview" ? [examResults.previewLookups, examResults.previewFound] : [examResults.lookups, examResults.found];
   await db().update(examResults)
     .set({ [env === "preview" ? "previewLookups" : "lookups"]: sql`${lookups} + 1`, ...(hit ? { [env === "preview" ? "previewFound" : "found"]: sql`${found} + 1` } : {}) })

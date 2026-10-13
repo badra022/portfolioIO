@@ -21,6 +21,7 @@ import * as quizRepo from "@/lib/server/quiz-attempts";
 import * as siteFiles from "@/lib/server/site-files";
 import * as results from "@/lib/server/exam-results";
 import { MAX_SITE_FILE } from "@/lib/site-files";
+import { adminEnv } from "@/lib/server/admin-env";
 
 type Fail = { ok: false; reason: "forbidden" | "missing" | "error"; message?: string };
 
@@ -91,6 +92,8 @@ export async function saveSectionAction(
     }
     updateTag(tenantTag(ctx.slug));
     const after = await repo.getTenant(ctx.slug);
+    // A new quiz gets its exam results (filled by approving grades) right away.
+    if (after && section.keys?.includes("quizzes")) await results.ensureQuizResultSets(ctx.slug, after.content.quizzes);
     return { ok: true, version: r.version, previewVersion, pending: after?.preview.pending ?? false };
   } catch (e) {
     console.error(e);
@@ -329,6 +332,37 @@ export async function deleteAttemptAction(site: string, path: string, ids: numbe
   refresh();
 }
 
+/** The teacher's grade and comment on one attempt; approved grades are looked up by students right away. */
+export async function gradeAttemptAction(site: string, path: string, id: number, input: { name: string; phone: string; score: string; note: string }, approved: boolean): Promise<{ ok: true } | { ok: false; message: string }> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
+  try {
+    await quizRepo.reviewAttempt(ctx.slug, path, id, input, approved === true, principalName(ctx.p));
+  } catch (e) {
+    if (e instanceof quizRepo.GradeError) return { ok: false, message: e.message };
+    console.error("grade", e);
+    return { ok: false, message: "حصلت مشكلة، حاول تاني." };
+  }
+  // The exams section lists results once they have someone in them.
+  updateTag(tenantTag(ctx.slug));
+  refresh();
+  return { ok: true };
+}
+
+/** Approves every finished attempt that isn't approved yet, with its automatic score (or draft grade). */
+export async function approveAllAction(site: string, path: string, env: SiteEnv = "production"): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!isEnv(env)) return;
+  const t = await repo.getTenant(ctx.slug);
+  const content = t ? repo.copyFor(t, env).content : null;
+  const quiz = content?.quizzes.find((q) => q.path === path);
+  if (!content || !quiz) return;
+  await quizRepo.approveAll(ctx.slug, quiz, env, quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined, principalName(ctx.p));
+  updateTag(tenantTag(ctx.slug));
+  refresh();
+}
+
 /* ------------------------------------------------------------------ */
 /* Site files (super admin): verification files etc. at the site root  */
 /* ------------------------------------------------------------------ */
@@ -409,7 +443,7 @@ export async function importResultsAction(site: string, id: number, rows: unknow
   if (!Array.isArray(rows) || (mode !== "merge" && mode !== "replace")) return { ok: false, message: "بيانات غير صالحة." };
   try {
     const r = await results.importRows(ctx.slug, id, rows, mode, principalName(ctx.p));
-    const set = await results.getResultSet(ctx.slug, id);
+    const set = await results.getResultSet(ctx.slug, id, await adminEnv());
     if (!set) return { ok: false, message: "الامتحان مش موجود." };
     return { ok: true, summary: r.summary, set };
   } catch (e) { return failed(e); }
@@ -422,7 +456,7 @@ export async function saveResultRowsAction(site: string, id: number, rows: unkno
   try {
     const r = await results.saveRows(ctx.slug, id, rows, baseVersion, principalName(ctx.p));
     if (!r.ok) return { ok: false, message: r.reason === "conflict" ? "حد تاني عدّل النتايج دي من شوية. حدّث الصفحة وكرر تعديلك." : "الامتحان مش موجود." };
-    const set = await results.getResultSet(ctx.slug, id);
+    const set = await results.getResultSet(ctx.slug, id, await adminEnv());
     return set ? { ok: true, set } : { ok: false, message: "الامتحان مش موجود." };
   } catch (e) { return failed(e); }
 }

@@ -62,7 +62,7 @@ export type StructuredDataOptions = {
 /**
  * The page's knowledge graph: the website and page, the teacher (Person) and
  * their classes (EducationalOrganization, with each subject/grade and its weekly
- * groups in a catalog), upcoming exams as EducationEvents, and the book.
+ * groups in a catalog), upcoming exams as EducationEvents, the book, and the FAQ.
  * Entities link to each other by @id. Only types whose Google requirements the
  * content can meet are used, so Google's Rich Results Test shows no invalid items.
  */
@@ -208,6 +208,18 @@ export function structuredData(c: Content, { canonical }: StructuredDataOptions)
     }));
   }
 
+  // The FAQ section, when it's on the page: questions and answers exactly as shown.
+  const faq = c.sections.includes("faq") ? (c.faq?.items ?? []).filter((q) => q.question.trim() && q.answer.trim()) : [];
+  if (faq.length) {
+    graph.push({
+      "@type": "FAQPage",
+      "@id": id("faq"),
+      inLanguage: lang,
+      isPartOf: { "@id": id("webpage") },
+      mainEntity: faq.map((q) => ({ "@type": "Question", name: q.question.trim(), acceptedAnswer: { "@type": "Answer", text: q.answer.trim() } })),
+    });
+  }
+
   // Featured YouTube videos are not described: Google requires an upload date on a
   // VideoObject (and marks it invalid without one), and the site doesn't store it.
   // The channel is linked from the teacher and organization (sameAs).
@@ -230,6 +242,9 @@ const REQUIRED: Record<string, string[]> = {
   EducationEvent: ["name", "startDate", "location"],
   Place: ["name"],
   Book: ["name", "author"],
+  FAQPage: ["mainEntity"],
+  Question: ["name", "acceptedAnswer"],
+  Answer: ["text"],
 };
 
 /** Problems in a graph (empty = fine). Used by scripts/validate.ts in CI. */

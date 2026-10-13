@@ -121,6 +121,15 @@ export const quizAttempts = pgTable("quiz_attempts", {
   finishedAt: timestamp("finished_at", { withTimezone: true }),
   /** Where it came from: the public site or the private preview (lib/environments.ts). */
   env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
+  /**
+   * The teacher's grade: { name, phone, score, note? } (lib/exam-results.ts ResultRow).
+   * Saved as a draft until approved; approved grades join the quiz's exam results
+   * (exam_results.quiz_path) and students can look them up.
+   */
+  result: jsonb("result"),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  reviewedBy: text("reviewed_by"),
 }, (t) => [
   index("quiz_attempts_quiz_idx").on(t.tenantId, t.quizPath, t.startedAt),
   // One attempt per number and environment: trying a quiz in preview doesn't use up the real one.
@@ -151,6 +160,11 @@ export const examResults = pgTable("exam_results", {
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   /** The exam on the page this belongs to (content.exams.items[].id), if any. */
   examId: text("exam_id"),
+  /**
+   * The online quiz (content.quizzes[].path) whose approved grades are part of these
+   * results, next to the rows entered by hand. Created automatically, one per quiz.
+   */
+  quizPath: text("quiz_path"),
   title: text("title").notNull(),
   /** YYYY-MM-DD. */
   date: text("date").notNull(),
@@ -172,4 +186,7 @@ export const examResults = pgTable("exam_results", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by"),
-}, (t) => [index("exam_results_tenant_idx").on(t.tenantId, t.date)]);
+}, (t) => [
+  index("exam_results_tenant_idx").on(t.tenantId, t.date),
+  uniqueIndex("exam_results_quiz_idx").on(t.tenantId, t.quizPath).where(sql`${t.quizPath} is not null`),
+]);

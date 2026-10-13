@@ -117,7 +117,8 @@ export async function platformStats(range: StatsRange): Promise<PlatformStats | 
       .from(quizAttempts).where(and(eq(quizAttempts.env, "production"), inDays(cairo(quizAttempts.startedAt)))).groupBy(sql`1`),
     d.select({
       sets: sql<number>`count(*)::int`,
-      students: sql<number>`coalesce(sum(jsonb_array_length(${examResults.rows})), 0)::int`,
+      // Rows entered by hand plus approved online-quiz grades.
+      students: sql<number>`(coalesce(sum(jsonb_array_length(${examResults.rows})), 0) + (select count(*) from ${quizAttempts} where ${quizAttempts.env} = 'production' and ${quizAttempts.approvedAt} is not null))::int`,
     }).from(examResults),
     // "All time" starts at the first day anything was recorded.
     from ? Promise.resolve([{ day: from }]) : d.select({ day: sql<string>`to_char(min(${analyticsDaily.day}), 'YYYY-MM-DD')` }).from(analyticsDaily).where(eq(analyticsDaily.env, "production")),
