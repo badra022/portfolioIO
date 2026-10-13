@@ -172,6 +172,33 @@ The app is also an MCP server, so Claude (claude.ai, the Claude apps, or Claude 
 
 **Security:** the token is the key to every teacher, as powerful as `ADMIN_PASSWORD`. In the claude.ai form it is part of the URL, so treat the connector URL like a password and rotate `MCP_TOKEN` if it leaks (the old URL stops working). Without `MCP_TOKEN` the endpoint doesn't exist; it answers only on the platform host, and wrong tokens get a plain 404. Saves are recorded as "Claude (MCP)" in the history. Upload links are signed per teacher and expire (24 h by default). Image downloads from links only reach public internet addresses (no internal/cloud-metadata addresses), up to 4 MB.
 
+## Environments and releases (dev → production)
+
+```
+feature/* ──PR──▶ develop ──(auto)──▶ DEV   portfolio-io-dev.vercel.app   (dev Supabase project)
+                     │
+                 release PR develop → main  (CI green + owner's approval)
+                     ▼
+                   main ──(auto)──▶ PRODUCTION  ostaz-io.vercel.app + teachers' domains  (prod Supabase)
+```
+
+- **Dev** is a separate copy of the platform for testing code: its own Supabase project (database and images), its own admin login, its own `MCP_TOKEN`. Every Vercel deployment that isn't `main` (the `develop` branch and every feature-branch preview) uses the dev settings, so nothing tested there can touch real students' data. With `APP_STAGE=dev` every page asks for the dev admin login, nothing is indexed, and a "DEV" bar shows on every page. Teachers are at `/t/<slug>` there (their domains stay on production).
+- **Preview** (inside the admin panel) is different: it's the teacher's unpublished *content* on the production site. See "Preview and production".
+- **Releasing**: work goes into `develop` through pull requests (CI must pass), is checked on the dev URL, then a release PR `develop → main` lists the changes and migrations. `main` is protected: it needs CI green and the owner's approval. Merging deploys production.
+- **Hotfix**: branch from `main`, PR into `main` (same approval), then merge `main` back into `develop`.
+- **Rollback**: Vercel → Deployments → previous production deployment → Instant Rollback.
+- **Migrations** run during the Vercel build (`scripts/vercel-build.mjs`): for `develop` on the dev database, for production on the production database, never for feature branches. A failing migration fails the build and the previous version keeps serving. Write migrations backward compatible (add columns/tables; rename or drop only in a later release, after the code stops using them), because the old version keeps running until the new one is live. Applied migrations are recorded in `public._portfolio_migrations`.
+- **CI** (`.github/workflows/ci.yml`, on every PR into `develop`/`main`): typecheck, `npm run validate`, every migration applied twice on an empty Postgres, and a production build.
+- **Dev data**: Actions → `refresh-dev-data` → Run workflow copies the teachers' pages and images from production to dev. Never copied: requests, quiz attempts, analytics, exam grades, teacher logins, domains, history. Needs the repo secrets `PROD_DATABASE_URL`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_SECRET_KEY`, `DEV_DATABASE_URL`, `DEV_SUPABASE_URL`, `DEV_SUPABASE_SECRET_KEY`.
+- Free Supabase projects pause after a week without use; resume the dev project from the Supabase dashboard if the dev site can't reach its database.
+
+| Vercel env var | Production (`main`) | Preview (`develop` and feature branches) |
+|---|---|---|
+| `DATABASE_URL`, `DATABASE_URL_UNPOOLED` | production project | dev project |
+| `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | production project | dev project |
+| `ADMIN_USER`, `ADMIN_PASSWORD`, `MCP_TOKEN` | production values | different dev values |
+| `APP_STAGE` | (unset) | `dev` |
+
 ## Set it up (about 30 minutes, once)
 
 ### 1. Supabase (database + images)

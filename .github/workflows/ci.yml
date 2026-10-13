@@ -1,0 +1,61 @@
+name: ci
+
+# Runs on every pull request into develop or main and on pushes to them.
+# main is protected: a release PR (develop -> main) can only merge when this passes.
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      # Throwaway database: every migration is applied from scratch, so broken SQL
+      # fails here instead of on the dev or production database.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      TZ: Africa/Cairo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Dependencies are pinned to exact versions in package.json (no lockfile in the repo).
+      - run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Validate teacher data and structured data
+        run: npm run validate
+
+      - name: Migrations apply cleanly on an empty database
+        env:
+          PGPASSWORD: postgres
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+        run: |
+          # Supabase's API roles, which the migrations lock out of every table.
+          psql -h localhost -U postgres -c "create role anon; create role authenticated;"
+          npm run db:migrate
+          # Running again must be a no-op.
+          npm run db:migrate
+
+      - name: Build
+        run: npm run build

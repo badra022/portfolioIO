@@ -326,3 +326,10 @@ select { font: 15px var(--f-body); color: var(--text); background: var(--surface
 .platform-home { max-width: 640px; margin: 15vh auto; padding: 0 20px; text-align: center; font-family: system-ui, sans-serif; }
 .plain { min-height: 100vh; }
 .site:has(> .admin) { padding-bottom: 0; }
+
+/* Developer environment marker (APP_STAGE=dev): on every page, public and admin. */
+.dev-bar {
+  position: relative; z-index: 90; padding: 4px 12px; text-align: center;
+  background: repeating-linear-gradient(-45deg, #0e7490 0 12px, #0c6278 12px 24px); color: #fff;
+  font: 700 12px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .02em;
+}

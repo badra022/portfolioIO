@@ -1,0 +1,25 @@
+name: refresh-dev-data
+
+# Copies the teachers' pages and images from production to the dev environment
+# (scripts/sync-dev-data.mjs). No student data is copied. Run it from the Actions tab.
+on:
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Copy pages and images (production -> dev)
+        run: node scripts/sync-dev-data.mjs
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          PROD_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          PROD_SUPABASE_SECRET_KEY: ${{ secrets.PROD_SUPABASE_SECRET_KEY }}
+          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+          DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          DEV_SUPABASE_SECRET_KEY: ${{ secrets.DEV_SUPABASE_SECRET_KEY }}

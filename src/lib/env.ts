@@ -22,7 +22,15 @@ export const env = {
   adminPassword: process.env.ADMIN_PASSWORD ?? "",
   /** Secret for the MCP server (/api/mcp) and its upload links. 32+ random characters; empty turns the MCP server off. */
   mcpToken: process.env.MCP_TOKEN ?? "",
+  /**
+   * "dev" on the developer environment (Vercel Preview deployments: the develop
+   * branch and feature branches), which has its own database and storage. The
+   * whole dev site then asks for the admin login and is never indexed.
+   */
+  stage: process.env.APP_STAGE === "dev" ? ("dev" as const) : ("production" as const),
 };
+
+export const isDev = () => env.stage === "dev";
 
 export const hasDb = () => Boolean(env.databaseUrl);
 export const hasSupabaseStorage = () => Boolean(env.supabaseUrl && env.supabaseSecretKey);
