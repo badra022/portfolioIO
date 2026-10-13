@@ -119,7 +119,7 @@ export const DayKey = z.enum(["sat", "sun", "mon", "tue", "wed", "thu", "fri"]);
 
 export const SectionKey = z.enum([
   "hero", "grades", "schedule", "method", "book",
-  "students", "reviews", "challenge", "exams", "youtube", "services", "final",
+  "students", "reviews", "challenge", "exams", "youtube", "services", "featured", "faq", "final",
 ]);
 
 const Hero = z.object({
@@ -311,6 +311,50 @@ const Services = z.object({
   })).default([]),
 });
 
+/** Questions students and parents ask, with the teacher's answers (open/close one at a time). */
+const Faq = z.object({
+  ...SectionHead,
+  items: z.array(z.object({ question: z.string(), answer: z.string() })).default([]),
+  /** The first answer is open when the page loads. */
+  openFirst: z.boolean().default(true),
+  /** "Still have a question?" line and button under the questions. */
+  moreText: z.string().optional(),
+  cta: Action.optional(),
+});
+
+/**
+ * Anything the teacher wants to put forward: a limited-time offer, a new course,
+ * a video, an announcement. Each card can have a video or an image, a badge, a
+ * price (and the old price), short points, a countdown to its end date, and up
+ * to two buttons. Cards appear and disappear on their own dates.
+ */
+const Featured = z.object({
+  ...SectionHead,
+  items: z.array(z.object({
+    /** Small label on the card, e.g. "عرض لفترة محدودة" or "جديد". */
+    badge: z.string().optional(),
+    title: z.string(),
+    text: z.string().optional(),
+    /** YouTube link played on the card (takes the place of the image). */
+    video: z.string().regex(YOUTUBE_RE, { error: "الصق رابط فيديو يوتيوب" }).optional(),
+    image: OptionalImageRef.optional(),
+    /** Short lines with a check mark, e.g. what the offer includes. */
+    points: z.array(z.string()).default([]),
+    price: z.string().optional(),
+    /** Shown crossed out next to the price. */
+    oldPrice: z.string().optional(),
+    priceNote: z.string().optional(),
+    startsAt: StartDate.optional(),
+    endsAt: EndDate.optional(),
+    /** A countdown to the end date ("ends in 2 days 5 hours"). */
+    countdown: z.boolean().default(true),
+    cta: Action.optional(),
+    secondaryCta: Action.optional(),
+  })).default([]),
+  /** big = the first card spans the full width (spotlight); grid = all cards the same size. */
+  layout: z.enum(["big", "grid"]).default("big"),
+});
+
 /**
  * The red bar at the very top of the page (above the menu): short promotions of
  * anything (an exam, results, a new video, a book). One message shows at a time:
@@ -443,6 +487,8 @@ export const ContentSchema = z.object({
   youtube: Youtube.optional(),
   reviews: Reviews.optional(),
   services: Services.optional(),
+  featured: Featured.optional(),
+  faq: Faq.optional(),
   final: Final.optional(),
   popup: Popup.optional(),
   bar: AnnouncementBar.optional(),

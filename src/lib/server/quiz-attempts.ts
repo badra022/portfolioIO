@@ -5,7 +5,8 @@ import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import type { LeadFormT, QuizT } from "@/lib/schema";
-import { attemptDeadline, availability, grade, publicQuestions, type Graded, type PublicQuestion } from "@/lib/quiz";
+import { attemptDeadline, availability, grade, publicQuestions, studentOf, type Graded, type PublicQuestion } from "@/lib/quiz";
+import { cleanRow, type ResultRow } from "@/lib/exam-results";
 import { checkAnswers, normalizePhone } from "./submissions";
 
 const { quizAttempts, tenants } = schema;
@@ -147,6 +148,13 @@ export type AttemptRow = {
   /** Seconds from start to hand-in (finished attempts). */
   seconds: number | null;
   graded: Graded;
+  /** The teacher's grade (a draft until approved), or null when not graded yet. */
+  result: ResultRow | null;
+  /** When the grade was approved (students can look it up), or null. */
+  approvedAt: string | null;
+  reviewedBy: string | null;
+  /** Name and phone from the student's form, for a new grade. */
+  student: { name: string; phone: string };
 };
 
 async function tenantIdOf(slug: string): Promise<string | null> {
@@ -164,7 +172,7 @@ async function closeExpired(tenantId: string, quiz: QuizT): Promise<void> {
     .where(and(base, isNotNull(quizAttempts.deadlineAt), lt(quizAttempts.deadlineAt, new Date(Date.now() - GRACE_MS))));
 }
 
-export async function listAttempts(slug: string, quiz: QuizT, env: SiteEnv = "production"): Promise<AttemptRow[]> {
+export async function listAttempts(slug: string, quiz: QuizT, env: SiteEnv = "production", form?: LeadFormT): Promise<AttemptRow[]> {
   if (!hasDb()) return [];
   const id = await tenantIdOf(slug);
   if (!id) return [];
@@ -182,7 +190,63 @@ export async function listAttempts(slug: string, quiz: QuizT, env: SiteEnv = "pr
     finishedAt: r.finishedAt?.toISOString() ?? null,
     seconds: r.finishedAt ? Math.max(0, Math.round((r.finishedAt.getTime() - r.startedAt.getTime()) / 1000)) : null,
     graded: grade(quiz, r.answers as Record<string, string>),
+    result: r.result ? cleanRow(r.result as Record<string, unknown>) : null,
+    approvedAt: r.approvedAt?.toISOString() ?? null,
+    reviewedBy: r.reviewedBy,
+    student: studentOf(form, r.fields as Record<string, string>, r.contact),
   }));
+}
+
+/* ------------------------------------------------------------------ */
+/* Grading (admin)                                                     */
+/* ------------------------------------------------------------------ */
+
+export class GradeError extends Error {}
+
+/**
+ * The teacher's grade and comment on one finished attempt. Approved grades are
+ * part of the quiz's exam results right away (lib/server/exam-results.ts);
+ * approved = false keeps it as a draft (or takes an approved grade back).
+ */
+export async function reviewAttempt(slug: string, quizPath: string, id: number, input: { name?: unknown; phone?: unknown; score?: unknown; note?: unknown }, approved: boolean, author: string): Promise<void> {
+  const tenantId = await tenantIdOf(slug);
+  if (!tenantId || !Number.isInteger(id)) throw new GradeError("الطالب مش موجود.");
+  const row = cleanRow({ name: input.name, phone: input.phone, score: input.score, note: input.note });
+  if (!row?.name) throw new GradeError("اكتب اسم الطالب.");
+  if (approved && !row.score) throw new GradeError("اكتب الدرجة قبل الاعتماد.");
+  const [u] = await db().update(quizAttempts)
+    .set({ result: row, approvedAt: approved ? sql`coalesce(${quizAttempts.approvedAt}, now())` : null, reviewedAt: new Date(), reviewedBy: author })
+    .where(and(eq(quizAttempts.tenantId, tenantId), eq(quizAttempts.quizPath, quizPath), eq(quizAttempts.id, id), sql`${quizAttempts.status} <> 'in_progress'`))
+    .returning({ id: quizAttempts.id });
+  if (!u) throw new GradeError("الطالب لسه بيحل، أو المحاولة اتمسحت.");
+}
+
+/**
+ * Approves every finished attempt that isn't approved yet with the automatic
+ * score (or the teacher's draft grade, when there is one). Returns how many.
+ */
+export async function approveAll(slug: string, quiz: QuizT, env: SiteEnv, form: LeadFormT | undefined, author: string): Promise<number> {
+  const rows = (await listAttempts(slug, quiz, env, form)).filter((r) => r.status !== "in_progress" && !r.approvedAt);
+  const tenantId = await tenantIdOf(slug);
+  if (!tenantId) return 0;
+  let n = 0;
+  for (const r of rows) {
+    const score = r.result?.score || (r.graded.max ? String(r.graded.score) : "");
+    const result = cleanRow({ name: r.result?.name || r.student.name, phone: r.result?.phone || r.student.phone, score, note: r.result?.note });
+    if (!result?.name || !result.score) continue;
+    await db().update(quizAttempts).set({ result, approvedAt: new Date(), reviewedAt: new Date(), reviewedBy: author })
+      .where(and(eq(quizAttempts.tenantId, tenantId), eq(quizAttempts.id, r.id), sql`${quizAttempts.approvedAt} is null`));
+    n++;
+  }
+  return n;
+}
+
+/** Approved grades of a quiz as result rows, for the quiz's exam results. */
+export async function approvedRows(tenantId: string, quizPath: string, env: SiteEnv): Promise<ResultRow[]> {
+  const rows = await db().select({ result: quizAttempts.result }).from(quizAttempts)
+    .where(and(eq(quizAttempts.tenantId, tenantId), eq(quizAttempts.env, env), eq(quizAttempts.quizPath, quizPath), isNotNull(quizAttempts.approvedAt)))
+    .orderBy(desc(quizAttempts.approvedAt));
+  return rows.map((r) => (r.result ? cleanRow(r.result as Record<string, unknown>) : null)).filter((r): r is ResultRow => r !== null);
 }
 
 /** Attempt counts per quiz path, for the admin overview. */
@@ -274,7 +338,7 @@ export function attemptsCsv(quiz: QuizT, form: LeadFormT | undefined, rows: Atte
     return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
   const when = (iso: string | null) => (iso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso)).replace(",", "") : "");
-  const head = [...fieldIds.map(label), "الحالة", "الدرجة", "من", "النسبة %", "بدأ", "سلّم", "المدة (دقيقة)",
+  const head = [...fieldIds.map(label), "الحالة", "الدرجة", "من", "النسبة %", "درجة المدرس", "تعليق المدرس", "معتمدة", "بدأ", "سلّم", "المدة (دقيقة)",
     ...quiz.questions.flatMap((q, i) => [`س${i + 1}${q.text ? `: ${q.text.slice(0, 40)}` : ""}`, `س${i + 1} ✓`])];
   const lines = rows.map((r) => [
     ...fieldIds.map((id) => {
@@ -282,6 +346,7 @@ export function attemptsCsv(quiz: QuizT, form: LeadFormT | undefined, rows: Atte
       return tel.has(id) && /^\+?\d{8,15}$/.test(v) ? `"=""${v}"""` : cell(v);
     }),
     cell(STATUS[r.status]), String(r.graded.max ? r.graded.score : ""), String(r.graded.max || ""), r.graded.percent === null ? "" : String(r.graded.percent),
+    cell(r.result?.score ?? ""), cell(r.result?.note ?? ""), r.approvedAt ? "✓" : "",
     cell(when(r.startedAt)), cell(when(r.finishedAt)), r.seconds === null ? "" : String(Math.round(r.seconds / 6) / 10),
     ...quiz.questions.flatMap((_, i) => [cell(r.answers[String(i)] ?? ""), r.graded.marks[i] === null ? "" : r.graded.marks[i] ? "✓" : "✗"]),
   ].join(","));

@@ -18,6 +18,8 @@ import { Youtube } from "./Youtube";
 import { Final } from "./Final";
 import { Reviews } from "./Reviews";
 import { Services } from "./Services";
+import { Featured } from "./Featured";
+import { Faq } from "./Faq";
 import { Popup } from "./Popup";
 import { DevCredit } from "./DevCredit";
 import { Tracker } from "./Tracker";
@@ -98,6 +100,8 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
     youtube: () => <Youtube data={c.youtube!} avatar={c.profile.avatar} socials={c.socials} />,
     reviews: () => <Reviews data={c.reviews!} />,
     services: () => <Services data={c.services!} chat={chat} />,
+    featured: () => <Featured data={c.featured!} chat={chat} />,
+    faq: () => <Faq data={c.faq!} chat={chat} />,
     final: () => <Final c={c} chat={chat} />,
   };
 

@@ -64,7 +64,7 @@ export function NewResultSet({ action, exams }: { action: (prev: ConsoleState, f
 type Status = { tone: "" | "saved" | "error"; text: string };
 const EMPTY: ResultRow = { name: "", phone: "", score: "" };
 
-export function ResultsEditor({ site, initial }: { site: string; initial: ResultSet }) {
+export function ResultsEditor({ site, initial, quizUrl }: { site: string; initial: ResultSet; quizUrl: string | null }) {
   const [set, setSet] = useState(initial);
   const [rows, setRows] = useState<ResultRow[]>(initial.rows);
   const [dirty, setDirty] = useState(false);
@@ -86,16 +86,19 @@ export function ResultsEditor({ site, initial }: { site: string; initial: Result
   return (
     <>
       <Meta site={site} set={set} onSaved={(m) => setSet({ ...set, ...m })} />
+      {quizUrl && <QuizRows rows={set.quizRows} total={set.total} quizUrl={quizUrl} />}
       <Import site={site} set={set} blocked={dirty} onImported={(s, text) => { loaded(s); setStatus({ tone: "saved", text }); }} />
-      <Rows rows={rows} total={set.total} onChange={edit} />
-      <TryIt rows={rows} total={set.total} />
-      <details className="a-panel a-confirm">
-        <summary className="btn-sm danger">مسح نتايج الامتحان ده</summary>
-        <form action={deleteResultSetAction.bind(null, site, set.id)}>
-          <p className="a-sub">هتتمسح كل الدرجات ({set.rows.length} طالب) وتختفي من الموقع. مفيش رجوع.</p>
-          <button type="submit" className="btn-sm danger">أيوه، امسح</button>
-        </form>
-      </details>
+      <Rows rows={rows} total={set.total} onChange={edit} title={quizUrl ? "طلاب متضافين يدوي (امتحان ورقي مثلاً)" : undefined} />
+      <TryIt rows={[...set.quizRows, ...rows]} total={set.total} />
+      {!quizUrl && (
+        <details className="a-panel a-confirm">
+          <summary className="btn-sm danger">مسح نتايج الامتحان ده</summary>
+          <form action={deleteResultSetAction.bind(null, site, set.id)}>
+            <p className="a-sub">هتتمسح كل الدرجات ({set.rows.length} طالب) وتختفي من الموقع. مفيش رجوع.</p>
+            <button type="submit" className="btn-sm danger">أيوه، امسح</button>
+          </form>
+        </details>
+      )}
       {(dirty || status.text) && (
         <div className="a-savebar">
           <span className={`a-status ${status.tone}`} role="status">{status.text || "فيه تعديلات مش محفوظة."}</span>
@@ -125,7 +128,7 @@ function Meta({ site, set, onSaved }: { site: string; set: ResultSet; onSaved: (
     onSaved({ title: title.trim(), date, total: total.trim() || null, published, preview: { ...set.preview, published: previewPublished } });
     setMsg({ ok: true, text: done });
   };
-  const empty = !set.rows.length;
+  const empty = !set.rows.length && !set.quizRows.length && !set.quizPath;
 
   return (
     <section className="a-panel">
@@ -328,7 +331,37 @@ function Import({ site, set, blocked, onImported }: { site: string; set: ResultS
 
 /* ---------- the table ---------- */
 
-function Rows({ rows, total, onChange }: { rows: ResultRow[]; total: string | null; onChange: (rows: ResultRow[]) => void }) {
+/* ---------- an online quiz's approved grades ---------- */
+
+function QuizRows({ rows, total, quizUrl }: { rows: ResultRow[]; total: string | null; quizUrl: string }) {
+  return (
+    <section className="a-panel">
+      <div className="qz-head">
+        <h2>درجات الاختبار المعتمدة ({rows.length})</h2>
+        <a className="btn-sm primary" href={quizUrl}>تصحيح واعتماد الدرجات</a>
+      </div>
+      <p className="a-sub">بتتضاف هنا لوحدها أول ما تعتمد درجة طالب في صفحة تصحيح الاختبار، ومن هناك تعدّلها أو تلغي اعتمادها. النتيجة مش بتظهر للطلاب وهي فاضية.</p>
+      {rows.length === 0 ? <p className="an-empty">لسه مفيش درجات معتمدة.</p> : (
+        <table className="a-table rs-table">
+          <thead><tr><th>#</th><th>الاسم</th><th>الموبايل</th><th>الدرجة{total ? ` / ${total}` : ""}</th><th>التعليق</th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td>{i + 1}</td>
+                <td>{r.name}</td>
+                <td dir="ltr">{r.phone}{!isPhoneKey(phoneKey(r.phone)) && <span className="rs-warn" title="الطالب مش هيقدر يلاقي نتيجته من غير رقم صحيح"> ⚠</span>}</td>
+                <td><b>{r.score}</b>{percentOf(r.score, total) !== null && <small className="a-sub"> ({percentOf(r.score, total)}%)</small>}</td>
+                <td>{r.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+function Rows({ rows, total, onChange, title }: { rows: ResultRow[]; total: string | null; onChange: (rows: ResultRow[]) => void; title?: string }) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
   const dupes = useMemo(() => {
@@ -343,7 +376,7 @@ function Rows({ rows, total, onChange }: { rows: ResultRow[]; total: string | nu
   return (
     <section className="a-panel">
       <div className="qz-head">
-        <h2>الدرجات ({rows.length})</h2>
+        <h2>{title ?? "الدرجات"} ({rows.length})</h2>
         <button type="button" className="btn-sm ghost" onClick={() => { onChange([...rows, { ...EMPTY }]); setEditing(rows.length); setQ(""); }}>+ طالب</button>
       </div>
       {rows.length > 8 && <input type="search" className="rs-search" placeholder="دوّر باسم أو رقم" value={q} onChange={(e) => setQ(e.target.value)} />}

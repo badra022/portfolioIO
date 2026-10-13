@@ -6,11 +6,13 @@ import { slugForSite } from "@/lib/server/site";
 import { copyFor, getTenant } from "@/lib/server/repo";
 import { adminEnv } from "@/lib/server/admin-env";
 import { listAttempts, quizMetrics } from "@/lib/server/quiz-attempts";
+import { quizResultSet } from "@/lib/server/exam-results";
+import { GradeBox } from "@/components/admin/GradeBox";
 import { availability } from "@/lib/quiz";
 import { deadline } from "@/lib/dates";
 import { formatWhen } from "@/lib/admin/format";
 import { QuizStateButtons, quizStatus } from "@/components/admin/QuizBits";
-import { deleteAttemptAction } from "../../actions";
+import { approveAllAction, deleteAttemptAction } from "../../actions";
 
 export const metadata: Metadata = { title: "نتايج الاختبار" };
 
@@ -33,12 +35,20 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
   const quiz = content?.quizzes.find((q) => q.path === decodeURIComponent(path));
   if (!slug || !t || !content || !quiz) notFound();
   const form = quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined;
-  const rows = await listAttempts(slug, quiz, env);
+  const [rows, set] = await Promise.all([listAttempts(slug, quiz, env, form), quizResultSet(slug, quiz)]);
   const m = quizMetrics(quiz, rows);
-  const sort = (await searchParams).sort === "score" ? "score" : "time";
-  const sorted = sort === "score"
+  const q = await searchParams;
+  const sort = q.sort === "score" ? "score" : "time";
+  const show = q.show === "todo" || q.show === "approved" ? q.show : "all";
+  const done = rows.filter((r) => r.status !== "in_progress");
+  const approved = done.filter((r) => r.approvedAt).length;
+  const todo = done.length - approved;
+  const sorted = (sort === "score"
     ? [...rows].sort((a, b) => (b.graded.percent ?? -1) - (a.graded.percent ?? -1) || (a.seconds ?? 1e9) - (b.seconds ?? 1e9))
-    : rows;
+    : rows).filter((r) => show === "all" || (r.status !== "in_progress" && (show === "approved") === Boolean(r.approvedAt)));
+  const link = (p: { sort?: string; show?: string }) => `?sort=${p.sort ?? sort}&show=${p.show ?? show}`;
+  const total = set?.total ?? (String(quiz.questions.reduce((a, x) => a + x.points, 0)) || null);
+  const visible = set ? (env === "preview" ? set.preview.published : set.published) : false;
   const base = baseForSite(site);
   const s = quizStatus(quiz, availability(quiz));
   const fieldLabel = (id: string) => form?.fields.find((f) => f.id === id)?.label ?? id;
@@ -73,6 +83,32 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
         <div className="an-tile"><span>متوسط وقت الحل</span><b>{mins(m.avgSeconds)}</b></div>
       </div>
       {!m.graded && <p className="a-alert">مفيش إجابات صحيحة متسجلة للأسئلة، فمفيش تصحيح. ضيفها من «تعديل الأسئلة» والنتايج هتتحسب لوحدها، حتى للي سلّموا قبل كده.</p>}
+
+      <section className="a-panel gr-panel">
+        <div className="qz-head">
+          <h2>التصحيح والنتايج للطلاب</h2>
+          {set && <a className="btn-sm ghost" href={`${base}/admin/results/${set.id}`}>صفحة النتيجة ↗</a>}
+        </div>
+        <p className="a-sub">
+          حط درجة وتعليق لكل طالب سلّم واعتمدها. أول ما تعتمد، الطالب يقدر يعرف درجته وتعليقك من الموقع (قسم الامتحانات ← {"«"}نتايج الامتحانات اللي فاتت{"»"}) باسمه ورقم موبايله.
+          {m.graded ? " الدرجة التلقائية من الإجابات الصحيحة متكتبة جاهزة، وتقدر تغيّرها." : ""}
+        </p>
+        <div className="an-tiles">
+          <div className="an-tile strong"><span>اتعتمدوا</span><b>{approved}</b><small>من {done.length} سلّموا</small></div>
+          <div className="an-tile"><span>محتاجين تصحيح</span><b>{todo}</b><small>{todo ? "مش ظاهرين للطلاب لسه" : "خلصت كله 👏"}</small></div>
+        </div>
+        {set && !visible && <p className="a-alert">النتيجة دي مخفية من {env === "preview" ? "المعاينة" : "الموقع"}. اظهرها من <a href={`${base}/admin/results/${set.id}`}>صفحة النتيجة</a>.</p>}
+        {!form?.fields.some((f) => f.type === "tel") && <p className="a-alert">نموذج الاختبار مفيهوش رقم موبايل، فالطالب مش هيقدر يدوّر على نتيجته. ضيف خانة «رقم موبايل» للنموذج، أو اكتب الرقم في التصحيح.</p>}
+        {todo > 0 && (
+          <details className="a-confirm">
+            <summary className="btn-sm primary">اعتماد كل اللي متصححوش ({todo})</summary>
+            <form action={approveAllAction.bind(null, site, quiz.path, env)}>
+              <p className="a-sub">{m.graded ? "كل طالب سلّم ومتعتمدش هيتعتمد بالدرجة التلقائية (أو المسودة اللي كتبتها)." : "هيتعتمد بس اللي كتبتله درجة كمسودة (مفيش إجابات صحيحة للتصحيح التلقائي)."} تقدر تعدّل أي درجة بعدها.</p>
+              <button type="submit" className="btn-sm primary">أيوه، اعتمد</button>
+            </form>
+          </details>
+        )}
+      </section>
 
       {m.graded && finished > 0 && (
         <section className="a-panel an-bars">
@@ -111,11 +147,17 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
         <div className="qz-head">
           <h2>الطلاب ({rows.length})</h2>
           <nav className="an-ranges">
-            <a href="?sort=time" aria-current={sort === "time" ? "page" : undefined}>الأحدث</a>
-            {m.graded && <a href="?sort=score" aria-current={sort === "score" ? "page" : undefined}>الأعلى درجة</a>}
+            <a href={link({ sort: "time" })} aria-current={sort === "time" ? "page" : undefined}>الأحدث</a>
+            {m.graded && <a href={link({ sort: "score" })} aria-current={sort === "score" ? "page" : undefined}>الأعلى درجة</a>}
           </nav>
         </div>
+        <nav className="an-ranges">
+          <a href={link({ show: "all" })} aria-current={show === "all" ? "page" : undefined}>الكل ({rows.length})</a>
+          <a href={link({ show: "todo" })} aria-current={show === "todo" ? "page" : undefined}>محتاج تصحيح ({todo})</a>
+          <a href={link({ show: "approved" })} aria-current={show === "approved" ? "page" : undefined}>معتمد ({approved})</a>
+        </nav>
         {rows.length === 0 && <p className="an-empty">محدش بدأ الاختبار لسه.</p>}
+        {rows.length > 0 && sorted.length === 0 && <p className="an-empty">{show === "todo" ? "مفيش حد محتاج تصحيح." : "لسه مفيش درجات معتمدة."}</p>}
         <ul className="rq-list">
           {sorted.map((r, i) => {
             const st = STATUS[r.status];
@@ -125,6 +167,9 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
                 <div className="rq-top">
                   {sort === "score" && <b className="qz-rank">#{i + 1}</b>}
                   <span className={`rq-badge ${st.tone}`}>{st.label}</span>
+                  {r.status !== "in_progress" && (r.approvedAt
+                    ? <span className="rq-badge gr-ok">✓ الدرجة معتمدة{r.result ? `: ${r.result.score}` : ""}</span>
+                    : <span className="rq-badge gr-todo">{r.result ? "مسودة" : "محتاج تصحيح"}</span>)}
                   {r.graded.max > 0 && r.status !== "in_progress" && (
                     <b className={`qz-score ${passed ? "pass" : "fail"}`} dir="ltr">{r.graded.score}/{r.graded.max} · {r.graded.percent}%</b>
                   )}
@@ -153,10 +198,27 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
                     })}
                   </ol>
                 </details>
+                {r.status !== "in_progress" && (
+                  <GradeBox
+                    key={r.id}
+                    site={site}
+                    path={quiz.path}
+                    id={r.id}
+                    initial={{
+                      name: r.result?.name ?? r.student.name,
+                      phone: r.result?.phone ?? r.student.phone,
+                      score: r.result?.score ?? (r.graded.max ? String(r.graded.score) : ""),
+                      note: r.result?.note ?? "",
+                    }}
+                    approved={Boolean(r.approvedAt)}
+                    total={total}
+                    reviewedBy={r.reviewedBy}
+                  />
+                )}
                 <div className="rq-foot">
                   <span className="a-sub">{r.finishedAt ? `سلّم ${formatWhen(r.finishedAt)}` : "لسه بيحل"}</span>
                   <details className="a-confirm">
-                    <summary className="f-link danger">حذف (يسمح له يدخل تاني)</summary>
+                    <summary className="f-link danger">حذف (يسمح له يدخل تاني{r.approvedAt ? "، ودرجته تتشال من النتيجة" : ""})</summary>
                     <form action={deleteAttemptAction.bind(null, site, quiz.path, [r.id])}>
                       <button type="submit" className="btn-sm danger">تأكيد الحذف</button>
                     </form>
