@@ -4,6 +4,7 @@ import { Icon } from "./Icon";
 import { YoutubeVideo } from "./YoutubeVideo";
 import { youtubeId } from "@/lib/youtube";
 import { SectionHead } from "./SectionHead";
+import { Carousel } from "./Carousel";
 
 const sameUrl = (a: string, b: string) => a.replace(/\/+$/, "").toLowerCase() === b.replace(/\/+$/, "").toLowerCase();
 
@@ -22,9 +23,9 @@ export function Youtube({ data, avatar, socials }: { data: NonNullable<Content["
       <div className="wrap">
         <SectionHead eyebrow={data.eyebrow} title={data.title} intro={data.intro} />
         {videos.length > 0 && (
-          <div className="vids">
+          <Carousel display={data.display} className="vids" label={data.eyebrow}>
             {videos.map((v) => <YoutubeVideo key={v.id} id={v.id} title={v.title} caption={v.caption} />)}
-          </div>
+          </Carousel>
         )}
         <a className="yt-card" href={data.channelUrl} target="_blank" rel="noopener noreferrer">
           <span className="yt-id">

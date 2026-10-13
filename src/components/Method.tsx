@@ -1,13 +1,14 @@
 import type { Content } from "@/lib/schema";
 import { Icon } from "./Icon";
 import { SectionHead } from "./SectionHead";
+import { Carousel } from "./Carousel";
 
 export function Method({ data }: { data: NonNullable<Content["method"]> }) {
   return (
     <section className="block" id="method">
       <div className="wrap">
         <SectionHead eyebrow={data.eyebrow} title={data.title} intro={data.intro} />
-        <div className="method">
+        <Carousel display={data.display} className="method" label={data.eyebrow}>
           {data.items.map((m) => (
             <div className="m" key={m.title}>
               <span className="ico"><Icon name={m.icon} /></span>
@@ -15,7 +16,7 @@ export function Method({ data }: { data: NonNullable<Content["method"]> }) {
               <p>{m.text}</p>
             </div>
           ))}
-        </div>
+        </Carousel>
       </div>
     </section>
   );

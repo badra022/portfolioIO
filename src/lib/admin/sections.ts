@@ -32,7 +32,7 @@ export const SECTIONS: SectionDef[] = [
   { id: "students", title: "الطلاب", description: "عدد الطلاب، صورة المجموعة، وصور الحصص والرحلات.", keys: ["students"] },
   { id: "challenge", title: "تحدي الأسئلة", description: "الأسئلة والجائزة لمن يحل صح على واتساب.", keys: ["challenge"] },
   { id: "final", title: "الدعوة الأخيرة", description: "آخر قسم قبل الفوتر.", keys: ["final"] },
-  { id: "layout", title: "ترتيب الأقسام والقوائم", description: "الأقسام الظاهرة، القائمة العلوية، الشريط السفلي، والفوتر.", keys: ["sections", "nav", "navCta", "sticky", "footer"] },
+  { id: "layout", title: "ترتيب الأقسام والقوائم", description: "الأقسام الظاهرة، قائمة الأقسام الجانبية، القائمة العلوية، الشريط السفلي، والفوتر.", keys: ["sections", "menu", "nav", "navCta", "sticky", "footer"] },
   { id: "seo", title: "جوجل والمشاركة", description: "عنوان ووصف الموقع في جوجل وصورة المشاركة.", keys: ["seo"] },
   { id: "general", title: "اللغة والنصوص العامة", description: "اللغة، الاتجاه، وأسماء الأيام.", keys: ["locale", "dir", "labels"] },
   { id: "theme", title: "الهوية البصرية", description: "الألوان والخطوط وشكل الصور.", theme: true, superOnly: true },

@@ -26,6 +26,10 @@ import { Tracker } from "./Tracker";
 import { jsonLdScript, structuredData } from "@/lib/structured-data";
 import { LeadForms } from "./LeadForms";
 import { Footer, StickyBar } from "./Footer";
+import { SectionMenu } from "./SectionMenu";
+import { ChatButton } from "./ChatButton";
+import { asset } from "@/lib/assets";
+import { menuItems } from "@/lib/sections-meta";
 
 function chatConfig(c: Content): ChatConfig {
   const { primary, whatsapp, telegram, messenger, refCodes, refLabel } = c.contact;
@@ -80,6 +84,18 @@ function barMessages(c: Content, base: string): BarMessage[] {
 export function TenantPage({ c, base, canonical, pastExams, preview = false }: { c: Content; base: string; canonical: string | null; pastExams: PastExamItem[]; preview?: boolean }) {
   const chat = chatConfig(c);
   const results = { exams: pastExams, slug: c.slug, base, ...contactIds(c) };
+  // Sections that have something to show (the others are skipped by their components too).
+  const shown = (key: Content["sections"][number]) => {
+    switch (key) {
+      case "exams": return c.exams ? upcomingExams(c.exams).length > 0 || pastExams.length > 0 : false;
+      case "services": return (c.services?.items.length ?? 0) > 0;
+      case "featured": return (c.featured?.items.length ?? 0) > 0;
+      case "faq": return (c.faq?.items ?? []).some((q) => q.question.trim() && q.answer.trim());
+      default: return true;
+    }
+  };
+  const menu = c.menu.enabled ? menuItems(c, shown) : [];
+  const hasMenu = menu.length >= 3;
   const render: Record<Content["sections"][number], () => React.ReactNode> = {
     hero: () => <Hero c={c} chat={chat} />,
     grades: () => <Grades data={c.grades!} />,
@@ -108,7 +124,16 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
   return (
     <>
       {c.bar && <AnnouncementBar messages={barMessages(c, base)} />}
-      <Nav c={c} chat={chat} />
+      <Nav c={c} chat={chat} menu={hasMenu} />
+      {hasMenu && (
+        <SectionMenu
+          items={menu}
+          title={c.menu.title}
+          name={c.profile.fullTitle}
+          avatar={c.profile.avatar ? asset(c.profile.avatar) : c.profile.photo ? asset(c.profile.photo) : undefined}
+          cta={<ChatButton chat={chat} block label={c.navCta.label} message={c.navCta.message} refCode={c.navCta.ref} form={c.navCta.form} />}
+        />
+      )}
       <main>
         {c.sections.map((key, i) => (
           <div key={key} className={`section-slot slot-${key}`}>

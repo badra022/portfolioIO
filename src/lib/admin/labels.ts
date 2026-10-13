@@ -155,6 +155,7 @@ const BY_KEY: Record<string, string> = {
   moreLabel: "نص زر عرض الكل",
   // services
   services: "خدمات أخرى",
+  display: "طريقة العرض",
   // featured / faq
   answer: "الإجابة",
   // popup
@@ -199,12 +200,13 @@ const BY_KEY: Record<string, string> = {
   bg: "الخلفية", surface: "خلفية البطاقات", raised: "خلفية مرتفعة", line: "الخطوط الفاصلة",
   accent: "اللون الأساسي", accentHot: "اللون الأساسي (عند التمرير)", accentDeep: "اللون الأساسي الداكن", onAccent: "لون النص فوق الأساسي",
   muted: "نص ثانوي", subtle: "نص باهت", online: "لون أونلاين",
-  fonts: "الخطوط", googleFontsHref: "رابط Google Fonts", display: "خط العناوين", body: "خط النصوص", numeric: "خط الأرقام",
+  fonts: "الخطوط", googleFontsHref: "رابط Google Fonts", body: "خط النصوص", numeric: "خط الأرقام",
   radius: "استدارة الحواف", card: "البطاقات", control: "الحقول", pill: "الأزرار",
   texture: "ملمس الخلفية", glow: "توهج الخلفية", heroPhotoShape: "شكل صورة الواجهة", tagRotation: "ميل الكلمة المميزة", buttonGlow: "توهج الأزرار",
 };
 
 const BY_PATH: Record<string, string> = {
+  "fonts.display": "خط العناوين",
   "contact.primary": "تطبيق التواصل الأساسي",
   "schedule.labels.book": "نص زر الحجز",
   "schedule.labels.ask": "نص زر الاستفسار",
@@ -262,6 +264,13 @@ const BY_PATH: Record<string, string> = {
   "services.items.cta.type": "يفتح",
   "popup.cta.message": "رسالة جاهزة (واتساب وتيليجرام فقط)",
   "services.items.cta.message": "رسالة جاهزة (واتساب وتيليجرام فقط)",
+  // menu
+  "menu": "قائمة الأقسام",
+  "menu.enabled": "إظهار قائمة الأقسام",
+  "menu.title": "عنوان القائمة",
+  "menu.items": "الأقسام في القائمة (اختياري)",
+  "menu.items.section": "القسم",
+  "menu.items.label": "الاسم في القائمة",
   // featured
   "featured": "القسم المميز",
   "featured.items": "الكروت",
@@ -283,7 +292,7 @@ const BY_PATH: Record<string, string> = {
   "featured.items.secondaryCta.type": "يفتح",
   "featured.items.cta.message": "رسالة جاهزة (واتساب وتيليجرام فقط)",
   "featured.items.secondaryCta.message": "رسالة جاهزة (واتساب وتيليجرام فقط)",
-  "featured.layout": "شكل الكروت",
+
   // faq
   "faq": "الأسئلة الشائعة",
   "faq.items": "الأسئلة",
@@ -360,7 +369,14 @@ const HINTS: Record<string, string> = {
   "featured.items.countdown": "يظهر «ينتهي خلال ...» تحت السعر لو فيه تاريخ اختفاء.",
   "featured.items.cta.to": "واتساب: رقم دولي (فارغ = رقم الموقع). تيليجرام/ماسنجر: اسم المستخدم. اتصال: رقم الهاتف. رابط: https://...",
   "featured.items.secondaryCta.to": "واتساب: رقم دولي (فارغ = رقم الموقع). تيليجرام/ماسنجر: اسم المستخدم. اتصال: رقم الهاتف. رابط: https://...",
-  "featured.layout": "«أول كارت كبير» يخلي أول كارت بعرض الصفحة (مناسب لعرض واحد مهم).",
+  "exams.display": "تلقائي = الطالب بيسحب الكروت بصباعه على الموبايل بدل ما تبقى تحت بعض، وعلى الشاشات الكبيرة بتظهر شبكة. كاروسيل = بيتسحب على كل الشاشات (بأسهم ونقط).",
+  "services.display": "تلقائي = الطالب بيسحب الكروت بصباعه على الموبايل بدل ما تبقى تحت بعض، وعلى الشاشات الكبيرة بتظهر شبكة. كاروسيل = بيتسحب على كل الشاشات (بأسهم ونقط).",
+  "youtube.display": "تلقائي = الطالب بيسحب الكروت بصباعه على الموبايل بدل ما تبقى تحت بعض، وعلى الشاشات الكبيرة بتظهر شبكة. كاروسيل = بيتسحب على كل الشاشات (بأسهم ونقط).",
+  "method.display": "تلقائي = الطالب بيسحب الكروت بصباعه على الموبايل بدل ما تبقى تحت بعض، وعلى الشاشات الكبيرة بتظهر شبكة. كاروسيل = بيتسحب على كل الشاشات (بأسهم ونقط).",
+  "reviews.display": "تلقائي/شبكة/تحت بعض = حيطة صور الآراء مع زرار «عرض الكل». كاروسيل = صف صور بيتسحب.",
+  "featured.display": "«تلقائي» هنا = أول كارت كبير بعرض الصفحة والباقي تحته (مناسب لعرض واحد مهم).",
+  "menu": "قائمة بكل أقسام الصفحة: على الكمبيوتر والتابلت بتظهر على جنب، وعلى الموبايل زرار «الأقسام» فوق بيفتحها في الشاشة كلها. الطالب بيشوف كل اللي في الموقع مرة واحدة ويروح لأي قسم بضغطة.",
+  "menu.items": "فاضية = كل الأقسام الظاهرة بترتيب الصفحة وبأسمائها العادية. لو ضفت هنا، القائمة هتبقى بالترتيب والأسماء دي بس.",
   "faq": "الأسئلة اللي الطلاب وأولياء الأمور بيسألوها كتير (المواعيد، الأسعار، الحجز، الأونلاين...). بتظهر كقائمة تفتح وتقفل، وبتساعد في الظهور في جوجل. فعّل القسم من «ترتيب الأقسام».",
   "faq.items.answer": "إجابة قصيرة وواضحة. تقدر تكتبها في أكتر من سطر.",
   "faq.cta.to": "واتساب: رقم دولي (فارغ = رقم الموقع). تيليجرام/ماسنجر: اسم المستخدم. اتصال: رقم الهاتف. رابط: https://...",
@@ -373,7 +389,7 @@ const ENUMS: Record<string, string> = {
   accent: "ملوّن", tag: "داخل إطار", strong: "عريض",
   hero: "الواجهة", grades: "الصفوف", schedule: "الجدول", method: "طريقة الشرح", book: "الكتاب", students: "الطلاب",
   challenge: "التحدي", exams: "الامتحانات", final: "الدعوة الأخيرة", reviews: "آراء الطلاب", services: "خدمات أخرى",
-  featured: "القسم المميز", faq: "الأسئلة الشائعة", big: "أول كارت كبير", grid: "كل الكروت بنفس الحجم",
+  featured: "القسم المميز", faq: "الأسئلة الشائعة",
   phone: "اتصال", link: "رابط",
   tel: "رقم موبايل", number: "رقم", select: "اختيار من قائمة", textarea: "نص طويل",
   text: "نص مكتوب", choice: "اختيار من متعدد",
@@ -400,7 +416,18 @@ export function hintFor(path: string): string | undefined {
   return HINTS[path] ?? HINTS[generic(path)] ?? KEY_HINTS[path.split(".").pop() ?? ""];
 }
 
-export function enumLabel(value: string): string {
+/** Choices whose meaning depends on the field (the same value means something else elsewhere). */
+const ENUMS_BY_KEY: Record<string, Record<string, string>> = {
+  display: {
+    auto: "تلقائي: سحب على الموبايل، شبكة على الكمبيوتر",
+    carousel: "شريط بيتسحب (كاروسيل) على كل الشاشات",
+    grid: "شبكة (كروت جنب بعض)",
+    list: "تحت بعض",
+  },
+};
+
+export function enumLabel(value: string, key?: string): string {
+  if (key && ENUMS_BY_KEY[key]?.[value]) return ENUMS_BY_KEY[key][value];
   if (value === "book") return "كتاب";
   return ENUMS[value] ?? value;
 }

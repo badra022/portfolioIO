@@ -2,6 +2,7 @@ import type { Content } from "@/lib/schema";
 import type { ChatConfig } from "@/lib/chat";
 import { dateParts, parseDate } from "@/lib/format";
 import { ExamCard } from "./ExamCard";
+import { Carousel } from "./Carousel";
 import { SectionHead } from "./SectionHead";
 import { ExamResults, type PastExamItem } from "./ExamResults";
 
@@ -24,9 +25,9 @@ export function Exams({ data, locale, chat, results }: { data: Data; locale: str
       <div className="wrap">
         <SectionHead eyebrow={data.eyebrow} title={data.title} intro={data.intro} />
         {items.length > 0 && (
-          <div className={`exams count-${items.length}`}>
+          <Carousel display={data.display} className={`exams count-${items.length}`} per={2} label={data.eyebrow}>
             {items.map((e) => <ExamCard key={e.id} exam={e} parts={dateParts(e.date, locale)} labels={data.labels} chat={chat} />)}
-          </div>
+          </Carousel>
         )}
         {results.exams.length > 0 && (
           <ExamResults {...results} locale={locale} label={data.resultsLabel} intro={data.resultsIntro} />

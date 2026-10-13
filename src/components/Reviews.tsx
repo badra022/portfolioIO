@@ -4,6 +4,7 @@ import type { Content } from "@/lib/schema";
 import { Icon } from "./Icon";
 import { Lightbox } from "./Lightbox";
 import { Rich } from "./Rich";
+import { Carousel } from "./Carousel";
 
 type Data = NonNullable<Content["reviews"]>;
 
@@ -46,7 +47,16 @@ export function Reviews({ data }: { data: Data }) {
             </div>
           )}
         </div>
-        {photos.length > 0 && (
+        {photos.length > 0 && data.display === "carousel" && (
+          <Carousel display="carousel" className="rv-row" per={4} label={data.eyebrow}>
+            {photos.map((p, i) => (
+              <button key={p.src + i} type="button" className="rv" onClick={() => setView(i)} aria-label={p.alt}>
+                <img src={p.src} alt={data.images[i].alt ?? ""} loading="lazy" />
+              </button>
+            ))}
+          </Carousel>
+        )}
+        {photos.length > 0 && data.display !== "carousel" && (
           <>
             {/* The height cap sits on a wrapper: on the column container itself, extra reviews would spill into hidden side columns. */}
             <div ref={wall} className={`rv-clip${expanded ? " open" : ""}${overflows && !expanded ? " cut" : ""}`}>

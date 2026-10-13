@@ -113,6 +113,13 @@ const SectionHead = {
 /** YouTube video id (11 chars) or any common YouTube link to one video. */
 export const YOUTUBE_RE = /^(?:[\w\-]{11}|https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)[\w\-]{11}(?:[?&#][^\s]*)?)$/;
 
+/**
+ * How a section shows its list (exams, videos, cards...): auto = swipe on phones and
+ * the usual grid on bigger screens; carousel = swipe/arrows everywhere; grid = cards
+ * side by side; list = one under the other.
+ */
+export const Display = z.enum(["auto", "carousel", "grid", "list"]).default("auto");
+
 export const DayKey = z.enum(["sat", "sun", "mon", "tue", "wed", "thu", "fri"]);
 
 /* ---------- sections ---------- */
@@ -180,6 +187,7 @@ const Schedule = z.object({
 
 const Method = z.object({
   ...SectionHead,
+  display: Display,
   items: z.array(z.object({
     icon: z.enum(["book", "chat", "check", "loop", "trophy", "bolt", "star", "users"]),
     title: z.string(),
@@ -245,6 +253,7 @@ const Challenge = z.object({
 
 const Exams = z.object({
   ...SectionHead,
+  display: Display,
   labels: z.object({
     scope: z.string(), prize: z.string(), trackLabel: z.string(),
     countdown: z.string(), days: z.string(), hours: z.string(), minutes: z.string(), today: z.string(),
@@ -271,6 +280,8 @@ const Exams = z.object({
 
 const Youtube = z.object({
   ...SectionHead,
+  /** How the videos are shown. */
+  display: Display,
   channelName: z.string(),
   channelUrl: z.string().url(),
   subscribeLabel: z.string(),
@@ -293,6 +304,8 @@ const Final = z.object({ title: RichText, text: z.string(), cta: ChatCta });
 /** Students' feedback: screenshots of messages/reviews under a headline number. */
 const Reviews = z.object({
   ...SectionHead,
+  /** auto = the wall of screenshots (with "show all"). */
+  display: Display,
   metric: z.object({ value: z.string(), label: z.string() }).optional(),
   stars: z.boolean().default(true),
   images: z.array(z.object({ image: ImageRef, alt: z.string().optional() })).default([]),
@@ -302,6 +315,7 @@ const Reviews = z.object({
 /** Other services the teacher offers, each with its own button and links. */
 const Services = z.object({
   ...SectionHead,
+  display: Display,
   items: z.array(z.object({
     title: z.string(),
     text: z.string(),
@@ -351,8 +365,8 @@ const Featured = z.object({
     cta: Action.optional(),
     secondaryCta: Action.optional(),
   })).default([]),
-  /** big = the first card spans the full width (spotlight); grid = all cards the same size. */
-  layout: z.enum(["big", "grid"]).default("big"),
+  /** auto = the first card spans the full width (spotlight), the others under it. */
+  display: Display,
 });
 
 /**
@@ -391,6 +405,18 @@ const Popup = z.object({
   delaySeconds: z.number().min(0).max(60).default(2),
   /** After a visitor closes it, show it to them again after this many hours. */
   remindAfterHours: z.number().min(0).max(24 * 60).default(5),
+});
+
+/**
+ * The sections menu: a sidebar on tablets and computers, a full-screen menu on
+ * phones (button in the top bar), so visitors see everything on the page at once.
+ * Lists the visible sections in page order, with their usual names, unless the
+ * teacher lists them here (own names, order, or fewer).
+ */
+const Menu = z.object({
+  enabled: z.boolean().default(true),
+  title: z.string().default("محتوى الصفحة"),
+  items: z.array(z.object({ section: SectionKey, label: z.string().optional() })).default([]),
 });
 
 /* ---------- quizzes ---------- */
@@ -492,6 +518,7 @@ export const ContentSchema = z.object({
   final: Final.optional(),
   popup: Popup.optional(),
   bar: AnnouncementBar.optional(),
+  menu: Menu.default({ enabled: true, title: "محتوى الصفحة", items: [] }),
   forms: z.array(LeadForm).default([]),
   quizzes: z.array(Quiz).default([]),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),
