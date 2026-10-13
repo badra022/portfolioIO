@@ -4,6 +4,7 @@ import { asset } from "@/lib/assets";
 import { ActionButton } from "./ActionButton";
 import { SectionHead } from "./SectionHead";
 import { Socials } from "./Socials";
+import { Carousel } from "./Carousel";
 
 /** "Other services": cards with an image, text, a button to any channel, and optional social links. */
 export function Services({ data, chat }: { data: NonNullable<Content["services"]>; chat: ChatConfig }) {
@@ -12,7 +13,7 @@ export function Services({ data, chat }: { data: NonNullable<Content["services"]
     <section className="block" id="services">
       <div className="wrap">
         <SectionHead eyebrow={data.eyebrow} title={data.title} intro={data.intro} />
-        <div className={`svc-grid${data.items.length === 1 ? " single" : ""}`}>
+        <Carousel display={data.display} className={`svc-grid${data.items.length === 1 ? " single" : ""}`} per={2} label={data.eyebrow}>
           {data.items.map((s, i) => (
             <article className="svc" key={s.title + i}>
               {s.image && <img className="svc-img" src={asset(s.image)} alt="" loading="lazy" />}
@@ -24,7 +25,7 @@ export function Services({ data, chat }: { data: NonNullable<Content["services"]
               </div>
             </article>
           ))}
-        </div>
+        </Carousel>
       </div>
     </section>
   );

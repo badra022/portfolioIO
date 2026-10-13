@@ -8,6 +8,7 @@ import { HideAfter } from "./HideAfter";
 import { Icon } from "./Icon";
 import { YoutubeVideo } from "./YoutubeVideo";
 import { OfferCountdown } from "./OfferCountdown";
+import { Carousel } from "./Carousel";
 
 type Data = NonNullable<Content["featured"]>;
 type Item = Data["items"][number];
@@ -19,18 +20,29 @@ type Item = Data["items"][number];
  */
 export function Featured({ data, chat }: { data: Data; chat: ChatConfig }) {
   if (!data.items.length) return null;
-  const big = data.layout === "big";
+  // auto: the first card is the spotlight (full width), the others under it.
+  const big = data.display === "auto";
   return (
     <section className="block" id="featured">
       <div className="wrap">
         <SectionHead eyebrow={data.eyebrow} title={data.title} intro={data.intro} />
-        <div className={`ft-grid${big ? " spotlight" : ""}${data.items.length === 1 ? " single" : ""}`}>
-          {data.items.map((it, i) => (
-            <HideAfter key={it.title + i} from={it.startsAt} until={it.endsAt}>
-              <Card it={it} chat={chat} wide={big && (i === 0 || data.items.length === 1)} />
-            </HideAfter>
-          ))}
-        </div>
+        {big ? (
+          <div className={`ft-grid spotlight${data.items.length === 1 ? " single" : ""}`}>
+            {data.items.map((it, i) => (
+              <HideAfter key={it.title + i} from={it.startsAt} until={it.endsAt}>
+                <Card it={it} chat={chat} wide={i === 0} />
+              </HideAfter>
+            ))}
+          </div>
+        ) : (
+          <Carousel display={data.display} className="ft-grid" per={data.display === "list" ? 1 : 3} label={data.eyebrow}>
+            {data.items.map((it, i) => (
+              <HideAfter key={it.title + i} from={it.startsAt} until={it.endsAt}>
+                <Card it={it} chat={chat} wide={data.display === "list"} />
+              </HideAfter>
+            ))}
+          </Carousel>
+        )}
       </div>
     </section>
   );

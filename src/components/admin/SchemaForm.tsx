@@ -98,7 +98,7 @@ function Field(props: FieldProps) {
         return (
           <select id={id} value={String(value ?? "")} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)}>
             {!required && <option value="">{name === "style" ? "عادي" : "—"}</option>}
-            {inner.enum!.map((o) => <option key={String(o)} value={String(o)}>{enumLabel(String(o))}</option>)}
+            {inner.enum!.map((o) => <option key={String(o)} value={String(o)}>{enumLabel(String(o), name)}</option>)}
           </select>
         );
       case "string":
