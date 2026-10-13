@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { getSiteData } from "@/lib/server/site";
+import { isDev } from "@/lib/env";
 
 /**
  * Admin, API, upload and private preview pages are never crawled. Everything else may be fetched,
@@ -10,6 +11,8 @@ import { getSiteData } from "@/lib/server/site";
  */
 export async function GET(_req: Request, ctx: RouteContext<"/sites/[site]/robots.txt">) {
   await connection();
+  // The developer environment is never crawled (it also asks for a login on every page).
+  if (isDev()) return new Response("User-agent: *\nDisallow: /\n", { headers: { "Content-Type": "text/plain; charset=utf-8" } });
   const data = await getSiteData(decodeURIComponent((await ctx.params).site));
   const sitemap = data.kind === "tenant" && data.indexable ? `\nSitemap: ${data.canonical}/sitemap.xml\n` : "";
   const body = "User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /upload\nDisallow: /preview\nDisallow: /t/*/admin\nDisallow: /t/*/api/\nDisallow: /t/*/upload\nDisallow: /t/*/preview\n" + sitemap;

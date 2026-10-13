@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { env } from "@/lib/env";
+import { env, isDev } from "@/lib/env";
 import { isAdminPath, route } from "@/lib/routing";
 import { authenticate, teacherSlugFor } from "@/lib/server/auth";
 import { isSiteFileName } from "@/lib/site-files";
@@ -9,8 +9,11 @@ import { PREVIEW_PATH, siteEnv } from "@/lib/environments";
  * Every request is mapped by its host name to /sites/<site>/... (see lib/routing.ts).
  * /admin paths and the private preview (/preview/...) additionally require basic
  * auth; the same check runs again inside every admin page, server action and
- * preview page.
+ * preview page. On the dev environment (APP_STAGE=dev) every page asks for it.
  */
+
+/** Dev paths that carry their own credentials: the MCP token and signed photo-upload links. */
+const OPEN_ON_DEV = /^\/(api\/mcp|api\/upload|upload)(\/|$)/;
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const host = request.headers.get("host");
@@ -24,7 +27,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(to, 307);
   }
 
-  if (isAdminPath(r.rest) || preview) {
+  const devGate = isDev() && !OPEN_ON_DEV.test(r.rest);
+
+  if (isAdminPath(r.rest) || preview || devGate) {
     const header = request.headers.get("authorization");
     const principal = await authenticate(header, r.site);
     if (!principal) {
@@ -53,10 +58,8 @@ export async function proxy(request: NextRequest) {
   url.pathname = `/sites/${encodeURIComponent(r.site)}${rest === "/" ? "" : rest}`;
   url.search = search;
   const res = NextResponse.rewrite(url);
-  if (isAdminPath(r.rest) || preview) {
-    res.headers.set("Cache-Control", "no-store");
-    res.headers.set("X-Robots-Tag", "noindex, nofollow");
-  }
+  if (isAdminPath(r.rest) || preview) res.headers.set("Cache-Control", "no-store");
+  if (isAdminPath(r.rest) || preview || isDev()) res.headers.set("X-Robots-Tag", "noindex, nofollow");
   return res;
 }
 

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getSiteData } from "@/lib/server/site";
 import { requireAdmin } from "@/lib/server/auth";
 import { PREVIEW_PATH } from "@/lib/environments";
+import { isDev } from "@/lib/env";
 import { themeAttrs, themeCss } from "@/lib/theme";
 import "../../globals.css";
 import "../../sections.css";
@@ -20,6 +21,7 @@ export default function RootLayout({ children, params }: LayoutProps<"/sites/[si
   return (
     <html lang="ar" dir="rtl">
       <body>
+        {isDev() && <div className="dev-bar" role="note" dir="ltr">DEV · test environment with its own database, not the live site</div>}
         <Suspense fallback={null}>
           <SiteFrame params={params}>{children}</SiteFrame>
         </Suspense>
