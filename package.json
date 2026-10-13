@@ -10,7 +10,7 @@
     "start": "next start",
     "validate": "node --experimental-strip-types scripts/validate.ts",
     "schema": "node --experimental-strip-types scripts/generate-schema.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/db-migrate.mjs",
     "postinstall": "node --experimental-strip-types scripts/generate-schema.ts"
