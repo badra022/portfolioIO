@@ -8,7 +8,7 @@ import type { Content } from "./schema";
  * - and its data pages in the admin show an error (analytics, requests).
  * It applies to everyone editing that teacher's site, the super admin included.
  */
-export const FEATURES = ["analytics", "forms", "exams", "votes", "promo"] as const;
+export const FEATURES = ["analytics", "students", "forms", "exams", "votes", "promo"] as const;
 export type Feature = (typeof FEATURES)[number];
 
 export type Permissions = Record<Feature, boolean> & {
@@ -17,12 +17,13 @@ export type Permissions = Record<Feature, boolean> & {
 };
 
 /** New teachers: nothing paid. */
-export const NO_PERMISSIONS: Permissions = { analytics: false, forms: false, exams: false, votes: false, promo: false, maxForms: null };
+export const NO_PERMISSIONS: Permissions = { analytics: false, students: false, forms: false, exams: false, votes: false, promo: false, maxForms: null };
 /** Teachers from before permissions existed, and sites without a database. */
-export const ALL_PERMISSIONS: Permissions = { analytics: true, forms: true, exams: true, votes: true, promo: true, maxForms: null };
+export const ALL_PERMISSIONS: Permissions = { analytics: true, students: true, forms: true, exams: true, votes: true, promo: true, maxForms: null };
 
 export const FEATURE_INFO: Record<Feature, { title: string; description: string }> = {
   analytics: { title: "الإحصائيات", description: "صفحة الإحصائيات وأرقام الزيارات والضغطات في لوحة المدرس." },
+  students: { title: "ملفات الطلاب", description: "ملف لكل طالب برقم موبايله: بياناته، طلباته، اختباراته ونتايجه، ومنحنى مستواه، وتنزيلهم Excel. البيانات بتتجمع حتى لو مقفولة." },
   forms: { title: "النماذج والطلبات", description: "نماذج جمع بيانات الطلاب على الأزرار، وصفحة «الطلبات» وتنزيلها." },
   exams: { title: "الاختبارات والنتايج", description: "الاختبارات الأونلاين وتصحيحها، ونتايج الامتحانات اللي الطلاب بيدوروا فيها." },
   votes: { title: "التصويتات", description: "صفحات التصويت من غير اسم ولا رقم." },
@@ -67,7 +68,7 @@ export function countedForms(c: Content): Content["forms"] {
 }
 
 /** Per bundle: whether the content uses it, and a fingerprint of that part (to tell if a save changes it). */
-function usage(c: Content): Record<Exclude<Feature, "analytics">, { used: boolean; print: string }> {
+function usage(c: Content): Record<Exclude<Feature, "analytics" | "students">, { used: boolean; print: string }> {
   const featuredOn = c.sections.includes("featured") && (c.featured?.items.length ?? 0) > 0;
   const promoUsed = Boolean(c.popup?.enabled) || (c.bar?.items.length ?? 0) > 0 || featuredOn;
   return {

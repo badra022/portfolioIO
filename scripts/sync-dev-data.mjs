@@ -3,7 +3,7 @@
 //
 // Copied:    tenants (content, theme, the admin preview copy, status, plan) and every image in
 //            the storage bucket.
-// Never:     submissions, quiz_attempts, analytics_daily, exam_results (students' names,
+// Never:     submissions, quiz_attempts, students, analytics_daily, exam_results (students' names,
 //            phones, grades), admin_users (teachers' passwords), tenant_domains (dev serves
 //            teachers at /t/<slug> only), tenant_revisions, tenant_files.
 //
@@ -32,7 +32,7 @@ const dst = postgres(devDb, { prepare: false, max: 1 });
 try {
   // select *: production may not have the permissions column yet (before its release); it then had everything.
   const rows = await src`select * from tenants`;
-  const ALL = { analytics: true, forms: true, exams: true, votes: true, promo: true };
+  const ALL = { analytics: true, students: true, forms: true, exams: true, votes: true, promo: true };
   for (const r of rows) {
     await dst`
       insert into tenants (slug, name, status, content, theme, version, preview_content, preview_theme, preview_version, permissions, updated_by)

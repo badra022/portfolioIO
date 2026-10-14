@@ -78,6 +78,13 @@
       "when": 1791992399166,
       "tag": "0010_tenant_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792016103875,
+      "tag": "0011_students",
+      "breakpoints": true
     }
   ]
 }
