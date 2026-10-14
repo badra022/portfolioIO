@@ -135,7 +135,7 @@ export const DayKey = z.enum(["sat", "sun", "mon", "tue", "wed", "thu", "fri"]);
 
 export const SectionKey = z.enum([
   "hero", "grades", "schedule", "method", "book",
-  "students", "reviews", "challenge", "exams", "youtube", "services", "featured", "faq", "final",
+  "students", "reviews", "challenge", "exams", "youtube", "services", "featured", "honors", "faq", "final",
 ]);
 
 const Hero = z.object({
@@ -161,6 +161,9 @@ const Grades = z.object({
   })),
 });
 
+/** A group's status: still has places, full, or not started yet. */
+export const GROUP_STATUS = ["available", "full", "notStarted"] as const;
+
 const Schedule = z.object({
   ...SectionHead,
   location: z.string(),
@@ -175,6 +178,16 @@ const Schedule = z.object({
     area: z.string().optional(),
     pm: z.string(), am: z.string(), tbd: z.string(), empty: z.string(),
     book: z.string(), ask: z.string(),
+    /** Group status labels and the full group's button (defaults in components/Schedule.tsx). */
+    available: z.string().optional(),
+    full: z.string().optional(),
+    notStarted: z.string().optional(),
+    /** "Starts on" before a not-started group's start date. */
+    startsOn: z.string().optional(),
+    /** Button of a full group (joins the waiting list). */
+    waitlist: z.string().optional(),
+    /** Button of a group that hasn't started (books a place early). */
+    reserve: z.string().optional(),
   }),
   slots: z.array(z.object({
     id: z.string(),
@@ -188,8 +201,22 @@ const Schedule = z.object({
     /** Where this group meets. Empty = the section's default location. */
     area: z.string().optional(),
     center: z.string().optional(),
+    /**
+     * Optional label on the group: still has places, full (the button joins the
+     * waiting list instead), or not started yet (shows its start date; the button
+     * books a place early).
+     */
+    status: z.enum(GROUP_STATUS).optional(),
+    /** When a not-started group begins. */
+    startsOn: StartDate.optional(),
   })),
-  messages: z.object({ book: z.string(), ask: z.string() }),
+  messages: z.object({
+    book: z.string(), ask: z.string(),
+    /** Message of a full group's button (waiting list). Empty = a ready-made one. */
+    waitlist: z.string().optional(),
+    /** Message of a not-started group's button. Empty = a ready-made one. */
+    reserve: z.string().optional(),
+  }),
   /** Booking buttons open this form instead of WhatsApp (the group's details are attached). */
   form: FormRef.optional(),
 });
@@ -379,6 +406,36 @@ const Featured = z.object({
 });
 
 /**
+ * The honor board: the teacher's top students and results. Each entry is one
+ * student (or a group, e.g. "the class of 2025's top ten") with one or more
+ * photos (a grid when there are several), their grade, short lines with icons
+ * ("full mark", "first in the school"), an optional YouTube video, a description
+ * that can be long (folded after a few lines), and an optional button.
+ */
+export const HONOR_ICONS = ["trophy", "medal", "crown", "star", "bolt", "check", "book", "users"] as const;
+const Honors = z.object({
+  ...SectionHead,
+  items: z.array(z.object({
+    name: z.string(),
+    /** The result, shown big, e.g. "50/50" or "98.5%". */
+    score: z.string().optional(),
+    /** e.g. "3 ثانوي - 2025". */
+    grade: z.string().optional(),
+    icon: z.enum(HONOR_ICONS).default("trophy"),
+    images: z.array(z.object({ image: ImageRef, alt: z.string().optional() })).default([]),
+    /** Short lines, each with its icon, e.g. "الأول على المدرسة". */
+    highlights: z.array(z.object({ icon: z.enum(HONOR_ICONS).default("star"), text: z.string() })).default([]),
+    video: z.string().regex(YOUTUBE_RE, { error: "الصق رابط فيديو يوتيوب" }).optional(),
+    description: z.string().optional(),
+    cta: Action.optional(),
+  })).default([]),
+  /** auto = one entry under the other (swipes when there are more than two). */
+  display: Display,
+  /** Button under the board, e.g. "احجز مكانك واكتب اسمك هنا السنة الجاية". */
+  cta: Action.optional(),
+});
+
+/**
  * The red bar at the very top of the page (above the menu): short promotions of
  * anything (an exam, results, a new video, a book). One message shows at a time:
  * the first in the list whose dates are current. Not part of the section order.
@@ -550,6 +607,7 @@ export const ContentSchema = z.object({
   reviews: Reviews.optional(),
   services: Services.optional(),
   featured: Featured.optional(),
+  honors: Honors.optional(),
   faq: Faq.optional(),
   final: Final.optional(),
   popup: Popup.optional(),

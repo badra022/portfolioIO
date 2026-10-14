@@ -16,6 +16,7 @@ export const SECTION_META: Record<Key, { id: string; label: string; icon: string
   exams: { id: "exams", label: "الامتحانات", icon: "trophy" },
   youtube: { id: "youtube", label: "الفيديوهات", icon: "youtube" },
   services: { id: "services", label: "خدمات أخرى", icon: "link" },
+  honors: { id: "honors", label: "لوحة الشرف", icon: "medal" },
   faq: { id: "faq", label: "أسئلة شائعة", icon: "help" },
   final: { id: "final", label: "تواصل معانا", icon: "phone" },
 };

@@ -19,6 +19,7 @@ import { Final } from "./Final";
 import { Reviews } from "./Reviews";
 import { Services } from "./Services";
 import { Featured } from "./Featured";
+import { Honors } from "./Honors";
 import { Faq } from "./Faq";
 import { Popup } from "./Popup";
 import { DevCredit } from "./DevCredit";
@@ -90,6 +91,7 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
       case "exams": return c.exams ? upcomingExams(c.exams).length > 0 || pastExams.length > 0 : false;
       case "services": return (c.services?.items.length ?? 0) > 0;
       case "featured": return (c.featured?.items.length ?? 0) > 0;
+      case "honors": return (c.honors?.items ?? []).some((h) => h.name.trim());
       case "faq": return (c.faq?.items ?? []).some((q) => q.question.trim() && q.answer.trim());
       default: return true;
     }
@@ -105,6 +107,7 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
         stages={(c.grades?.stages ?? []).map((s) => ({ id: s.id, name: s.name }))}
         dayLabels={c.labels.days}
         joiner={c.labels.daysJoiner}
+        locale={c.locale}
         chat={chat}
       />
     ),
@@ -117,6 +120,7 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
     reviews: () => <Reviews data={c.reviews!} />,
     services: () => <Services data={c.services!} chat={chat} />,
     featured: () => <Featured data={c.featured!} chat={chat} />,
+    honors: () => <Honors data={c.honors!} chat={chat} />,
     faq: () => <Faq data={c.faq!} chat={chat} />,
     final: () => <Final c={c} chat={chat} />,
   };

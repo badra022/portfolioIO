@@ -8,15 +8,29 @@ import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
 import { Carousel } from "./Carousel";
 
+/** Ready-made texts when the teacher leaves them empty. */
+const STATUS_TEXT = { available: "فيه أماكن", full: "كامل العدد", notStarted: "لسه مبدأتش" } as const;
+const WAITLIST_LABEL = "سجّلني في قائمة الانتظار";
+const RESERVE_LABEL = "احجز مكانك من دلوقتي";
+const WAITLIST_MSG = "السلام عليكم، مجموعة {grade} ({subject}) {days} {time} كاملة. ممكن تسجلني في قائمة الانتظار لو فضي مكان؟";
+const RESERVE_MSG = "السلام عليكم، عايز أحجز مكان في مجموعة {grade} ({subject}) اللي هتبدأ {start}. ممكن التفاصيل؟";
+
+/** "السبت 10 أكتوبر", in Cairo time so the server and the phone agree. */
+function startDay(iso: string, locale: string) {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00Z`) : new Date(iso);
+  return new Intl.DateTimeFormat(`${locale}-u-nu-latn`, { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Cairo" }).format(d);
+}
+
 type Props = {
   data: NonNullable<Content["schedule"]>;
   stages: { id: string; name: string }[];
   dayLabels: Record<string, string>;
   joiner: string;
+  locale: string;
   chat: ChatConfig;
 };
 
-export function Schedule({ data, stages, dayLabels, joiner, chat }: Props) {
+export function Schedule({ data, stages, dayLabels, joiner, locale, chat }: Props) {
   const [stage, setStage] = useState("all");
   const [day, setDay] = useState("all");
   const [area, setArea] = useState("all");
@@ -83,24 +97,42 @@ export function Schedule({ data, stages, dayLabels, joiner, chat }: Props) {
             const center = s.center?.trim() || data.location;
             const place = [s.area?.trim(), center].filter(Boolean).join(" - ");
             const vars = { grade: s.grade, subject: s.subject, days, time: t ? `${t.clock} ${t.period}` : "", location: center, area: s.area?.trim() ?? "" };
-            const msg = fill(t ? data.messages.book : data.messages.ask, vars);
+            const status = s.status;
+            const statusText = status ? (L[status]?.trim() || STATUS_TEXT[status]) : null;
+            const start = status === "notStarted" && s.startsOn ? startDay(s.startsOn, locale) : "";
+            // Full: the button joins the waiting list. Not started: it books a place early.
+            const kind = status === "full" ? "waitlist" : status === "notStarted" ? "reserve" : t ? "book" : "ask";
+            const label = kind === "waitlist" ? L.waitlist?.trim() || WAITLIST_LABEL : kind === "reserve" ? L.reserve?.trim() || RESERVE_LABEL : kind === "book" ? L.book : L.ask;
+            const template = kind === "waitlist" ? data.messages.waitlist?.trim() || WAITLIST_MSG : kind === "reserve" ? data.messages.reserve?.trim() || RESERVE_MSG : data.messages[kind];
+            const msg = fill(template, { ...vars, start: start || "قريب" }).replace(/ {2,}/g, " ");
+            const strong = kind === "book" || kind === "reserve";
             return (
-              <article className={`slot${t ? "" : " tbd"}`} key={s.id}>
+              <article className={`slot${t ? "" : " tbd"}${status ? ` st-${status}` : ""}`} key={s.id}>
                 <div className="slot-top">
                   <div><h3>{s.grade}</h3><span className="subj">{s.subject}</span></div>
                   {s.mode && <span className="mode">{s.mode}</span>}
                 </div>
+                {statusText && (
+                  <span className={`slot-status is-${status}`}>
+                    <i aria-hidden="true" />{statusText}
+                    {start && <small>· {L.startsOn?.trim() || "تبدأ"} {start}</small>}
+                  </span>
+                )}
                 <div className="when">
                   {t ? <span className="time num">{t.clock}<small>{t.period}</small></span> : <span className="time">{L.tbd}</span>}
                   {s.days.length > 0 && <div className="days">{s.days.map((d) => <span className="day" key={d}>{dayLabels[d]}</span>)}</div>}
                 </div>
                 {perGroupPlaces && <span className="slot-place"><Icon name="pin" />{place}</span>}
                 {data.form ? (
-                  <ChatButton chat={chat} block variant={t ? "primary" : "ghost"} label={t ? L.book : L.ask} message="" refCode={`SCH-${s.id}`} form={data.form}
-                    context={{ "المجموعة": `${s.grade} — ${s.subject}`, ...(days ? { "الأيام": days } : {}), ...(t ? { "الساعة": `${t.clock} ${t.period}` } : {}), "المكان": place || center }} />
+                  <ChatButton chat={chat} block variant={strong ? "primary" : "ghost"} label={label} message="" refCode={`SCH-${s.id}`} form={data.form}
+                    context={{
+                      "المجموعة": `${s.grade} — ${s.subject}`, ...(days ? { "الأيام": days } : {}), ...(t ? { "الساعة": `${t.clock} ${t.period}` } : {}), "المكان": place || center,
+                      ...(statusText ? { "حالة المجموعة": start ? `${statusText} (تبدأ ${start})` : statusText } : {}),
+                      ...(kind === "waitlist" ? { "الطلب": "قائمة الانتظار" } : {}),
+                    }} />
                 ) : (
-                  <a className={`btn btn-block ${t ? "btn-wa" : "btn-ghost"}`} href={chatUrl(chat, msg, `SCH-${s.id}`)} target="_blank" rel="noopener noreferrer">
-                    <Icon name={chat.primary} />{t ? L.book : L.ask}
+                  <a className={`btn btn-block ${strong ? "btn-wa" : "btn-ghost"}`} href={chatUrl(chat, msg, `SCH-${s.id}`)} target="_blank" rel="noopener noreferrer">
+                    <Icon name={chat.primary} />{label}
                   </a>
                 )}
               </article>
