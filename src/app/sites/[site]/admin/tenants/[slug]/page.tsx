@@ -5,10 +5,11 @@ import { getTenant, listUsers } from "@/lib/server/repo";
 import { formatWhen } from "@/lib/admin/format";
 import {
   addDomainAction, createUserAction, deleteUserAction, primaryDomainAction, removeDomainAction,
-  resetPasswordAction, setStatusAction, setUserDisabledAction, putSiteFilesAction, deleteSiteFileAction,
+  resetPasswordAction, setStatusAction, setUserDisabledAction, putSiteFilesAction, deleteSiteFileAction, setPermissionsAction,
 } from "../../actions";
 import { listSiteFiles } from "@/lib/server/site-files";
 import { ActionForm } from "@/components/admin/ConsoleForms";
+import { FEATURES, FEATURE_INFO } from "@/lib/permissions";
 
 export default async function ManageTenant({ params }: PageProps<"/sites/[site]/admin/tenants/[slug]">) {
   const { site: raw, slug } = await params;
@@ -36,6 +37,28 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
           </form>
         </div>
       </div>
+
+      <section className="a-panel">
+        <h2>الباقة (الصلاحيات)</h2>
+        <p className="a-sub">
+          الخاصية المقفولة: المدرس يقدر يجهّزها ويحفظها في المعاينة بس مش يحفظها أو ينشرها على الموقع، وبتختفي من الموقع على طول.
+          صفحات الإحصائيات والطلبات بتظهر رسالة بدل البيانات. ده بيتطبق على أي حد بيعدّل الموقع، حتى حسابك.
+        </p>
+        <ActionForm action={setPermissionsAction.bind(null, t.slug)} submit="حفظ الباقة" className="a-form">
+          <div className="perm-list">
+            {FEATURES.map((f) => (
+              <label key={f} className="perm">
+                <input type="checkbox" name={f} defaultChecked={t.permissions[f]} />
+                <span><b>{FEATURE_INFO[f].title}</b><small>{FEATURE_INFO[f].description}</small></span>
+              </label>
+            ))}
+          </div>
+          <label className="f-field perm-max">
+            <span className="f-label">أقصى عدد نماذج <em className="f-opt">(فاضي = من غير حد)</em></span>
+            <input type="number" name="maxForms" min={0} max={100} defaultValue={t.permissions.maxForms ?? ""} placeholder="مثلاً 3" />
+          </label>
+        </ActionForm>
+      </section>
 
       <section className="a-panel">
         <h2>الدومينات</h2>

@@ -8,6 +8,8 @@ import { cairoDay } from "@/lib/analytics";
 import type { QuizT } from "@/lib/schema";
 import { MAX_ROWS, cleanRow, findResult, mergeRows, type MergeSummary, type ResultRow } from "@/lib/exam-results";
 import { approvedRows } from "./quiz-attempts";
+import { getTenant } from "./repo";
+import { blockedMessage } from "@/lib/permissions";
 
 const { examResults, quizAttempts, tenants } = schema;
 
@@ -40,6 +42,12 @@ export type ResultSet = ResultSetInfo & { rows: ResultRow[]; quizRows: ResultRow
 export type PastExam = { id: number; title: string; date: string };
 
 export class ResultsError extends Error {}
+
+/** Exam results are part of the "exams" plan bundle (lib/permissions.ts): no bundle, no changes. */
+async function requireExams(slug: string): Promise<void> {
+  const t = await getTenant(slug);
+  if (t && !t.permissions.exams) throw new ResultsError(blockedMessage("exams"));
+}
 
 async function tenantIdOf(slug: string): Promise<string> {
   const id = (await db().select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1))[0]?.id;
@@ -130,6 +138,7 @@ export async function ensureQuizResultSets(slug: string, quizzes: QuizT[]): Prom
 }
 
 export async function createResultSet(slug: string, m: { examId?: string | null; title?: unknown; date?: unknown; total?: unknown }, author: string): Promise<number> {
+  await requireExams(slug);
   const meta = cleanMeta(m);
   const tenantId = await tenantIdOf(slug);
   const [row] = await db().insert(examResults).values({ tenantId, examId: m.examId?.slice(0, 60) || null, ...meta, updatedBy: author }).returning({ id: examResults.id });
@@ -149,6 +158,7 @@ async function update(w: Where, set: Partial<typeof examResults.$inferInsert>, a
 
 /** Title, date, full mark, and whether it shows on the site (published) and in the preview (previewPublished). */
 export async function updateResultMeta(slug: string, id: number, m: { title?: unknown; date?: unknown; total?: unknown; published?: boolean; previewPublished?: boolean }, author: string): Promise<void> {
+  await requireExams(slug);
   const current = await getResultSet(slug, id);
   if (!current) throw new ResultsError("الامتحان مش موجود.");
   const meta = cleanMeta({ title: m.title ?? current.title, date: m.date ?? current.date, total: m.total === undefined ? current.total : m.total });
@@ -159,6 +169,7 @@ export type SaveRows = { ok: true; version: number; count: number } | { ok: fals
 
 /** Replaces all rows (manual edits). Refused when someone saved in between (baseVersion). */
 export async function saveRows(slug: string, id: number, rows: unknown[], baseVersion: number, author: string): Promise<SaveRows> {
+  await requireExams(slug);
   const clean = cleanRows(rows);
   const version = await update({ slug, id }, { rows: clean }, author, baseVersion);
   if (version !== null) return { ok: true, version, count: clean.length };
@@ -167,6 +178,7 @@ export async function saveRows(slug: string, id: number, rows: unknown[], baseVe
 
 /** Adds imported rows: a student already there (same phone + first name) gets the new score; "replace" starts over. */
 export async function importRows(slug: string, id: number, rows: unknown[], mode: "merge" | "replace", author: string): Promise<{ summary: MergeSummary; count: number; version: number }> {
+  await requireExams(slug);
   for (let attempt = 0; attempt < 3; attempt++) {
     const current = await getResultSet(slug, id);
     if (!current) throw new ResultsError("الامتحان مش موجود.");

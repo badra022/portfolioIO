@@ -324,3 +324,13 @@ details.a-result summary { cursor: pointer; font-weight: 600; }
 .cl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px dashed var(--a-line); border-radius: 10px; background: #fcfbfa; }
 .cl a { font-weight: 600; overflow-wrap: anywhere; }
 .pl-admin ul { margin-top: 4px; }
+
+/* Outside the site's plan (PlanBlocked) */
+.plan-blocked { border-color: #f1c6c2; background: #fdf3f2; display: grid; gap: 6px; }
+.perm-list { display: grid; gap: 8px; }
+.perm { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--a-line); border-radius: 10px; cursor: pointer; }
+.perm input { margin-top: 4px; inline-size: 18px; block-size: 18px; }
+.perm span { display: grid; gap: 2px; }
+.perm small { color: var(--a-muted); }
+.perm:has(input:checked) { border-color: #bfe3cc; background: #f6fcf8; }
+.perm-max { max-width: 260px; }

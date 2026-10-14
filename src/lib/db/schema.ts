@@ -22,6 +22,8 @@ export const tenants = pgTable("tenants", {
   previewVersion: integer("preview_version").notNull().default(0),
   previewUpdatedAt: timestamp("preview_updated_at", { withTimezone: true }),
   previewUpdatedBy: text("preview_updated_by"),
+  /** What the teacher's plan includes (lib/permissions.ts). Empty = nothing paid (new teachers). */
+  permissions: jsonb("permissions").notNull().default(sql`'{}'::jsonb`),
 });
 
 /** Custom domains that serve a teacher. Each must also be added to the Vercel project. */

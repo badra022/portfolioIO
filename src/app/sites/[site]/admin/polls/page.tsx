@@ -9,6 +9,7 @@ import { resultsFor } from "@/lib/server/polls";
 import { pollStatus, pollTimes } from "@/lib/poll";
 import { formatWhen } from "@/lib/admin/format";
 import { CopyLink } from "@/components/admin/CopyLink";
+import { blockedMessage } from "@/lib/permissions";
 import { resetVotesAction, updatePollAction } from "../actions";
 
 export const metadata: Metadata = { title: "التصويتات" };
@@ -36,6 +37,7 @@ export default async function Polls({ params }: PageProps<"/sites/[site]/admin/p
         </p>
         <div className="a-actions"><a className="btn-sm primary" href={`${base}/admin/edit/polls`}>+ تصويت جديد / تعديل</a></div>
       </div>
+      {!t.permissions.votes && <p className="a-alert">🔒 {blockedMessage("votes")} التصويتات مش ظاهرة على الموقع.</p>}
       {polls.length === 0 && <p className="an-empty">لسه مفيش تصويتات. اعمل واحد من «تصويت جديد».</p>}
       <ul className="qz-list">
         {all.map(({ p, r, s, end }) => {

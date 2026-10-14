@@ -8,6 +8,7 @@ import { adminEnv } from "@/lib/server/admin-env";
 import { listAttempts, quizMetrics } from "@/lib/server/quiz-attempts";
 import { quizResultSet } from "@/lib/server/exam-results";
 import { GradeBox } from "@/components/admin/GradeBox";
+import { blockedMessage } from "@/lib/permissions";
 import { availability } from "@/lib/quiz";
 import { deadline } from "@/lib/dates";
 import { formatWhen } from "@/lib/admin/format";
@@ -75,6 +76,7 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
         </div>
       </div>
 
+      {!t.permissions.exams && <p className="a-alert">🔒 {blockedMessage("exams")} (التصحيح والاعتماد والنشر مقفولين.)</p>}
       <div className="an-tiles">
         <div className="an-tile strong"><span>بدأوا</span><b>{m.started}</b><small>{m.inProgress ? `${m.inProgress} بيحلوا دلوقتي` : " "}</small></div>
         <div className="an-tile strong"><span>سلّموا</span><b>{finished}</b><small>{m.completion}% من اللي بدأوا · {m.timedOut} انتهى وقتهم</small></div>

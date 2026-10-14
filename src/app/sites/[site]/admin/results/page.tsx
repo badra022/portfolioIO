@@ -9,6 +9,7 @@ import { formatWhen } from "@/lib/admin/format";
 import { NewResultSet } from "@/components/admin/ResultsEditor";
 import { createResultSetAction } from "../actions";
 import { adminEnv } from "@/lib/server/admin-env";
+import { blockedMessage } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "نتايج الامتحانات" };
 
@@ -38,6 +39,7 @@ export default async function Results({ params }: PageProps<"/sites/[site]/admin
         </p>
       </div>
 
+      {!t.permissions.exams && <p className="a-alert">🔒 {blockedMessage("exams")} النتايج مش ظاهرة على الموقع.</p>}
       <details className="a-panel" open={sets.length === 0}>
         <summary><b>+ نتيجة امتحان جديد</b></summary>
         <NewResultSet action={createResultSetAction.bind(null, site)} exams={exams} />

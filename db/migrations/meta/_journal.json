@@ -71,6 +71,13 @@
       "when": 1791927520519,
       "tag": "0009_poll_votes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791992399166,
+      "tag": "0010_tenant_permissions",
+      "breakpoints": true
     }
   ]
 }

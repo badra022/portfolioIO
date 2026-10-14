@@ -46,7 +46,8 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/r"
 
   const data = await getSiteData(decodeURIComponent((await ctx.params).site));
   const id = Number(body.exam);
-  if (data.kind !== "tenant" || !Number.isInteger(id) || !hasDb()) return json({ ok: false, error: "not found" }, 404);
+  // Exam results are part of the "exams" plan bundle (lib/permissions.ts).
+  if (data.kind !== "tenant" || !data.permissions.exams || !Number.isInteger(id) || !hasDb()) return json({ ok: false, error: "not found" }, 404);
   try {
     const tenantId = await activeTenantId(data.slug);
     if (!tenantId) return json({ ok: false, error: "not found" }, 404);

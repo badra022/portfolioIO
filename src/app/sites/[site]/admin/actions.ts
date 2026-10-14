@@ -22,6 +22,7 @@ import * as siteFiles from "@/lib/server/site-files";
 import * as results from "@/lib/server/exam-results";
 import * as pollsRepo from "@/lib/server/polls";
 import { cairoNow } from "@/lib/poll";
+import { FEATURES, type Feature } from "@/lib/permissions";
 import { MAX_SITE_FILE } from "@/lib/site-files";
 import { adminEnv } from "@/lib/server/admin-env";
 
@@ -110,7 +111,11 @@ export async function publishPreviewAction(site: string): Promise<{ ok: true } |
   try {
     const r = await repo.publishPreview(ctx.slug, principalName(ctx.p));
     if (!r.ok) {
-      if (r.reason === "invalid") return { ok: false, message: `المعاينة فيها بيانات محتاجة تصحيح: ${r.issues.slice(0, 3).map((i) => i.path).join("، ")}` };
+      if (r.reason === "invalid") {
+        // Outside the plan: say so plainly; otherwise point at the fields to fix.
+        const plan = r.issues.filter((i) => i.message.includes("الإدارة"));
+        return { ok: false, message: plan.length ? plan.map((i) => i.message).join(" ") : `المعاينة فيها بيانات محتاجة تصحيح: ${r.issues.slice(0, 3).map((i) => i.path).join("، ")}` };
+      }
       if (r.reason === "conflict") return { ok: false, message: "حد عدّل المعاينة من شوية. حدّث الصفحة وراجعها تاني قبل النشر." };
       return { ok: false, message: "المدرس مش موجود." };
     }
@@ -240,6 +245,20 @@ export async function primaryDomainAction(slug: string, domain: string): Promise
   refresh();
 }
 
+/** The teacher's plan: which bundles their site includes, and the forms limit (lib/permissions.ts). */
+export async function setPermissionsAction(slug: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {
+  await requireSuper(PLATFORM);
+  const raw = String(form.get("maxForms") ?? "").trim();
+  const max = raw === "" ? null : Number(raw);
+  if (max !== null && (!Number.isInteger(max) || max < 0 || max > 100)) return { ok: false, message: "حد النماذج رقم من 0 لـ 100، أو فاضي = من غير حد." };
+  const p = { ...Object.fromEntries(FEATURES.map((f) => [f, form.get(f) === "on"])) as Record<Feature, boolean>, maxForms: max };
+  await repo.setPermissions(slug, p);
+  // The public site drops (or shows again) the parts the plan changed.
+  updateTag(tenantTag(slug));
+  refresh();
+  return { ok: true, message: "اتحفظت الباقة. الموقع اتحدّث على طول." };
+}
+
 export async function setStatusAction(slug: string, status: "active" | "disabled"): Promise<void> {
   await requireSuper(PLATFORM);
   await repo.setTenantStatus(slug, status);
@@ -360,7 +379,12 @@ export async function approveAllAction(site: string, path: string, env: SiteEnv 
   const content = t ? repo.copyFor(t, env).content : null;
   const quiz = content?.quizzes.find((q) => q.path === path);
   if (!content || !quiz) return;
-  await quizRepo.approveAll(ctx.slug, quiz, env, quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined, principalName(ctx.p));
+  try {
+    await quizRepo.approveAll(ctx.slug, quiz, env, quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined, principalName(ctx.p));
+  } catch (e) {
+    // Outside the plan: the quiz page already says so.
+    if (!(e instanceof quizRepo.GradeError)) throw e;
+  }
   updateTag(tenantTag(ctx.slug));
   refresh();
 }

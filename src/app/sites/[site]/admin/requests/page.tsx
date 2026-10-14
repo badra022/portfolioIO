@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { hasDb } from "@/lib/env";
 import { baseForSite } from "@/lib/routing";
 import { requireAdmin } from "@/lib/server/auth";
+import { PlanBlocked } from "@/components/admin/PlanBlocked";
+import { baseForSite as planBase } from "@/lib/routing";
 import { slugForSite } from "@/lib/server/site";
 import { copyFor, getTenant } from "@/lib/server/repo";
 import { adminEnv } from "@/lib/server/admin-env";
@@ -29,6 +31,8 @@ export default async function Requests({ params, searchParams }: PageProps<"/sit
   if (!slug) notFound();
   const t = await getTenant(slug);
   if (!t) notFound();
+  // Outside the site's plan (lib/permissions.ts): an error instead of the data, for everyone.
+  if (!t.permissions.forms) return <PlanBlocked feature="forms" back={`${planBase(site)}/admin`} />;
   const q = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
   const status = (STATUSES as readonly string[]).includes(one(q.status)) ? (one(q.status) as StatusT) : undefined;

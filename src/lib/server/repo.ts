@@ -5,6 +5,7 @@ import { hasDb } from "@/lib/env";
 import { ContentSchema, DeploySchema, ThemeSchema, type Content, type Theme } from "@/lib/schema";
 import { sameJson, upgradeContent, validate, type Issue } from "@/lib/content-utils";
 import { stampPolls } from "@/lib/poll";
+import { ALL_PERMISSIONS, readPermissions, violations, type Permissions } from "@/lib/permissions";
 import type { SiteEnv } from "@/lib/environments";
 import { listBundled, readBundledJson } from "./bundled";
 
@@ -27,6 +28,8 @@ export type TenantRecord = {
    * edit is saved to preview; pending = it differs and waits to be published.
    */
   preview: { content: Content; theme: Theme; version: number; pending: boolean; updatedAt: string | null; updatedBy: string | null };
+  /** What the teacher's plan includes (lib/permissions.ts). */
+  permissions: Permissions;
 };
 
 /** The content and theme a given environment shows. */
@@ -65,6 +68,7 @@ function bundledRecord(slug: string): TenantRecord | null {
     domains: deploy.domains.map((d, i) => ({ domain: d, isPrimary: i === 0 })),
     updatedAt: null, updatedBy: null,
     preview: { content, theme, version: 0, pending: false, updatedAt: null, updatedBy: null },
+    permissions: ALL_PERMISSIONS,
   };
 }
 
@@ -106,6 +110,7 @@ export async function getTenant(slug: string): Promise<TenantRecord | null> {
       updatedAt: row.previewUpdatedAt?.toISOString() ?? null,
       updatedBy: row.previewUpdatedBy,
     },
+    permissions: readPermissions(row.permissions),
   };
 }
 
@@ -159,6 +164,11 @@ export async function saveTenant(
     const row = (await tx.select().from(tenants).where(eq(tenants.slug, slug)).for("update").limit(1))[0];
     if (!row) return { ok: false, reason: "missing" } as const;
     if (row.version !== baseVersion) return { ok: false, reason: "conflict", version: row.version } as const;
+    // The plan: parts of the site it doesn't include can't be published (the preview still takes them).
+    if (content) {
+      const blocked = violations(content, withDefaults<Content>(ContentSchema, upgradeContent(row.content), `content for ${slug}`), readPermissions(row.permissions));
+      if (blocked.length) return { ok: false, reason: "invalid", issues: blocked } as const;
+    }
     const next = {
       content: content ?? (row.content as Content),
       theme: theme ?? (row.theme as Theme),
@@ -236,6 +246,8 @@ export async function publishPreview(slug: string, author: string): Promise<Save
     if (!row) return { ok: false, reason: "missing" } as const;
     // Someone saved the preview meanwhile: publish what they see now, not the older copy.
     if (row.previewVersion !== current.preview.version) return { ok: false, reason: "conflict", version: row.previewVersion } as const;
+    const blocked = violations(checked.content!, current.content, readPermissions(row.permissions));
+    if (blocked.length) return { ok: false, reason: "invalid", issues: blocked } as const;
     const version = row.version + 1;
     await tx.update(tenants).set({
       content: checked.content!, theme: checked.theme!, version, name: checked.content!.profile.name, updatedAt: new Date(), updatedBy: author,
@@ -316,6 +328,11 @@ export async function upsertBundledTenant(slug: string, author: string, overwrit
     await d.insert(tenantDomains).values({ domain: dom.domain, tenantId: (await getTenant(slug))!.id!, isPrimary: dom.isPrimary }).onConflictDoNothing();
   }
   return existing ? "updated" : "created";
+}
+
+/** The teacher's plan (super admin). */
+export async function setPermissions(slug: string, p: Permissions): Promise<void> {
+  await requireDb().update(tenants).set({ permissions: p }).where(eq(tenants.slug, slug));
 }
 
 export async function setTenantStatus(slug: string, status: "active" | "disabled"): Promise<void> {

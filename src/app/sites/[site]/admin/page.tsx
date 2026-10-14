@@ -8,6 +8,7 @@ import { formatWhen } from "@/lib/admin/format";
 import { countNew } from "@/lib/server/submissions";
 import { attemptCounts } from "@/lib/server/quiz-attempts";
 import { adminEnv } from "@/lib/server/admin-env";
+import { FEATURES, FEATURE_INFO } from "@/lib/permissions";
 import { PREVIEW_PATH } from "@/lib/environments";
 import { sameJson } from "@/lib/content-utils";
 import { PreviewPanel } from "@/components/admin/PreviewPanel";
@@ -22,7 +23,8 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
   if (!t) return <p>لا يوجد مدرس على هذا العنوان.</p>;
   const base = baseForSite(site);
   const env = await adminEnv();
-  const [newRequests, quizCounts] = await Promise.all([countNew(slug!, env), attemptCounts(slug!, env)]);
+  const [newRequests, quizCounts] = await Promise.all([t.permissions.forms ? countNew(slug!, env) : 0, attemptCounts(slug!, env)]);
+  const missing = FEATURES.filter((f) => !t.permissions[f]);
   const sections = SECTIONS.filter((s) => !s.superOnly || p.kind === "super");
   // Editor pages whose preview differs from the public site.
   const changed = new Set(t.preview.pending ? SECTIONS.filter((s) => s.theme
@@ -49,6 +51,12 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
           <a className="btn-sm ghost" href={`${base}/admin/history`}>سجل التعديلات</a>
         </div>
       </div>
+      {(missing.length > 0 || t.permissions.maxForms !== null) && (
+        <p className="a-envnote">
+          {missing.length > 0 && <>مش في باقة الموقع: {missing.map((f) => FEATURE_INFO[f].title).join("، ")}. تقدر تجهّزها في المعاينة، لكن النشر على الموقع محتاج تفعيلها من الإدارة. </>}
+          {t.permissions.maxForms !== null && <>الحد الأقصى للنماذج: {t.permissions.maxForms}.</>}
+        </p>
+      )}
       {changed.size > 0 && (
         <PreviewPanel
           site={site}
