@@ -93,6 +93,7 @@ Super admin console → a teacher → **الباقة (الصلاحيات)**: fiv
 | Bundle | Covers |
 |---|---|
 | الإحصائيات | The analytics page in the teacher's admin |
+| ملفات الطلاب | Student profiles (below) |
 | النماذج والطلبات | Data-collection forms on buttons, the requests page and its export; optional **max forms** (forms used only by a quiz don't count) |
 | الاختبارات والنتايج | Online quizzes, grading, and exam results students look up |
 | التصويتات | Vote pages |
@@ -103,6 +104,16 @@ Super admin console → a teacher → **الباقة (الصلاحيات)**: fiv
 - It's **left out of the live site right away**: quiz and vote pages return not found, the results button and its API go, buttons that opened a removed form fall back to WhatsApp. Switching it back on brings everything back.
 - The analytics and requests pages show a "not in your plan" message instead of the data. The teacher's dashboard lists what's not included.
 - Plans apply to **everyone** editing that site in its admin panel, the super admin included, and to Claude's content edits.
+
+## Student profiles (admin → الطلاب)
+
+One profile per student, identified by their mobile number (compared like the results lookup: no country code or leading zero), built automatically from what they do on the site: form requests, quiz attempts (with the teacher's approved grade or the automatic score) and the exam results the teacher typed or imported. Votes are anonymous, so they don't count.
+
+- **Profile fields grow on their own:** every form field has **«يتحفظ في ملف الطالب»** (on by default, except long text). The student's latest answer updates their profile (grade, school…). The name follows the newest, fullest spelling.
+- **The teacher's own data:** edit the name and any field, delete fields, add their own (parent's phone, group…), and keep private notes. What the teacher types is never overwritten by a later form.
+- **Numbers and progress:** requests, quizzes taken, average quiz %, exams, average exam %, first and last activity, the change between the last two grades, and a chart of every grade over time. The profile lists the student's quizzes (with grade and comment) and requests.
+- **List:** search by name, phone or any profile value; sort by activity, name, averages or engagement; add a student by hand (e.g. from a paper list); **download all profiles as Excel (CSV)** with one column per profile field.
+- Profiles are synced from new activity whenever the students pages open (`students`, `student_sync`, and `student_id` on requests and quiz attempts; migration `0011`). The public forms and quizzes are unchanged. Plan bundle **ملفات الطلاب** (on for existing teachers); data keeps being collected while it's off.
 
 ## Votes (anonymous polls)
 

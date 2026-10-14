@@ -334,3 +334,19 @@ details.a-result summary { cursor: pointer; font-weight: 600; }
 .perm small { color: var(--a-muted); }
 .perm:has(input:checked) { border-color: #bfe3cc; background: #f6fcf8; }
 .perm-max { max-width: 260px; }
+
+/* Student profiles (admin/students) */
+.st-table td { white-space: nowrap; }
+.st-tags { display: flex; flex-wrap: wrap; gap: 4px; white-space: normal !important; max-width: 260px; }
+.st-chart { display: block; inline-size: 100%; block-size: auto; margin-top: 8px; }
+.st-chart .st-line { fill: none; stroke: var(--a-primary); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.st-chart .st-mid { stroke: var(--a-line); stroke-dasharray: 4 4; }
+.st-chart .st-pt { stroke: #fff; stroke-width: 2; }
+.st-chart .st-pt.ok { fill: var(--a-ok); }
+.st-chart .st-pt.bad { fill: var(--a-bad); }
+.st-up { color: var(--a-ok); }
+.st-down { color: var(--a-bad); }
+.st-traits { display: grid; gap: 8px; }
+.st-trait { display: grid; grid-template-columns: minmax(110px, 180px) 1fr auto auto; gap: 8px; align-items: center; }
+.st-trait .st-tl { font-weight: 600; }
+@media (max-width: 560px) { .st-trait { grid-template-columns: 1fr 1fr; } }

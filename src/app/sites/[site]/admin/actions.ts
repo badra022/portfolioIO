@@ -21,8 +21,9 @@ import * as quizRepo from "@/lib/server/quiz-attempts";
 import * as siteFiles from "@/lib/server/site-files";
 import * as results from "@/lib/server/exam-results";
 import * as pollsRepo from "@/lib/server/polls";
+import * as studentsRepo from "@/lib/server/students";
 import { cairoNow } from "@/lib/poll";
-import { FEATURES, type Feature } from "@/lib/permissions";
+import { FEATURES, blockedMessage, type Feature } from "@/lib/permissions";
 import { MAX_SITE_FILE } from "@/lib/site-files";
 import { adminEnv } from "@/lib/server/admin-env";
 
@@ -387,6 +388,53 @@ export async function approveAllAction(site: string, path: string, env: SiteEnv 
   }
   updateTag(tenantTag(ctx.slug));
   refresh();
+}
+
+/* ------------------------------------------------------------------ */
+/* Student profiles (/admin/students)                                  */
+/* ------------------------------------------------------------------ */
+
+/** Allowed on this site's plan (lib/permissions.ts), for the student pages' actions. */
+async function studentsContext(site: string): Promise<{ p: Principal; slug: string } | { ok: false; message: string }> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
+  const t = await repo.getTenant(ctx.slug);
+  if (!t?.permissions.students) return { ok: false, message: blockedMessage("students") };
+  return ctx;
+}
+
+export async function updateStudentAction(site: string, id: number, input: { name: string; traits: { key: string; label: string; value: string }[]; notes: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  const ctx = await studentsContext(site);
+  if ("ok" in ctx) return ctx;
+  try {
+    await studentsRepo.updateStudent(ctx.slug, await adminEnv(), id, input);
+  } catch (e) {
+    if (e instanceof studentsRepo.StudentError) return { ok: false, message: e.message };
+    console.error("student", e);
+    return { ok: false, message: "حصلت مشكلة، حاول تاني." };
+  }
+  refresh();
+  return { ok: true };
+}
+
+export async function createStudentAction(site: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {
+  const ctx = await studentsContext(site);
+  if ("ok" in ctx) return ctx;
+  let id: number;
+  try {
+    id = await studentsRepo.createStudent(ctx.slug, await adminEnv(), String(form.get("name") ?? ""), String(form.get("phone") ?? ""));
+  } catch (e) {
+    if (e instanceof studentsRepo.StudentError) return { ok: false, message: e.message };
+    throw e;
+  }
+  redirect(`${baseForSite(site)}/admin/students/${id}`);
+}
+
+export async function deleteStudentAction(site: string, id: number): Promise<void> {
+  const ctx = await studentsContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  await studentsRepo.deleteStudent(ctx.slug, await adminEnv(), id);
+  redirect(`${baseForSite(site)}/admin/students`);
 }
 
 /* ------------------------------------------------------------------ */

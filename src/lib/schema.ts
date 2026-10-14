@@ -71,7 +71,16 @@ const FormField = z.object({
   /** Choices for "select". */
   options: z.array(z.string()).default([]),
   placeholder: z.string().optional(),
+  /**
+   * Keep the answer on the student's profile (lib/server/students.ts), updated by
+   * their latest answer. Empty = yes, except long text ("textarea"). Name and phone
+   * are always the profile's own.
+   */
+  profile: z.boolean().optional(),
 });
+
+/** Whether a form field's answer goes on the student's profile. */
+export const inProfile = (f: { type: string; profile?: boolean }) => f.profile ?? f.type !== "textarea";
 
 /** A form a button can open instead of WhatsApp. Submissions appear in the admin panel ("Requests"). */
 export const LeadForm = z.object({
