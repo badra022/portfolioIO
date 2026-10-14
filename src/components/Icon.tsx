@@ -30,6 +30,8 @@ const paths: Record<string, React.ReactNode> = {
   menu: (<path d="M4 6.5h16M4 12h16M4 17.5h16" />),
   home: (<><path d="M4 11l8-6.5 8 6.5" /><path d="M6 9.5V20h12V9.5" /><path d="M10 20v-5h4v5" /></>),
   help: (<><circle cx="12" cy="12" r="8.5" /><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6" /><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none" /></>),
+  medal: (<><path d="M8 3h3l1.5 5M16 3h-3l-1 3" /><circle cx="12" cy="15" r="5.5" /><path d="M12 12.4l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" fill="currentColor" stroke="none" /></>),
+  crown: (<><path d="M4 8l4 4 4-7 4 7 4-4-1.5 10h-13z" /><path d="M5.5 21h13" /></>),
   gift: (<><rect x="3.5" y="8.5" width="17" height="4" rx="1" /><path d="M5 12.5V20h14v-7.5M12 8.5V20" /><path d="M12 8.5c-1.5-3.5-5-3.5-5-1.5S10 8.5 12 8.5c2 0 5-.5 5-1.5s-3.5-2-5 1.5z" /></>),
 };
 

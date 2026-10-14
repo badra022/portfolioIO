@@ -30,6 +30,7 @@ for (const slug of tenants) {
       ...(c.book?.pages ?? []).map((p) => p.image), ...(c.students?.gallery ?? []).map((g) => g.image),
       ...(c.reviews?.images ?? []).map((r) => r.image), ...(c.services?.items ?? []).map((s) => s.image),
       ...(c.featured?.items ?? []).map((f) => f.image),
+      ...(c.honors?.items ?? []).flatMap((h) => h.images.map((p) => p.image)),
     ]
       .filter((f): f is string => typeof f === "string" && !/^https?:/.test(f));
     for (const f of files) {
