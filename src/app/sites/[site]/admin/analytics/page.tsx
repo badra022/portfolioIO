@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { hasDb } from "@/lib/env";
 import { baseForSite } from "@/lib/routing";
 import { requireAdmin } from "@/lib/server/auth";
+import { PlanBlocked } from "@/components/admin/PlanBlocked";
+import { baseForSite as planBase } from "@/lib/routing";
 import { slugForSite } from "@/lib/server/site";
 import { getTenant } from "@/lib/server/repo";
 import { RANGES, report, type RangeT } from "@/lib/server/analytics";
@@ -21,6 +23,8 @@ export default async function Analytics({ params, searchParams }: PageProps<"/si
   if (!slug) notFound();
   const t = await getTenant(slug);
   if (!t) notFound();
+  // Outside the site's plan (lib/permissions.ts): an error instead of the data, for everyone.
+  if (!t.permissions.analytics) return <PlanBlocked feature="analytics" back={`${planBase(site)}/admin`} />;
   const q = (await searchParams).range;
   const range: RangeT = RANGES.includes(q as RangeT) ? (q as RangeT) : "month";
   const r = await report(slug, range, await adminEnv());

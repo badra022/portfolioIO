@@ -7,6 +7,8 @@ import { hasDb } from "@/lib/env";
 import type { LeadFormT, QuizT } from "@/lib/schema";
 import { attemptDeadline, availability, grade, publicQuestions, studentOf, type Graded, type PublicQuestion } from "@/lib/quiz";
 import { cleanRow, type ResultRow } from "@/lib/exam-results";
+import { blockedMessage } from "@/lib/permissions";
+import { getTenant } from "./repo";
 import { checkAnswers, normalizePhone } from "./submissions";
 
 const { quizAttempts, tenants } = schema;
@@ -209,6 +211,7 @@ export class GradeError extends Error {}
  * approved = false keeps it as a draft (or takes an approved grade back).
  */
 export async function reviewAttempt(slug: string, quizPath: string, id: number, input: { name?: unknown; phone?: unknown; score?: unknown; note?: unknown }, approved: boolean, author: string): Promise<void> {
+  if ((await getTenant(slug))?.permissions.exams === false) throw new GradeError(blockedMessage("exams"));
   const tenantId = await tenantIdOf(slug);
   if (!tenantId || !Number.isInteger(id)) throw new GradeError("الطالب مش موجود.");
   const row = cleanRow({ name: input.name, phone: input.phone, score: input.score, note: input.note });
@@ -226,6 +229,7 @@ export async function reviewAttempt(slug: string, quizPath: string, id: number, 
  * score (or the teacher's draft grade, when there is one). Returns how many.
  */
 export async function approveAll(slug: string, quiz: QuizT, env: SiteEnv, form: LeadFormT | undefined, author: string): Promise<number> {
+  if ((await getTenant(slug))?.permissions.exams === false) throw new GradeError(blockedMessage("exams"));
   const rows = (await listAttempts(slug, quiz, env, form)).filter((r) => r.status !== "in_progress" && !r.approvedAt);
   const tenantId = await tenantIdOf(slug);
   if (!tenantId) return 0;

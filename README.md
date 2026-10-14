@@ -86,6 +86,24 @@ Timed quizzes on their own page, e.g. `teacher.com/exam-oct`, managed from `/adm
 
 Attempts live in `quiz_attempts` (run `db/migrations/0004_quizzes.sql` once on an existing database). Claude can create and edit quizzes through the connector and read results with `quiz_results`. Don't reorder questions after students start: answers are stored by question number.
 
+## Plans (what each teacher's site includes)
+
+Super admin console → a teacher → **الباقة (الصلاحيات)**: five bundles and a forms limit (`lib/permissions.ts`, stored in `tenants.permissions`).
+
+| Bundle | Covers |
+|---|---|
+| الإحصائيات | The analytics page in the teacher's admin |
+| النماذج والطلبات | Data-collection forms on buttons, the requests page and its export; optional **max forms** (forms used only by a quiz don't count) |
+| الاختبارات والنتايج | Online quizzes, grading, and exam results students look up |
+| التصويتات | Vote pages |
+| أدوات الإعلان | Pop-up, red bar, featured section |
+
+- **New teachers start with none; teachers created before plans existed keep everything** (migration `0010` sets them all on).
+- A bundle that's off can be prepared and **saved to the preview**, but **not saved or published to the site**. Only parts a save changes are checked, so editing the rest still works. Grading and exam-results changes are refused too.
+- It's **left out of the live site right away**: quiz and vote pages return not found, the results button and its API go, buttons that opened a removed form fall back to WhatsApp. Switching it back on brings everything back.
+- The analytics and requests pages show a "not in your plan" message instead of the data. The teacher's dashboard lists what's not included.
+- Plans apply to **everyone** editing that site in its admin panel, the super admin included, and to Claude's content edits.
+
 ## Votes (anonymous polls)
 
 Admin → **التصويتات**. A vote has its own page (`teacher.com/<path>`, like quizzes) so the teacher can paste the link in a story or a group; it isn't part of the main page and isn't listed by search engines.
