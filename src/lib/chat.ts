@@ -10,6 +10,12 @@ export type ChatConfig = {
   refLabel: string;
 };
 
+/** The site's chat settings (content.contact), for every button. */
+export function chatConfig(c: { contact: ChatConfig & { primary: Channel } }): ChatConfig {
+  const { primary, whatsapp, telegram, messenger, refCodes, refLabel } = c.contact;
+  return { primary, whatsapp, telegram, messenger, refCodes, refLabel };
+}
+
 export function fill(template: string, vars: Record<string, string | number | undefined>): string {
   return template.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
 }

@@ -602,3 +602,30 @@ button.btn { font: inherit; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .hb-photos img { transition: none; } }
 .hb-list.iv-list { max-width: none; }
 [dir="ltr"] .announce-arrow { display: inline-block; transform: scaleX(-1); }
+
+/* ---------- self-graded quiz result ---------- */
+.qg { display: flex; flex-direction: column; gap: 16px; }
+.qg-score { display: flex; align-items: center; gap: 20px; padding: 18px; border-radius: var(--r-card); background: var(--raised); border: 1px solid var(--line); }
+.qg-ring { --c: var(--online); flex: none; width: 104px; height: 104px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--c) var(--pct), var(--line) 0); }
+.qg-score.fail .qg-ring { --c: var(--accent); }
+.qg-ring b { width: 82px; height: 82px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); font-size: 24px; }
+.qg-score > div:last-child { display: grid; gap: 2px; }
+.qg-score small { color: var(--muted); }
+.qg-score > div:last-child > b { font-size: 30px; line-height: 1.1; }
+.qg-score.pass span { color: var(--online); font-weight: 700; }
+.qg-score.fail span { color: var(--accent); font-weight: 700; }
+.qg-cta { display: grid; gap: 10px; padding: 16px; border-radius: var(--r-card); border: 1px dashed var(--accent-35); background: var(--accent-12); }
+.qg-cta p { margin: 0; font-weight: 600; }
+.qg-review-title { font-size: 20px; margin: 6px 0 0; }
+.qg-review { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.qg-review li { padding: 12px 14px; border-radius: var(--r-control); border: 1px solid var(--line); border-inline-start-width: 4px; display: grid; gap: 6px; }
+.qg-review li.ok { border-inline-start-color: var(--online); }
+.qg-review li.bad { border-inline-start-color: var(--accent); }
+.qg-review p { margin: 0; }
+.qg-review small { color: var(--muted); }
+.qg-q { display: flex; gap: 8px; font-weight: 700; }
+.qg-mark { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; background: var(--raised); }
+.qg-review li.ok .qg-mark { background: var(--online); color: #fff; }
+.qg-review li.bad .qg-mark { background: var(--accent); color: var(--on-accent); }
+.qg-right { color: var(--online); font-weight: 600; }
+@media (max-width: 480px) { .qg-score { flex-direction: column; text-align: center; } }

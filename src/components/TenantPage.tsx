@@ -32,11 +32,8 @@ import { ChatButton } from "./ChatButton";
 import { asset } from "@/lib/assets";
 import { menuItems } from "@/lib/sections-meta";
 import { ui } from "@/lib/i18n";
+import { chatConfig } from "@/lib/chat";
 
-function chatConfig(c: Content): ChatConfig {
-  const { primary, whatsapp, telegram, messenger, refCodes, refLabel } = c.contact;
-  return { primary, whatsapp, telegram, messenger, refCodes, refLabel };
-}
 
 /** Short stable hash, so editing the pop-up shows it again to visitors who closed the old one. */
 function hash(value: unknown): string {

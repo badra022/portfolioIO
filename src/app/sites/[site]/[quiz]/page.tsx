@@ -5,6 +5,9 @@ import { getSiteData } from "@/lib/server/site";
 import { QuizApp, type QuizSummary } from "@/components/QuizApp";
 import { PollApp, type PollSummary } from "@/components/PollApp";
 import { ui } from "@/lib/i18n";
+import { ActionButton } from "@/components/ActionButton";
+import { LeadForms } from "@/components/LeadForms";
+import { chatConfig } from "@/lib/chat";
 
 type Props = PageProps<"/sites/[site]/[quiz]">;
 
@@ -96,8 +99,14 @@ async function Body({ params }: { params: Props["params"] }) {
     <>
       {header}
       <main className="wrap quiz-wrap">
-        <QuizApp slug={data.slug} base={data.base} quiz={summary} form={form} />
+        <QuizApp
+          slug={data.slug} base={data.base} quiz={summary} form={form}
+          resultMessage={quiz.selfGrading ? quiz.resultMessage : undefined}
+          resultCta={quiz.selfGrading && quiz.resultCta ? <ActionButton action={quiz.resultCta} chat={chatConfig(c)} block /> : undefined}
+        />
       </main>
+      {/* The button under a self-graded result can open one of the site's forms. */}
+      {quiz.selfGrading && quiz.resultCta?.form && <LeadForms forms={c.forms} slug={data.slug} base={data.base} />}
     </>
   );
 }
