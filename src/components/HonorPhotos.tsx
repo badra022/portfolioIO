@@ -31,7 +31,7 @@ export function HonorPhotos({ photos }: { photos: Photo[] }) {
           </a>
         ))}
       </div>
-      {open !== null && <Lightbox photos={photos} index={open} onIndex={setOpen} onClose={() => setOpen(null)} closeLabel="إغلاق" />}
+      {open !== null && <Lightbox photos={photos} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />}
     </>
   );
 }

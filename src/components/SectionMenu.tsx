@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MenuItem } from "@/lib/sections-meta";
 import { Icon } from "./Icon";
+import { useUI } from "./UIText";
 
 /** Opens or closes the sections menu (the header's menu button). */
 const TOGGLE = "sections-menu";
@@ -23,6 +24,7 @@ export function SectionMenu({ items, title, name, avatar, cta }: {
   avatar?: string;
   cta: React.ReactNode;
 }) {
+  const t = useUI();
   const [active, setActive] = useState(items[0]?.id ?? "");
   const [open, setOpen] = useState(false);
   const [docked, setDocked] = useState(false);
@@ -92,7 +94,7 @@ export function SectionMenu({ items, title, name, avatar, cta }: {
             {avatar ? <img src={avatar} alt="" width={40} height={40} /> : <span className="side-mono">{name.trim().slice(0, 1)}</span>}
             <b>{name}</b>
           </a>
-          <button type="button" className="side-close" aria-label="إغلاق القائمة" onClick={() => window.dispatchEvent(new Event(TOGGLE))}><Icon name="close" /></button>
+          <button type="button" className="side-close" aria-label={t.menuClose} onClick={() => window.dispatchEvent(new Event(TOGGLE))}><Icon name="close" /></button>
         </div>
         <p className="side-title">{title}</p>
         <nav className="side-nav">
@@ -111,7 +113,9 @@ export function SectionMenu({ items, title, name, avatar, cta }: {
 }
 
 /** The header's button that opens and closes the sections menu, on every screen. */
-export function MenuButton({ label }: { label: string }) {
+export function MenuButton() {
+  const t = useUI();
+  const label = t.menu;
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     const on = (e: Event) => setExpanded(Boolean((e as CustomEvent<boolean>).detail));

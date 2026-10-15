@@ -75,7 +75,7 @@ export function Reviews({ data }: { data: Data }) {
             )}
           </>
         )}
-        {view !== null && <Lightbox photos={photos} index={view} onIndex={setView} onClose={() => setView(null)} closeLabel="إغلاق" />}
+        {view !== null && <Lightbox photos={photos} index={view} onIndex={setView} onClose={() => setView(null)} />}
       </div>
     </section>
   );

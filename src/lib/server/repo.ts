@@ -114,21 +114,24 @@ export async function getTenant(slug: string): Promise<TenantRecord | null> {
   };
 }
 
-export type TenantSummary = { slug: string; name: string; status: string; domains: DomainRow[]; users: number; updatedAt: string | null };
+export type TenantSummary = { slug: string; name: string; status: string; domains: DomainRow[]; users: number; updatedAt: string | null;
+  /** The live site's language (lib/i18n.ts). */
+  locale: string };
 
 export async function listTenants(): Promise<TenantSummary[]> {
   if (!hasDb()) {
-    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null }));
+    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null, locale: t.content.locale }));
   }
   const d = db();
   const rows = await d.select({
     id: tenants.id, slug: tenants.slug, name: tenants.name, status: tenants.status, updatedAt: tenants.updatedAt,
     // Columns spelled out with their tables: unqualified, "id" would resolve to admin_users.id inside the subquery.
     users: sql<number>`(select count(*)::int from "admin_users" where "admin_users"."tenant_id" = "tenants"."id")`,
+    locale: sql<string | null>`"tenants"."content"->>'locale'`,
   }).from(tenants).orderBy(tenants.name);
   const domains = await d.select().from(tenantDomains);
   return rows.map((r) => ({
-    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(),
+    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(), locale: r.locale ?? "ar-EG",
     domains: domains.filter((x) => x.tenantId === r.id).map((x) => ({ domain: x.domain, isPrimary: x.isPrimary }))
       .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
   }));

@@ -73,6 +73,9 @@ export function structuredData(c: Content, { canonical }: StructuredDataOptions)
   const root = canonical ? `${canonical}/` : "";
   const id = (frag: string) => `${root}#${frag}`;
   const lang = c.locale;
+  // Plain check (no i18n import): this file also runs in scripts/validate.ts under bare Node.
+  const en = c.locale === "en";
+  const t = en ? { withTeacher: "with", subjectsAndGrades: "subjects and grades" } : { withTeacher: "مع", subjectsAndGrades: "المواد والصفوف" };
   const p = c.profile;
   const sameAs = [...new Set(c.socials.map((s) => s.url).concat(c.youtube?.channelUrl ?? []))];
   const phones = (c.contact.phones.length ? c.contact.phones : [c.contact.whatsapp]).map(intlPhone);
@@ -156,7 +159,7 @@ export function structuredData(c: Content, { canonical }: StructuredDataOptions)
         "@id": id(`class-${n}`),
         name: `${course.subject} — ${course.grade}`,
         serviceType: course.subject,
-        description: `${course.subject} ${course.grade} مع ${p.fullTitle}`,
+        description: `${course.subject} ${course.grade} ${t.withTeacher} ${p.fullTitle}`,
         audience: { "@type": "EducationalAudience", educationalRole: "student", educationalLevel: course.grade },
         provider: { "@id": id("organization") },
         availableChannel: online ? { "@type": "ServiceChannel", name: "Online" } : undefined,
@@ -171,7 +174,7 @@ export function structuredData(c: Content, { canonical }: StructuredDataOptions)
   }
   if (catalog.length) {
     const org = graph.find((x) => x["@type"] === "EducationalOrganization")!;
-    org.hasOfferCatalog = { "@type": "OfferCatalog", name: `${p.fullTitle} — المواد والصفوف`, itemListElement: catalog };
+    org.hasOfferCatalog = { "@type": "OfferCatalog", name: `${p.fullTitle} — ${t.subjectsAndGrades}`, itemListElement: catalog };
   }
 
   // Exams still shown on the page (past ones are already removed before rendering).

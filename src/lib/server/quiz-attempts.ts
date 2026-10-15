@@ -10,6 +10,7 @@ import { cleanRow, type ResultRow } from "@/lib/exam-results";
 import { blockedMessage } from "@/lib/permissions";
 import { getTenant } from "./repo";
 import { checkAnswers, normalizePhone } from "./submissions";
+import { ui } from "@/lib/i18n";
 
 const { quizAttempts, tenants } = schema;
 
@@ -72,10 +73,10 @@ export type StartResult =
  * form, the same number gets its existing attempt back (continue, or "already
  * submitted") instead of a new one, on any device.
  */
-export async function startAttempt(tenantId: string, env: SiteEnv, quiz: QuizT, form: LeadFormT | undefined, values: Record<string, string>): Promise<StartResult> {
+export async function startAttempt(tenantId: string, env: SiteEnv, quiz: QuizT, form: LeadFormT | undefined, values: Record<string, string>, locale?: string): Promise<StartResult> {
   let fields: Record<string, string> = {};
   if (form) {
-    const checked = checkAnswers(form, values);
+    const checked = checkAnswers(form, values, ui(locale));
     if (!checked.ok) return { ok: false, error: "invalid", errors: checked.errors };
     fields = checked.fields;
   }
@@ -99,7 +100,7 @@ export async function startAttempt(tenantId: string, env: SiteEnv, quiz: QuizT, 
     fields, answers: {}, questions: publicQuestions(quiz),
     startedAt: new Date(now), deadlineAt: deadline === null ? null : new Date(deadline),
   }).onConflictDoNothing().returning();
-  if (!row) return startAttempt(tenantId, env, quiz, form, values); // the same number started at the same moment: resume it
+  if (!row) return startAttempt(tenantId, env, quiz, form, values, locale); // the same number started at the same moment: resume it
   return { ok: true, attempt: stateOf(row), resumed: false };
 }
 

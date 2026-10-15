@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { pollStatus, pollTimes, type PollStatus } from "@/lib/poll";
 import { Carousel } from "./Carousel";
 import { Icon } from "./Icon";
+import { useUI } from "./UIText";
+import { tf } from "@/lib/i18n";
 
 export type PollSummary = {
   path: string;
@@ -24,12 +26,13 @@ const two = (n: number) => String(n).padStart(2, "0");
 
 /** "باقي 3 ساعات 12 دقيقة 05 ثانية" as boxes: the vote's own deadline, the same for everyone. */
 function Countdown({ left }: { left: number }) {
+  const tx = useUI();
   const s = Math.max(0, Math.floor(left / 1000));
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  const parts = [...(d > 0 ? [[String(d), "يوم"]] : []), [two(h), "ساعة"], [two(m), "دقيقة"], [two(sec), "ثانية"]];
+  const parts = [...(d > 0 ? [[String(d), tx.day]] : []), [two(h), tx.hour], [two(m), tx.minute], [two(sec), tx.second]];
   return (
     <div className="pl-timer" role="timer" aria-live="off">
-      <span className="pl-timer-lbl">باقي على نهاية التصويت</span>
+      <span className="pl-timer-lbl">{tx.pollTimer}</span>
       <div className="pl-timer-boxes" dir="ltr">
         {parts.map(([v, l]) => <span key={l}><b className="num">{v}</b><small>{l}</small></span>)}
       </div>
@@ -43,6 +46,7 @@ function Countdown({ left }: { left: number }) {
  * time left on every phone; when it reaches zero the vote closes.
  */
 export function PollApp({ base, poll }: { base: string; poll: PollSummary }) {
+  const tx = useUI();
   const [offset, setOffset] = useState(0);
   const [now, setNow] = useState<number | null>(null);
   const [choice, setChoice] = useState<number | null>(null);
@@ -79,9 +83,9 @@ export function PollApp({ base, poll }: { base: string; poll: PollSummary }) {
     try {
       const { status: code, data } = await api({ op: "vote", choice });
       if (data.ok || data.error === "voted") { setVoted(true); setResults(data.results ?? null); return; }
-      setError(code === 409 ? "التصويت مقفول دلوقتي." : "حصلت مشكلة، حاول تاني.");
+      setError(code === 409 ? tx.pollClosedNow : tx.error);
     } catch {
-      setError("مفيش اتصال بالإنترنت؟ حاول تاني.");
+      setError(tx.offline);
     } finally {
       setBusy(false);
     }
@@ -97,7 +101,7 @@ export function PollApp({ base, poll }: { base: string; poll: PollSummary }) {
   };
 
   const closedText = status && !status.open
-    ? status.reason === "notYet" ? "التصويت لسه مبدأش. ارجع تاني قريب." : "التصويت انتهى. شكراً لكل اللي شاركوا!"
+    ? status.reason === "notYet" ? tx.pollNotYet : tx.pollOver
     : null;
 
   return (
@@ -108,7 +112,7 @@ export function PollApp({ base, poll }: { base: string; poll: PollSummary }) {
           {poll.images.map((src, i) => <img key={i} className="pl-cover" src={src} alt="" />)}
         </Carousel>
       )}
-      <span className="pl-tag"><Icon name="chat" />تصويت · من غير اسم ولا رقم</span>
+      <span className="pl-tag"><Icon name="chat" />{tx.pollTag}</span>
       <h1>{poll.title}</h1>
       {poll.description && <p className="pl-desc">{poll.description}</p>}
       {left !== null && left > 0 && !voted && <Countdown left={left} />}
@@ -129,7 +133,7 @@ export function PollApp({ base, poll }: { base: string; poll: PollSummary }) {
               })}
             </ul>
           )}
-          {results && <small className="pl-total">{results.total} صوت لحد دلوقتي</small>}
+          {results && <small className="pl-total">{tf(tx.pollVotes, { n: results.total })}</small>}
         </div>
       ) : closedText ? (
         <p className="pl-closed" role="status">{closedText}</p>
@@ -147,11 +151,11 @@ export function PollApp({ base, poll }: { base: string; poll: PollSummary }) {
           </fieldset>
           {error && <p className="lead-err" role="alert">{error}</p>}
           <button type="button" className="btn btn-wa btn-block" disabled={choice === null || busy || !status?.open} onClick={send}>
-            <Icon name="check" />{busy ? "جاري الإرسال…" : poll.submitLabel}
+            <Icon name="check" />{busy ? tx.sending : poll.submitLabel}
           </button>
         </>
       )}
-      <button type="button" className="btn btn-ghost btn-sm pl-share" onClick={share}><Icon name="link" />{copied ? "اتنسخ الرابط" : "شارك التصويت"}</button>
+      <button type="button" className="btn btn-ghost btn-sm pl-share" onClick={share}><Icon name="link" />{copied ? tx.copied : tx.sharePoll}</button>
     </article>
   );
 }

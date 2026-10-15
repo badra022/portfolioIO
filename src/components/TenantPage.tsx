@@ -31,6 +31,7 @@ import { SectionMenu } from "./SectionMenu";
 import { ChatButton } from "./ChatButton";
 import { asset } from "@/lib/assets";
 import { menuItems } from "@/lib/sections-meta";
+import { ui } from "@/lib/i18n";
 
 function chatConfig(c: Content): ChatConfig {
   const { primary, whatsapp, telegram, messenger, refCodes, refLabel } = c.contact;
@@ -84,6 +85,7 @@ function barMessages(c: Content, base: string): BarMessage[] {
 /** The public teacher page. Content arrives with image URLs resolved and expired items (exams, pop-up) removed. */
 export function TenantPage({ c, base, canonical, pastExams, preview = false }: { c: Content; base: string; canonical: string | null; pastExams: PastExamItem[]; preview?: boolean }) {
   const chat = chatConfig(c);
+  const t = ui(c.locale);
   const results = { exams: pastExams, slug: c.slug, base, ...contactIds(c) };
   // Sections that have something to show (the others are skipped by their components too).
   const shown = (key: Content["sections"][number]) => {
@@ -107,7 +109,6 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
         stages={(c.grades?.stages ?? []).map((s) => ({ id: s.id, name: s.name }))}
         dayLabels={c.labels.days}
         joiner={c.labels.daysJoiner}
-        locale={c.locale}
         chat={chat}
       />
     ),
@@ -153,7 +154,7 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
       {!preview && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData(c, { canonical })) }} />}
       <Tracker slug={c.slug} base={base} preview={preview} />
       {c.forms.length > 0 && <LeadForms forms={c.forms} slug={c.slug} base={base} />}
-      {c.popup && <Popup data={c.popup} chat={chat} storageKey={`popup:${c.slug}:${hash(c.popup)}`} closeLabel="إغلاق" />}
+      {c.popup && <Popup data={c.popup} chat={chat} storageKey={`popup:${c.slug}:${hash(c.popup)}`} closeLabel={t.close} />}
     </>
   );
 }

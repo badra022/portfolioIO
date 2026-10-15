@@ -3,6 +3,7 @@ import type { ChatConfig } from "@/lib/chat";
 import { asset } from "@/lib/assets";
 import { ChatButton } from "./ChatButton";
 import { MenuButton } from "./SectionMenu";
+import { ui } from "@/lib/i18n";
 
 export function Nav({ c, chat, menu }: { c: Content; chat: ChatConfig; menu: boolean }) {
   const logo = (
@@ -18,7 +19,7 @@ export function Nav({ c, chat, menu }: { c: Content; chat: ChatConfig; menu: boo
     return (
       <header className="nav has-menu">
         <div className="wrap">
-          <MenuButton label="قائمة الأقسام" />
+          <MenuButton />
           <div className="nav-end">{cta}{logo}</div>
         </div>
       </header>
@@ -29,7 +30,7 @@ export function Nav({ c, chat, menu }: { c: Content; chat: ChatConfig; menu: boo
       <div className="wrap">
         {logo}
         {c.nav.length > 0 && (
-          <nav className="nav-links" aria-label="أقسام الصفحة">
+          <nav className="nav-links" aria-label={ui(c.locale).pageSections}>
             {c.nav.map((n) => <a key={n.href} href={n.href}>{n.label}</a>)}
           </nav>
         )}

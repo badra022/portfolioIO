@@ -5,6 +5,7 @@ import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import type { LeadFormT } from "@/lib/schema";
 import { PLACE } from "@/lib/admin/places";
+import { ui, type UIText } from "@/lib/i18n";
 
 const { submissions, tenants } = schema;
 
@@ -38,19 +39,19 @@ export function parseIncoming(body: unknown): Incoming | null {
 }
 
 /** Checks the answers against the teacher's form. Returns cleaned values, or Arabic errors by field id. */
-export function checkAnswers(form: LeadFormT, values: Record<string, string>): { ok: true; fields: Record<string, string> } | { ok: false; errors: Record<string, string> } {
+export function checkAnswers(form: LeadFormT, values: Record<string, string>, t: Pick<UIText, "required" | "badPhone" | "badNumber" | "badChoice"> = ui("ar-EG")): { ok: true; fields: Record<string, string> } | { ok: false; errors: Record<string, string> } {
   const fields: Record<string, string> = {};
   const errors: Record<string, string> = {};
   for (const f of form.fields) {
     let v = (values[f.id] ?? "").trim();
-    if (!v) { if (f.required) errors[f.id] = "مطلوب"; continue; }
+    if (!v) { if (f.required) errors[f.id] = t.required; continue; }
     if (f.type === "tel") {
       v = normalizePhone(v);
-      if (!/^\+?\d{8,15}$/.test(v)) { errors[f.id] = "اكتب رقم صحيح"; continue; }
+      if (!/^\+?\d{8,15}$/.test(v)) { errors[f.id] = t.badPhone; continue; }
     } else if (f.type === "number") {
-      if (!/^-?\d+([.,]\d+)?$/.test(v)) { errors[f.id] = "اكتب رقم"; continue; }
+      if (!/^-?\d+([.,]\d+)?$/.test(v)) { errors[f.id] = t.badNumber; continue; }
     } else if (f.type === "select") {
-      if (!f.options.includes(v)) { errors[f.id] = "اختر من القائمة"; continue; }
+      if (!f.options.includes(v)) { errors[f.id] = t.badChoice; continue; }
     } else if (f.type !== "textarea") {
       v = v.slice(0, 200);
     }

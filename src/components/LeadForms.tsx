@@ -7,6 +7,7 @@ import { placeOf } from "@/lib/place";
 import { Icon } from "./Icon";
 import { FormFields, checkFields } from "./FormFields";
 import { hasFinePointer, useAboveKeyboard } from "./useAboveKeyboard";
+import { useUI } from "./UIText";
 
 type Open = { form: LeadFormT; trigger: LeadTrigger; place: string; ask: LeadFormT["fields"]; known: Record<string, string> };
 type Toast = { text: string; tone: "ok" | "info"; edit?: Omit<Open, "ask"> };
@@ -19,6 +20,7 @@ type Toast = { text: string; tone: "ok" | "info"; edit?: Omit<Open, "ask"> };
  * Shown as a card on tablets/desktops and a bottom sheet on phones.
  */
 export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: string; base: string }) {
+  const tx = useUI();
   const [open, setOpen] = useState<Open | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -49,7 +51,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 422 && data.errors) { setErrors(data.errors); return false; }
-      if (!res.ok) { setErrors({ _: data.error ?? "حصلت مشكلة، حاول تاني." }); return false; }
+      if (!res.ok) { setErrors({ _: data.error ?? tx.error }); return false; }
       // Remember the student's traits (not the answers) for next time.
       const keep = { ...remembered() };
       for (const f of o.form.fields) if (remembers(f) && answers[f.id]) keep[f.id] = answers[f.id];
@@ -57,12 +59,12 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
       window.dispatchEvent(new CustomEvent(CONVERT_EVENT, { detail: { ch: "form", at: o.place } }));
       return true;
     } catch {
-      setErrors({ _: "مفيش اتصال بالإنترنت؟ حاول تاني." });
+      setErrors({ _: tx.offline });
       return false;
     } finally {
       setBusy(false);
     }
-  }, [base, memKey, remembered]);
+  }, [base, memKey, remembered, tx]);
 
   const start = useCallback(async (trigger: LeadTrigger, el: Element) => {
     const form = forms.find((f) => f.id === trigger.f);
@@ -120,7 +122,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
     e.preventDefault();
     if (!open) return;
     const answers = Object.fromEntries(open.form.fields.map((f) => [f.id, (values[f.id] ?? open.known[f.id] ?? "").trim()]));
-    const problems = checkFields(open.ask, answers);
+    const problems = checkFields(open.ask, answers, tx);
     if (Object.keys(problems).length) { setErrors(problems); return; }
     const hp = (e.currentTarget as HTMLFormElement).elements.namedItem("website") as HTMLInputElement | null;
     if (await send(open, answers, hp?.value ?? "")) setDone(open.form.successMessage);
@@ -135,12 +137,12 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
         <div ref={layerRef} className="pop-layer lead-layer" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
           <div className="pop lead" role="dialog" aria-modal="true" aria-labelledby="lead-title">
             <span className="pop-grip" aria-hidden="true" />
-            <button type="button" className="pop-close" aria-label="إغلاق" onClick={close}><Icon name="close" /></button>
+            <button type="button" className="pop-close" aria-label={tx.close} onClick={close}><Icon name="close" /></button>
             {done ? (
               <div className="pop-body lead-done">
                 <span className="lead-check" aria-hidden="true"><Icon name="check" /></span>
                 <h2 id="lead-title">{done}</h2>
-                <button type="button" className="btn btn-wa btn-block" onClick={close}>تمام</button>
+                <button type="button" className="btn btn-wa btn-block" onClick={close}>{tx.ok}</button>
               </div>
             ) : (
               <form className="pop-body lead-form" onSubmit={submit} noValidate>
@@ -154,7 +156,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
                 {knownShown.length > 0 && (
                   <p className="lead-known">
                     {knownShown.map((f) => open.known[f.id]).join(" · ")}
-                    <button type="button" className="lead-edit" onClick={() => setOpen({ ...open, ask: open.form.fields })}>تعديل</button>
+                    <button type="button" className="lead-edit" onClick={() => setOpen({ ...open, ask: open.form.fields })}>{tx.edit}</button>
                   </p>
                 )}
                 <FormFields
@@ -167,7 +169,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
                 <input className="lead-hp" tabIndex={-1} autoComplete="off" aria-hidden="true" name="website" />
                 {errors._ && <p className="lead-err" role="alert">{errors._}</p>}
                 <button type="submit" className="btn btn-wa btn-block" disabled={busy}>
-                  <Icon name="form" />{busy ? "جاري الإرسال…" : open.form.submitLabel}
+                  <Icon name="form" />{busy ? tx.sending : open.form.submitLabel}
                 </button>
               </form>
             )}
@@ -185,7 +187,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
               setErrors({});
               setDone(null);
               setOpen({ ...o, ask: o.form.fields });
-            }}>مش انت؟ عدّل</button>
+            }}>{tx.notYou}</button>
           )}
         </div>
       )}

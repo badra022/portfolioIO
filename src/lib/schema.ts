@@ -565,8 +565,10 @@ export const Poll = z.object({
 export const ContentSchema = z.object({
   $schema: z.string().optional(),
   slug: z.string().regex(/^[a-z0-9-]+$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة فقط" }),
-  locale: z.string(),
-  dir: z.enum(["rtl", "ltr"]),
+  /** The site's language (lib/i18n.ts): Arabic reads right-to-left, English left-to-right. */
+  locale: z.enum(["ar-EG", "en"]).default("ar-EG"),
+  /** Old field, now follows the language (kept so older content still loads). */
+  dir: z.enum(["rtl", "ltr"]).optional(),
   seo: z.object({ title: z.string(), description: z.string(), ogImage: OptionalImageRef.optional() }),
   contact: z.object({
     primary: z.enum(["whatsapp", "telegram", "messenger"]).default("whatsapp"),

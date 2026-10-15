@@ -1,5 +1,7 @@
 "use client";
 import type { LeadFormT } from "@/lib/schema";
+import { ui, type UIText } from "@/lib/i18n";
+import { useUI } from "./UIText";
 
 type Field = LeadFormT["fields"][number];
 
@@ -10,13 +12,13 @@ const TYPE: Record<string, React.InputHTMLAttributes<HTMLInputElement>> = {
 };
 
 /** Same checks as the server (lib/server/submissions.ts checkAnswers), so mistakes show instantly. */
-export function checkFields(fields: Field[], values: Record<string, string>): Record<string, string> {
+export function checkFields(fields: Field[], values: Record<string, string>, t: Pick<UIText, "required" | "badPhone" | "badNumber"> = ui("ar-EG")): Record<string, string> {
   const problems: Record<string, string> = {};
   for (const f of fields) {
     const v = (values[f.id] ?? "").trim();
-    if (!v) { if (f.required) problems[f.id] = "مطلوب"; continue; }
-    if (f.type === "tel" && !/^\+?\d{8,15}$/.test(v.replace(/[\s\-().]/g, "").replace(/^00/, "+"))) problems[f.id] = "اكتب رقم صحيح";
-    if (f.type === "number" && !/^-?\d+([.,]\d+)?$/.test(v)) problems[f.id] = "اكتب رقم";
+    if (!v) { if (f.required) problems[f.id] = t.required; continue; }
+    if (f.type === "tel" && !/^\+?\d{8,15}$/.test(v.replace(/[\s\-().]/g, "").replace(/^00/, "+"))) problems[f.id] = t.badPhone;
+    if (f.type === "number" && !/^-?\d+([.,]\d+)?$/.test(v)) problems[f.id] = t.badNumber;
   }
   return problems;
 }
@@ -30,6 +32,7 @@ export function FormFields({ fields, values, errors, onChange, idPrefix = "lead"
   idPrefix?: string;
   autoFocus?: boolean;
 }) {
+  const t = useUI();
   return (
     <>
       {fields.map((f, i) => {
@@ -42,10 +45,10 @@ export function FormFields({ fields, values, errors, onChange, idPrefix = "lead"
         };
         return (
           <label className="lead-field" key={f.id} htmlFor={id}>
-            <span>{f.label}{!f.required && <em> (اختياري)</em>}</span>
+            <span>{f.label}{!f.required && <em> {t.optional}</em>}</span>
             {f.type === "select" ? (
               <select {...common}>
-                <option value="" disabled>اختر…</option>
+                <option value="" disabled>{t.choose}</option>
                 {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             ) : f.type === "textarea" ? (

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getSiteData } from "@/lib/server/site";
 import { QuizApp, type QuizSummary } from "@/components/QuizApp";
 import { PollApp, type PollSummary } from "@/components/PollApp";
+import { ui } from "@/lib/i18n";
 
 type Props = PageProps<"/sites/[site]/[quiz]">;
 
@@ -28,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const url = data.canonical ? `${data.canonical}/${poll.path}` : undefined;
     return {
       title: `${poll.title} | ${data.content.profile.fullTitle}`,
-      description: poll.description ?? "صوّت من غير اسم ولا رقم.",
+      description: poll.description ?? ui(data.content.locale).pollDescription,
       robots: { index: false, follow: false },
       openGraph: { title: poll.title, description: poll.description, url, type: "website", images: poll.images[0]?.image ? [poll.images[0].image] : undefined },
     };

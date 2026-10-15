@@ -4,6 +4,7 @@ import { overview } from "@/lib/server/analytics";
 import { importBundledAction } from "@/app/sites/[site]/admin/actions";
 import { formatWhen } from "@/lib/admin/format";
 import { ActionForm } from "./ConsoleForms";
+import { langOf } from "@/lib/i18n";
 
 /** Super-admin home on the platform host: every teacher, plus import from the repo. */
 export async function PlatformConsole() {
@@ -20,12 +21,13 @@ export async function PlatformConsole() {
         </div>
       </div>
       <table className="a-table">
-        <thead><tr><th>المدرس</th><th>الدومين</th><th>الحالة</th><th>حسابات</th><th>آخر تعديل</th><th></th></tr></thead>
+        <thead><tr><th>المدرس</th><th>الدومين</th><th>اللغة</th><th>الحالة</th><th>حسابات</th><th>آخر تعديل</th><th></th></tr></thead>
         <tbody>
           {tenants.map((t) => (
             <tr key={t.slug}>
               <td><strong>{t.name}</strong><br /><code dir="ltr">{t.slug}</code></td>
               <td dir="ltr">{t.domains.map((d) => <div key={d.domain}>{d.domain}{d.isPrimary ? " ★" : ""}</div>)}{t.domains.length === 0 && "—"}</td>
+              <td>{langOf(t.locale) === "en" ? <span className="a-lang en" dir="ltr">English</span> : <span className="a-lang">عربي</span>}</td>
               <td>{t.status === "active" ? "منشور" : "متوقف"}</td>
               <td>{t.users}</td>
               <td>{t.updatedAt ? formatWhen(t.updatedAt) : "—"}</td>

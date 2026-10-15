@@ -16,7 +16,7 @@ export function BookStack({ cover, coverAlt, pages, caption, closeLabel }: {
   coverAlt: string;
   pages: Photo[];
   caption?: string;
-  closeLabel: string;
+  closeLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<number | null>(null);

@@ -601,3 +601,4 @@ button.btn { font: inherit; cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) { .hb-photos img { transition: none; } }
 .hb-list.iv-list { max-width: none; }
+[dir="ltr"] .announce-arrow { display: inline-block; transform: scaleX(-1); }

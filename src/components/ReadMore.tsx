@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useUI } from "./UIText";
 
 /**
  * Long text folded after a few lines, with "read more" / "show less". Short text
  * shows whole (the button only appears when something is cut off).
  */
-export function ReadMore({ text, className, more = "اقرأ المزيد", less = "عرض أقل" }: { text: string; className: string; more?: string; less?: string }) {
+export function ReadMore({ text, className }: { text: string; className: string }) {
+  const t = useUI();
   const ref = useRef<HTMLParagraphElement>(null);
   const [open, setOpen] = useState(false);
   const [cut, setCut] = useState(false);
@@ -24,7 +26,7 @@ export function ReadMore({ text, className, more = "اقرأ المزيد", less
     <>
       <p ref={ref} className={`${className} folded${open ? " open" : ""}`}>{text}</p>
       {(cut || open) && (
-        <button type="button" className="read-more" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? less : more}</button>
+        <button type="button" className="read-more" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? t.readLess : t.readMore}</button>
       )}
     </>
   );

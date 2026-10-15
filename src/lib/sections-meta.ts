@@ -1,4 +1,5 @@
 import type { Content } from "./schema";
+import { langOf, ui } from "./i18n";
 
 type Key = Content["sections"][number];
 
@@ -35,6 +36,6 @@ export function menuItems(c: Content, shown: (key: Key) => boolean): MenuItem[] 
     if (seen.has(section) || !c.sections.includes(section) || !shown(section)) return [];
     seen.add(section);
     const m = SECTION_META[section];
-    return [{ id: m.id, label: label?.trim() || m.label, icon: m.icon }];
+    return [{ id: m.id, label: label?.trim() || (langOf(c.locale) === "en" ? ui(c.locale).sections[section] : m.label), icon: m.icon }];
   });
 }

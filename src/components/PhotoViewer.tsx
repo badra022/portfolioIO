@@ -8,7 +8,7 @@ export type { Photo };
  * A set of photos that open full size (with previous/next). Without JavaScript
  * each photo is a plain link to the full image.
  */
-export function PhotoViewer({ photos, className, closeLabel }: { photos: Photo[]; className: string; closeLabel: string }) {
+export function PhotoViewer({ photos, className, closeLabel }: { photos: Photo[]; className: string; closeLabel?: string }) {
   const [open, setOpen] = useState<number | null>(null);
   return (
     <>

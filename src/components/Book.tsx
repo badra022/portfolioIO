@@ -15,7 +15,6 @@ export function Book({ data, chat }: { data: NonNullable<Content["book"]>; chat:
             coverAlt={data.coverAlt}
             pages={data.pages.map((p) => ({ src: asset(p.image), alt: p.alt }))}
             caption={data.pagesTitle}
-            closeLabel="إغلاق"
           />
         ) : (
           <div className="cover-stage">
