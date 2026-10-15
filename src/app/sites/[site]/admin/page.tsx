@@ -48,6 +48,7 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
           <a className="btn-sm primary" href={`${base}/admin/analytics`}>الإحصائيات</a>
           <a className="btn-sm primary" href={`${base}/admin/quizzes`}>الاختبارات</a>
           <a className="btn-sm primary" href={`${base}/admin/polls`}>التصويتات</a>
+          <a className="btn-sm primary" href={`${base}/admin/referrals`}>روابط الشركاء</a>
           <a className="btn-sm primary" href={`${base}/admin/results`}>نتايج الامتحانات</a>
           <a className="btn-sm ghost" href={`${base}/admin/history`}>سجل التعديلات</a>
         </div>

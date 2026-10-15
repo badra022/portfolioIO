@@ -5,6 +5,7 @@ import { Carousel } from "./Carousel";
 import { Icon } from "./Icon";
 import { useUI } from "./UIText";
 import { tf } from "@/lib/i18n";
+import { currentRef } from "@/lib/referral";
 
 export type PollSummary = {
   path: string;
@@ -45,7 +46,7 @@ function Countdown({ left }: { left: number }) {
  * student is asked. The countdown uses the server's clock, so it shows the same
  * time left on every phone; when it reaches zero the vote closes.
  */
-export function PollApp({ base, poll }: { base: string; poll: PollSummary }) {
+export function PollApp({ base, slug, poll }: { base: string; slug: string; poll: PollSummary }) {
   const tx = useUI();
   const [offset, setOffset] = useState(0);
   const [now, setNow] = useState<number | null>(null);
@@ -81,7 +82,7 @@ export function PollApp({ base, poll }: { base: string; poll: PollSummary }) {
     if (choice === null) return;
     setBusy(true); setError("");
     try {
-      const { status: code, data } = await api({ op: "vote", choice });
+      const { status: code, data } = await api({ op: "vote", choice, ref: currentRef(slug) });
       if (data.ok || data.error === "voted") { setVoted(true); setResults(data.results ?? null); return; }
       setError(code === 409 ? tx.pollClosedNow : tx.error);
     } catch {

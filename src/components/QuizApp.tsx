@@ -8,6 +8,7 @@ import { FormFields, checkFields } from "./FormFields";
 import { Icon } from "./Icon";
 import { useUI } from "./UIText";
 import { tf } from "@/lib/i18n";
+import { currentRef } from "@/lib/referral";
 
 /** What the page knows about the quiz before it starts (no questions, no answer key). */
 export type QuizSummary = Pick<QuizT, "path" | "title" | "intro" | "image" | "durationMinutes" | "state" | "startsAt" | "endsAt" | "startLabel" | "submitLabel" | "doneMessage"> & { count: number };
@@ -174,7 +175,7 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
     setBusy(true);
     setNote("");
     try {
-      const { data } = await call({ op: "start", quiz: quiz.path, values });
+      const { data } = await call({ op: "start", quiz: quiz.path, values, ref: currentRef(slug) });
       if (data.ok && data.attempt) {
         if (form) {
           try {

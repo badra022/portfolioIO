@@ -5,6 +5,7 @@ import { getSiteData } from "@/lib/server/site";
 import { activeTenantId } from "@/lib/server/analytics";
 import { castVote, pollResults } from "@/lib/server/polls";
 import { pollStatus } from "@/lib/poll";
+import { countRefVote, refOf } from "@/lib/server/referrals";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -44,6 +45,8 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/po
       if (voted) return json({ ok: false, error: "voted", results: await results() }, 409);
       const r = await castVote(tenantId, data.env, poll, body.choice);
       if (!r.ok) return json({ ok: false, error: r.error }, r.error === "choice" ? 422 : 409);
+      const ref = refOf(data.content, body.ref);
+      if (ref) await countRefVote(tenantId, data.env, ref, poll.path).catch((e) => console.error("ref vote", e));
       jar.set(mark, "1", { httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: 60 * 60 * 24 * 365 });
       return json({ ok: true, results: poll.showResults ? r.results : null });
     }

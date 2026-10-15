@@ -560,6 +560,22 @@ export const Poll = z.object({
   showResults: z.boolean().default(true),
 });
 
+/* ---------- referral partners ---------- */
+
+/**
+ * People and pages that share the teacher's links (an influencer, a center, a
+ * Facebook group). Each gets its own code: a link with ?ref=<code> counts that
+ * partner's visits, and what those visitors send (requests, quizzes, votes) is
+ * credited to them, for 30 days after they came (admin → روابط الشركاء).
+ */
+export const Referral = z.object({
+  /** In the link: teacher.com/?ref=<code>. Don't change it after sharing. */
+  code: z.string().regex(/^[a-z0-9][a-z0-9-]{1,29}$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة، مثل ahmed-page" }),
+  name: z.string().min(1),
+  /** For the teacher only, e.g. the agreement ("10 جنيه على كل حجز"). */
+  note: z.string().optional(),
+});
+
 /* ---------- content.json ---------- */
 
 export const ContentSchema = z.object({
@@ -618,6 +634,7 @@ export const ContentSchema = z.object({
   forms: z.array(LeadForm).default([]),
   quizzes: z.array(Quiz).default([]),
   polls: z.array(Poll).default([]),
+  referrals: z.array(Referral).default([]),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),
   sticky: z.object({ secondary: LinkCta.optional(), cta: ChatCta }),
   labels: z.object({
@@ -637,6 +654,11 @@ export const ContentSchema = z.object({
     if (RESERVED_PATHS.includes(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "الاسم ده محجوز للموقع، اختار اسم تاني." });
     if (paths.has(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "في اختبار أو تصويت تاني بنفس العنوان." });
     paths.add(p);
+  });
+  const codes = new Set<string>();
+  c.referrals.forEach((r, i) => {
+    if (codes.has(r.code)) ctx.addIssue({ code: "custom", path: ["referrals", i, "code"], message: "الكود ده مستخدم لشريك تاني." });
+    codes.add(r.code);
   });
   const walk = (v: unknown, path: (string | number)[]) => {
     if (Array.isArray(v)) v.forEach((x, i) => walk(x, [...path, i]));

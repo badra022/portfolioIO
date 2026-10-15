@@ -8,6 +8,7 @@ import { Icon } from "./Icon";
 import { FormFields, checkFields } from "./FormFields";
 import { hasFinePointer, useAboveKeyboard } from "./useAboveKeyboard";
 import { useUI } from "./UIText";
+import { FORM_PARAM, currentRef } from "@/lib/referral";
 
 type Open = { form: LeadFormT; trigger: LeadTrigger; place: string; ask: LeadFormT["fields"]; known: Record<string, string> };
 type Toast = { text: string; tone: "ok" | "info"; edit?: Omit<Open, "ask"> };
@@ -47,7 +48,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
       const res = await fetch(`${base}/api/f`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ form: o.form.id, source: o.trigger.s, place: o.place, values: answers, context: o.trigger.c ?? {}, website }),
+        body: JSON.stringify({ form: o.form.id, source: o.trigger.s, place: o.place, values: answers, context: o.trigger.c ?? {}, website, ref: currentRef(slug) }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 422 && data.errors) { setErrors(data.errors); return false; }
@@ -64,7 +65,7 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
     } finally {
       setBusy(false);
     }
-  }, [base, memKey, remembered, tx]);
+  }, [base, memKey, remembered, tx, slug]);
 
   const start = useCallback(async (trigger: LeadTrigger, el: Element) => {
     const form = forms.find((f) => f.id === trigger.f);
@@ -107,6 +108,15 @@ export function LeadForms({ forms, slug, base }: { forms: LeadFormT[]; slug: str
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
   }, [start, showToast]);
+
+  // A shared link can open a form right away: teacher.com/?form=<id> (lib/referral.ts).
+  const linked = useRef(false);
+  useEffect(() => {
+    if (linked.current) return;
+    linked.current = true;
+    const id = new URLSearchParams(location.search).get(FORM_PARAM);
+    if (id && forms.some((f) => f.id === id)) void start({ f: id, s: "رابط مباشر" }, document.body);
+  }, [forms, start]);
 
   const close = useCallback(() => { setOpen(null); setDone(null); }, []);
   useEffect(() => {

@@ -4,6 +4,7 @@ import { getSiteData } from "@/lib/server/site";
 import { activeTenantId } from "@/lib/server/analytics";
 import { checkAnswers, parseIncoming, saveSubmission } from "@/lib/server/submissions";
 import { ui } from "@/lib/i18n";
+import { refOf } from "@/lib/server/referrals";
 
 const MAX_BODY = 16 * 1024;
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -35,7 +36,7 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/f"
   try {
     const tenantId = await activeTenantId(data.slug);
     if (!tenantId) return json({ ok: false, error: "not found" }, 404);
-    await saveSubmission(tenantId, { formId: form.id, source: incoming.source, place: incoming.place, fields: checked.fields, context: incoming.context, env: data.env });
+    await saveSubmission(tenantId, { formId: form.id, source: incoming.source, place: incoming.place, fields: checked.fields, context: incoming.context, env: data.env, ref: refOf(data.content, (body as { ref?: unknown }).ref) });
   } catch (e) {
     console.error("submission", e);
     return json({ ok: false, error: ui(data.content.locale).error }, 500);

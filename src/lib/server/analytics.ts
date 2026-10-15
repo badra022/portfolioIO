@@ -23,7 +23,7 @@ const periodsIn = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((p) =
  * Turns one batch from the browser into counter increments. Anything unexpected is
  * dropped, so a forged request can at most add to known counters.
  */
-export function toCounters(body: unknown): Map<string, number> {
+export function toCounters(body: unknown, refs?: { codes: ReadonlySet<string>; pages: ReadonlySet<string> }): Map<string, number> {
   const out = new Map<string, number>();
   const add = (metric: string, key: string, n = 1) => out.set(`${metric}\u0000${key}`, (out.get(`${metric}\u0000${key}`) ?? 0) + n);
   const events = (body as { e?: unknown })?.e;
@@ -48,6 +48,14 @@ export function toCounters(body: unknown): Map<string, number> {
         add("click_at", typeof e.at === "string" && PLACE_KEYS.includes(e.at) ? e.at : "other");
         const u = (e.u && typeof e.u === "object" ? e.u : {}) as Record<string, unknown>;
         for (const g of groupsOf(e.ch)) for (const p of periodsIn(u[g])) add("converted", `${g}:${p}`);
+        break;
+      }
+      case "ref": {
+        // Referral partners: only codes and pages the site has (lib/server/referrals.ts reads these).
+        if (!refs || typeof e.c !== "string" || !refs.codes.has(e.c)) break;
+        const page = typeof e.pg === "string" && refs.pages.has(e.pg) ? e.pg : "other";
+        add("ref_view", `${e.c}|${page}`);
+        if (e.u === true) add("ref_visitor", `${e.c}|${page}`);
         break;
       }
       case "dwell": {

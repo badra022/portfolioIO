@@ -27,7 +27,7 @@ export const FEATURE_INFO: Record<Feature, { title: string; description: string 
   forms: { title: "النماذج والطلبات", description: "نماذج جمع بيانات الطلاب على الأزرار، وصفحة «الطلبات» وتنزيلها." },
   exams: { title: "الاختبارات والنتايج", description: "الاختبارات الأونلاين وتصحيحها، ونتايج الامتحانات اللي الطلاب بيدوروا فيها." },
   votes: { title: "التصويتات", description: "صفحات التصويت من غير اسم ولا رقم." },
-  promo: { title: "أدوات الإعلان", description: "الإعلان المنبثق، الشريط الأحمر، والقسم المميز (العروض)." },
+  promo: { title: "أدوات الإعلان", description: "الإعلان المنبثق، الشريط الأحمر، القسم المميز (العروض)، وروابط الشركاء (التسويق بالعمولة)." },
 };
 
 /** Stored permissions (tenants.permissions) as a full object: anything missing is off. */
@@ -70,12 +70,12 @@ export function countedForms(c: Content): Content["forms"] {
 /** Per bundle: whether the content uses it, and a fingerprint of that part (to tell if a save changes it). */
 function usage(c: Content): Record<Exclude<Feature, "analytics" | "students">, { used: boolean; print: string }> {
   const featuredOn = c.sections.includes("featured") && (c.featured?.items.length ?? 0) > 0;
-  const promoUsed = Boolean(c.popup?.enabled) || (c.bar?.items.length ?? 0) > 0 || featuredOn;
+  const promoUsed = Boolean(c.popup?.enabled) || (c.bar?.items.length ?? 0) > 0 || featuredOn || c.referrals.length > 0;
   return {
     forms: { used: countedForms(c).length > 0, print: JSON.stringify([c.forms, [...buttonFormRefs(c)].sort()]) },
     exams: { used: c.quizzes.length > 0, print: JSON.stringify(c.quizzes) },
     votes: { used: c.polls.length > 0, print: JSON.stringify(c.polls) },
-    promo: { used: promoUsed, print: JSON.stringify([c.popup ?? null, c.bar ?? null, c.featured ?? null, featuredOn]) },
+    promo: { used: promoUsed, print: JSON.stringify([c.popup ?? null, c.bar ?? null, c.featured ?? null, featuredOn, c.referrals]) },
   };
 }
 
@@ -105,7 +105,7 @@ export function applyPermissions(c: Content, p: Permissions): Content {
   let out = c;
   if (!p.exams) out = { ...out, quizzes: [] };
   if (!p.votes) out = { ...out, polls: [] };
-  if (!p.promo) out = { ...out, popup: undefined, bar: undefined, sections: out.sections.filter((s) => s !== "featured") };
+  if (!p.promo) out = { ...out, popup: undefined, bar: undefined, referrals: [], sections: out.sections.filter((s) => s !== "featured") };
   const counted = countedForms(out);
   const keep = !p.forms ? [] : p.maxForms === null ? counted : counted.slice(0, p.maxForms);
   if (keep.length < counted.length) {

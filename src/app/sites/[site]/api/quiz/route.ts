@@ -4,6 +4,7 @@ import { getSiteData } from "@/lib/server/site";
 import { activeTenantId } from "@/lib/server/analytics";
 import { parseIncoming } from "@/lib/server/submissions";
 import { resumeAttempt, saveAnswers, startAttempt } from "@/lib/server/quiz-attempts";
+import { refOf } from "@/lib/server/referrals";
 
 const MAX_BODY = 64 * 1024;
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -38,7 +39,7 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/qu
         if (!quiz) return json({ ok: false, error: "not found" }, 404);
         const form = quiz.form ? data.content.forms.find((f) => f.id === quiz.form) : undefined;
         const values = parseIncoming({ form: "x", values: body.values })?.values ?? {};
-        const r = await startAttempt(tenantId, data.env, quiz, form, values, data.content.locale);
+        const r = await startAttempt(tenantId, data.env, quiz, form, values, data.content.locale, refOf(data.content, body.ref));
         return r.ok ? json({ ok: true, attempt: r.attempt, resumed: r.resumed }) : json({ ok: false, error: r.error, errors: r.errors }, r.errors ? 422 : 409);
       }
       case "resume": {
