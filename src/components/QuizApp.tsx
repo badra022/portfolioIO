@@ -9,11 +9,12 @@ import { Icon } from "./Icon";
 import { useUI } from "./UIText";
 import { tf } from "@/lib/i18n";
 import { currentRef } from "@/lib/referral";
+import type { SelfResult } from "@/lib/quiz";
 
 /** What the page knows about the quiz before it starts (no questions, no answer key). */
 export type QuizSummary = Pick<QuizT, "path" | "title" | "intro" | "image" | "durationMinutes" | "state" | "startsAt" | "endsAt" | "startLabel" | "submitLabel" | "doneMessage"> & { count: number };
 
-type Attempt = { token: string; status: "in_progress" | "submitted" | "timed_out"; questions: PublicQuestion[]; answers: Record<string, string>; deadline: number | null; now: number };
+type Attempt = { token: string; status: "in_progress" | "submitted" | "timed_out"; questions: PublicQuestion[]; answers: Record<string, string>; deadline: number | null; now: number; result?: SelfResult };
 type Saved = { token: string; answers: Record<string, string>; done?: boolean };
 type Phase = "loading" | "intro" | "quiz" | "done";
 
@@ -32,7 +33,15 @@ const fmtWhen = (v: string, intl: string) => new Intl.DateTimeFormat(`${intl}-u-
  * browser also keeps the answers, in case it was offline. Time up or the submit
  * button hands everything in; after that the quiz can't be taken again here.
  */
-export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string; quiz: QuizSummary; form: LeadFormT | null }) {
+export function QuizApp({ slug, base, quiz, form, resultMessage, resultCta }: {
+  slug: string;
+  base: string;
+  quiz: QuizSummary;
+  form: LeadFormT | null;
+  /** Self-grading quizzes: a line and a button under the grade (rendered by the page). */
+  resultMessage?: string;
+  resultCta?: React.ReactNode;
+}) {
   const tx = useUI();
   const key = `quiz:${slug}:${quiz.path}`;
   const memKey = `lf:${slug}`;
@@ -284,7 +293,10 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
         </>
       )}
 
-      {phase === "done" && (
+      {phase === "done" && attempt?.result && (
+        <SelfGrade title={quiz.title} attempt={attempt} result={attempt.result} timedOut={doneHow === "timed_out"} message={resultMessage} cta={resultCta} base={base} />
+      )}
+      {phase === "done" && !attempt?.result && (
         <div className="quiz-card quiz-done">
           <span className="lead-check" aria-hidden="true"><Icon name="check" /></span>
           <h1>{quiz.title}</h1>
@@ -292,6 +304,64 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
           <a className="btn btn-ghost" href={`${base}/`}>{tx.backToSite}</a>
         </div>
       )}
+    </div>
+  );
+}
+
+/** A self-grading quiz after handing in: the grade, then each question with the student's answer (and the right one). */
+function SelfGrade({ title, attempt, result, timedOut, message, cta, base }: {
+  title: string;
+  attempt: Attempt;
+  result: SelfResult;
+  timedOut: boolean;
+  message?: string;
+  cta?: React.ReactNode;
+  base: string;
+}) {
+  const tx = useUI();
+  const pct = result.percent ?? 0;
+  return (
+    <div className="quiz-card qg">
+      <h1>{title}</h1>
+      {timedOut && <p className="quiz-muted">{tx.quizTimedOut}</p>}
+      {result.max > 0 && (
+        <div className={`qg-score ${result.passed ? "pass" : "fail"}`} style={{ ["--pct" as string]: `${pct}%` }}>
+          <div className="qg-ring"><b className="num">{pct}%</b></div>
+          <div>
+            <small>{tx.yourGrade}</small>
+            <b className="num" dir="ltr">{result.score} / {result.max}</b>
+            <span>{result.passed ? tx.gradePassed : tx.gradeFailed}</span>
+          </div>
+        </div>
+      )}
+      {result.ungraded > 0 && <p className="quiz-muted">{tf(tx.ungradedNote, { n: result.ungraded })}</p>}
+      {(message || cta) && (
+        <div className="qg-cta">
+          {message && <p>{message}</p>}
+          {cta}
+        </div>
+      )}
+      <h2 className="qg-review-title">{tx.reviewAnswers}</h2>
+      <ol className="qg-review">
+        {attempt.questions.map((q, i) => {
+          const mine = (attempt.answers[String(i)] ?? "").trim();
+          const mark = result.marks[i];
+          const right = result.correct?.[i] ?? [];
+          return (
+            <li key={i} className={mark === true ? "ok" : mark === false ? "bad" : "na"}>
+              <div className="qg-q">
+                <span className="qg-mark" aria-hidden="true">{mark === true ? "✓" : mark === false ? "✗" : "…"}</span>
+                <span>{tf(tx.question, { n: i + 1 })}{q.text ? ` · ${q.text}` : ""}</span>
+              </div>
+              {q.image && <img className="quiz-img" src={q.image} alt="" loading="lazy" />}
+              <p><small>{tx.yourAnswerWas}:</small> {mine || <em>{tx.noAnswer}</em>}</p>
+              {mark === false && right.length > 0 && <p className="qg-right"><small>{tx.rightAnswer}:</small> {right.join(" / ")}</p>}
+              {mark === null && <p className="quiz-muted">{tx.notGraded}</p>}
+            </li>
+          );
+        })}
+      </ol>
+      <a className="btn btn-ghost" href={`${base}/`}>{tx.backToSite}</a>
     </div>
   );
 }

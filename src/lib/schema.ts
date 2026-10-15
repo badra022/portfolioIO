@@ -525,6 +525,19 @@ export const Quiz = z.object({
   endsAt: EndDate.optional(),
   /** Percentage that counts as passing, for the results page. */
   passPercent: z.number().min(0).max(100).default(50),
+  /**
+   * Self-grading: the student sees their grade (and which answers were right) as
+   * soon as they hand in, for quizzes shared to reach new students. The teacher
+   * still gets every attempt, but grades don't go to the exam results. Off: no
+   * grade on the page; the teacher grades, approves, and students look it up in the results.
+   */
+  selfGrading: z.boolean().default(false),
+  /** Self-grading: also show the right answer under each question. */
+  showCorrect: z.boolean().default(true),
+  /** Self-grading: a line under the grade, e.g. "عايز تقفل الامتحان؟ احجز حصة تجريبية مجاناً". */
+  resultMessage: z.string().optional(),
+  /** Self-grading: a button under the grade (WhatsApp, any channel, or a form). */
+  resultCta: Action.optional(),
   startLabel: z.string().default("ابدأ الاختبار"),
   submitLabel: z.string().default("سلّم الإجابات"),
   doneMessage: z.string().default("تم تسليم إجاباتك. بالتوفيق!"),

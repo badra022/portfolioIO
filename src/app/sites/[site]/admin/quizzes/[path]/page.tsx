@@ -37,11 +37,13 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
   if (!slug || !t || !content || !quiz) notFound();
   const form = quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined;
   const partnerOf = new Map(content.referrals.map((p) => [p.code, p.name]));
-  const [rows, set] = await Promise.all([listAttempts(slug, quiz, env, form), quizResultSet(slug, quiz)]);
+  // Self-grading quizzes: the student saw their grade already; nothing goes to the exam results.
+  const self = quiz.selfGrading;
+  const [rows, set] = await Promise.all([listAttempts(slug, quiz, env, form), self ? null : quizResultSet(slug, quiz)]);
   const m = quizMetrics(quiz, rows);
   const q = await searchParams;
   const sort = q.sort === "score" ? "score" : "time";
-  const show = q.show === "todo" || q.show === "approved" ? q.show : "all";
+  const show = !self && (q.show === "todo" || q.show === "approved") ? q.show : "all";
   const done = rows.filter((r) => r.status !== "in_progress");
   const approved = done.filter((r) => r.approvedAt).length;
   const todo = done.length - approved;
@@ -87,6 +89,20 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
       </div>
       {!m.graded && <p className="a-alert">مفيش إجابات صحيحة متسجلة للأسئلة، فمفيش تصحيح. ضيفها من «تعديل الأسئلة» والنتايج هتتحسب لوحدها، حتى للي سلّموا قبل كده.</p>}
 
+      {self ? (
+        <section className="a-panel gr-panel">
+          <h2>تصحيح تلقائي فوري</h2>
+          <p className="a-sub">
+            كل طالب شاف درجته {quiz.showCorrect ? "والإجابات الصحيحة " : ""}أول ما سلّم. الدرجات دي ليك انت بس ومش بتتنشر في نتايج الامتحانات.
+            كلّم الطلاب من هنا (زرار واتساب جنب كل رقم) واعرض عليهم الحصص: مثلاً اللي جابوا أقل من {quiz.passPercent}%.
+          </p>
+          <div className="an-tiles">
+            <div className="an-tile strong"><span>نجحوا</span><b>{done.filter((r) => r.graded.percent !== null && r.graded.percent >= quiz.passPercent).length}</b><small>من {done.length} سلّموا</small></div>
+            <div className="an-tile"><span>محتاجين مساعدة</span><b>{done.filter((r) => r.graded.percent !== null && r.graded.percent < quiz.passPercent).length}</b><small>أقل من {quiz.passPercent}%</small></div>
+          </div>
+          {!m.graded && <p className="a-alert">الطلاب مش هيشوفوا درجة لأن مفيش إجابات صحيحة متسجلة. ضيفها من «تعديل الأسئلة».</p>}
+        </section>
+      ) : (
       <section className="a-panel gr-panel">
         <div className="qz-head">
           <h2>التصحيح والنتايج للطلاب</h2>
@@ -112,6 +128,7 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
           </details>
         )}
       </section>
+      )}
 
       {m.graded && finished > 0 && (
         <section className="a-panel an-bars">
@@ -154,11 +171,11 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
             {m.graded && <a href={link({ sort: "score" })} aria-current={sort === "score" ? "page" : undefined}>الأعلى درجة</a>}
           </nav>
         </div>
-        <nav className="an-ranges">
+        {!self && <nav className="an-ranges">
           <a href={link({ show: "all" })} aria-current={show === "all" ? "page" : undefined}>الكل ({rows.length})</a>
           <a href={link({ show: "todo" })} aria-current={show === "todo" ? "page" : undefined}>محتاج تصحيح ({todo})</a>
           <a href={link({ show: "approved" })} aria-current={show === "approved" ? "page" : undefined}>معتمد ({approved})</a>
-        </nav>
+        </nav>}
         {rows.length === 0 && <p className="an-empty">محدش بدأ الاختبار لسه.</p>}
         {rows.length > 0 && sorted.length === 0 && <p className="an-empty">{show === "todo" ? "مفيش حد محتاج تصحيح." : "لسه مفيش درجات معتمدة."}</p>}
         <ul className="rq-list">
@@ -170,7 +187,7 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
                 <div className="rq-top">
                   {sort === "score" && <b className="qz-rank">#{i + 1}</b>}
                   <span className={`rq-badge ${st.tone}`}>{st.label}</span>
-                  {r.status !== "in_progress" && (r.approvedAt
+                  {r.status !== "in_progress" && !self && (r.approvedAt
                     ? <span className="rq-badge gr-ok">✓ الدرجة معتمدة{r.result ? `: ${r.result.score}` : ""}</span>
                     : <span className="rq-badge gr-todo">{r.result ? "مسودة" : "محتاج تصحيح"}</span>)}
                   {r.graded.max > 0 && r.status !== "in_progress" && (
@@ -202,7 +219,7 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
                     })}
                   </ol>
                 </details>
-                {r.status !== "in_progress" && (
+                {r.status !== "in_progress" && !self && (
                   <GradeBox
                     key={r.id}
                     site={site}

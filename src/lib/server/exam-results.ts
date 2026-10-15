@@ -118,6 +118,8 @@ export async function quizResultSet(slug: string, quiz: QuizT): Promise<ResultSe
  * the results list once its first grade is approved (empty results aren't listed).
  */
 export async function ensureQuizResultSets(slug: string, quizzes: QuizT[]): Promise<void> {
+  // Self-grading quizzes show the grade on the spot and stay out of the exam results.
+  quizzes = quizzes.filter((q) => !q.selfGrading);
   if (!hasDb() || !quizzes.length) return;
   const tenantId = (await db().select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1))[0]?.id;
   if (!tenantId) return;

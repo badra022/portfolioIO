@@ -70,6 +70,25 @@ export function grade(q: QuizT, answers: Record<string, string>): Graded {
   return { marks, score, max, percent: max ? Math.round((score / max) * 100) : null };
 }
 
+/** What a self-grading quiz shows the student after handing in (schema.ts Quiz.selfGrading). */
+export type SelfResult = Graded & {
+  passed: boolean;
+  /** Questions without an answer key (graded by the teacher later, not counted here). */
+  ungraded: number;
+  /** The accepted answers per question, when the teacher shows them (empty list for ungraded ones). */
+  correct?: string[][];
+};
+
+export function selfResult(q: QuizT, answers: Record<string, string>): SelfResult {
+  const g = grade(q, answers);
+  return {
+    ...g,
+    passed: g.percent !== null && g.percent >= q.passPercent,
+    ungraded: g.marks.filter((m) => m === null).length,
+    ...(q.showCorrect ? { correct: q.questions.map((x) => (x.type === "choice" ? x.correct : x.correct.slice(0, 1))) } : {}),
+  };
+}
+
 /**
  * The student's name and phone on an attempt, from the quiz's form: the field
  * with id "name" (or a text field labelled name/اسم, or the first text field),

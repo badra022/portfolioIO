@@ -5,7 +5,7 @@ import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import type { LeadFormT, QuizT } from "@/lib/schema";
-import { attemptDeadline, availability, grade, publicQuestions, studentOf, type Graded, type PublicQuestion } from "@/lib/quiz";
+import { attemptDeadline, availability, grade, publicQuestions, selfResult, studentOf, type Graded, type PublicQuestion, type SelfResult } from "@/lib/quiz";
 import { cleanRow, type ResultRow } from "@/lib/exam-results";
 import { blockedMessage } from "@/lib/permissions";
 import { getTenant } from "./repo";
@@ -27,17 +27,21 @@ export type AttemptState = {
   deadline: number | null;
   /** The server's clock, so the browser's countdown doesn't depend on the phone's time. */
   now: number;
+  /** Self-grading quizzes, once handed in: the grade and which answers were right. */
+  result?: SelfResult;
 };
 
 type Row = typeof quizAttempts.$inferSelect;
 
-const stateOf = (r: Row): AttemptState => ({
+const stateOf = (r: Row, quiz?: QuizT): AttemptState => ({
   token: r.token,
   status: r.status as AttemptState["status"],
   questions: r.questions as PublicQuestion[],
   answers: r.answers as Record<string, string>,
   deadline: r.deadlineAt?.getTime() ?? null,
   now: Date.now(),
+  // The answer key only leaves the server after the attempt is handed in, and only for self-grading quizzes.
+  ...(quiz?.selfGrading && r.status !== "in_progress" ? { result: selfResult(quiz, r.answers as Record<string, string>) } : {}),
 });
 
 /** Keeps only answers to existing questions, as strings, capped. No other checks: any answer (or none) is fine. */
@@ -88,7 +92,7 @@ export async function startAttempt(tenantId: string, env: SiteEnv, quiz: QuizT, 
       .where(and(eq(quizAttempts.tenantId, tenantId), eq(quizAttempts.env, env), eq(quizAttempts.quizPath, quiz.path), eq(quizAttempts.contact, contact))).limit(1))[0];
     if (existing) {
       const r = existing.status === "in_progress" && expired(existing, quiz) ? await finishTimedOut(existing) : existing;
-      return { ok: true, attempt: stateOf(r), resumed: true };
+      return { ok: true, attempt: stateOf(r, quiz), resumed: true };
     }
   }
   const a = availability(quiz);
@@ -114,7 +118,7 @@ export async function resumeAttempt(tenantId: string, quizzes: QuizT[], token: u
   const r = await byToken(tenantId, token);
   if (!r) return null;
   const quiz = quizzes.find((q) => q.path === r.quizPath);
-  return stateOf(r.status === "in_progress" && expired(r, quiz) ? await finishTimedOut(r) : r);
+  return stateOf(r.status === "in_progress" && expired(r, quiz) ? await finishTimedOut(r) : r, quiz);
 }
 
 /**
@@ -124,16 +128,16 @@ export async function resumeAttempt(tenantId: string, quizzes: QuizT[], token: u
 export async function saveAnswers(tenantId: string, quizzes: QuizT[], token: unknown, raw: unknown, final: boolean): Promise<AttemptState | null> {
   const r = await byToken(tenantId, token);
   if (!r) return null;
-  if (r.status !== "in_progress") return stateOf(r);
   const quiz = quizzes.find((q) => q.path === r.quizPath);
-  if (expired(r, quiz)) return stateOf(await finishTimedOut(r));
+  if (r.status !== "in_progress") return stateOf(r, quiz);
+  if (expired(r, quiz)) return stateOf(await finishTimedOut(r), quiz);
   const answers = cleanAnswers(raw, (r.questions as unknown[]).length);
   const timedOut = r.deadlineAt !== null && Date.now() > r.deadlineAt.getTime();
   const [u] = await db().update(quizAttempts)
     .set(final ? { answers, status: timedOut ? "timed_out" : "submitted", finishedAt: new Date() } : { answers })
     .where(and(eq(quizAttempts.id, r.id), eq(quizAttempts.status, "in_progress")))
     .returning();
-  return stateOf(u ?? r);
+  return stateOf(u ?? r, quiz);
 }
 
 /* ------------------------------------------------------------------ */
