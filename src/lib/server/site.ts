@@ -8,6 +8,7 @@ import type { Content, Theme } from "@/lib/schema";
 import { splitSite, type SiteEnv } from "@/lib/environments";
 import { copyFor, findSlugByDomain, getTenant } from "./repo";
 import { resolveImages } from "./assets";
+import { localizeDefaults } from "@/lib/i18n";
 import { publishedExams, type PastExam } from "./exam-results";
 
 export const tenantTag = (slug: string) => `tenant:${slug}`;
@@ -79,7 +80,7 @@ export async function getSiteData(siteKey: string): Promise<SiteData> {
     slug,
     env: siteEnv,
     // Parts of the site outside the teacher's plan are left out right away (lib/permissions.ts).
-    content: resolveImages(withLiveContent(applyPermissions(copy.content, t.permissions), new Date()), slug),
+    content: resolveImages(localizeDefaults(withLiveContent(applyPermissions(copy.content, t.permissions), new Date())), slug),
     permissions: t.permissions,
     theme: copy.theme,
     canonical: canonicalHost ? `https://${canonicalHost}` : null,

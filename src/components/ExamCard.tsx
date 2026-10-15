@@ -5,6 +5,7 @@ import { chatUrl, fill, type ChatConfig } from "@/lib/chat";
 import { parseDate } from "@/lib/format";
 import { Icon } from "./Icon";
 import { ChatButton } from "./ChatButton";
+import { useUI } from "./UIText";
 
 type Data = NonNullable<Content["exams"]>;
 type Exam = Data["items"][number];
@@ -25,6 +26,7 @@ function useCountdown(iso: string) {
 }
 
 export function ExamCard({ exam, parts, labels, chat }: { exam: Exam; parts: Parts; labels: Data["labels"]; chat: ChatConfig }) {
+  const tx = useUI();
   const [track, setTrack] = useState(exam.tracks[0].id);
   const t = exam.tracks.find((x) => x.id === track) ?? exam.tracks[0];
   const left = useCountdown(exam.date);
@@ -37,7 +39,7 @@ export function ExamCard({ exam, parts, labels, chat }: { exam: Exam; parts: Par
       const d = Math.floor(left / 86_400_000);
       const h = Math.floor((left % 86_400_000) / 3_600_000);
       const m = Math.floor((left % 3_600_000) / 60_000);
-      countdown = d > 0 ? `${labels.countdown} ${d} ${labels.days} و ${h} ${labels.hours}` : `${labels.countdown} ${h} ${labels.hours} و ${m} ${labels.minutes}`;
+      countdown = d > 0 ? `${labels.countdown} ${d} ${labels.days} ${tx.and} ${h} ${labels.hours}` : `${labels.countdown} ${h} ${labels.hours} ${tx.and} ${m} ${labels.minutes}`;
     }
   }
 

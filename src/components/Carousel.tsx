@@ -1,6 +1,7 @@
 "use client";
 import { Children, useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
+import { useUI } from "./UIText";
 
 export type DisplayT = "auto" | "carousel" | "grid" | "list";
 
@@ -20,6 +21,7 @@ export function Carousel({ display, className, per = 3, label, children }: {
   label: string;
   children: React.ReactNode;
 }) {
+  const t = useUI();
   const items = Children.toArray(children);
   const track = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState(0);
@@ -69,13 +71,13 @@ export function Carousel({ display, className, per = 3, label, children }: {
         ))}
       </div>
       <div className="car-ctrl" hidden={ends.start && ends.end}>
-        <button type="button" className="car-btn prev" aria-label="السابق" disabled={ends.start} onClick={() => go(at - 1)}><Icon name="arrow" /></button>
+        <button type="button" className="car-btn prev" aria-label={t.prev} disabled={ends.start} onClick={() => go(at - 1)}><Icon name="arrow" /></button>
         <div className="car-dots">
           {items.map((_, i) => (
             <button key={i} type="button" aria-label={`${i + 1}`} aria-current={i === at ? "true" : undefined} onClick={() => go(i)} />
           ))}
         </div>
-        <button type="button" className="car-btn next" aria-label="التالي" disabled={ends.end} onClick={() => go(at + 1)}><Icon name="arrow" /></button>
+        <button type="button" className="car-btn next" aria-label={t.next} disabled={ends.end} onClick={() => go(at + 1)}><Icon name="arrow" /></button>
       </div>
     </div>
   );

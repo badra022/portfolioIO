@@ -5,10 +5,12 @@ import { chatUrl, fill, type ChatConfig } from "@/lib/chat";
 import { Icon } from "./Icon";
 import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
+import { useUI } from "./UIText";
 
 type Data = NonNullable<Content["challenge"]>;
 
 function Question({ q, n, data, chat }: { q: Data["questions"][number]; n: number; data: Data; chat: ChatConfig }) {
+  const tx = useUI();
   const [answer, setAnswer] = useState<string | null>(null);
   const href = chatUrl(chat, fill(data.message, { n, answer: answer ?? "...", prize: data.prize ?? "" }), `CHALLENGE-${n}`);
   return (
@@ -32,7 +34,7 @@ function Question({ q, n, data, chat }: { q: Data["questions"][number]; n: numbe
           refCode={`CHALLENGE-${n}`}
           form={data.form}
           context={{ "السؤال": `${n}. ${q.question}`, "الإجابة": answer ?? "" }}
-          needs={answer ? undefined : "اختار إجابة الأول"}
+          needs={answer ? undefined : tx.pickAnswer}
         />
       ) : (
         <a className={`btn ${answer ? "btn-wa" : "btn-ghost"}`} href={href} target="_blank" rel="noopener noreferrer">

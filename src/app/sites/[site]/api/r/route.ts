@@ -4,6 +4,7 @@ import { getSiteData } from "@/lib/server/site";
 import { activeTenantId, record } from "@/lib/server/analytics";
 import { lookupResult } from "@/lib/server/exam-results";
 import { firstNameKey, isPhoneKey, phoneKey } from "@/lib/exam-results";
+import { ui } from "@/lib/i18n";
 
 const MAX_BODY = 2 * 1024;
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -36,15 +37,16 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/r"
 
   const name = typeof body.name === "string" ? body.name.slice(0, 120) : "";
   const phone = typeof body.phone === "string" ? body.phone.slice(0, 30) : "";
+  const data = await getSiteData(decodeURIComponent((await ctx.params).site));
+  const t = ui(data.kind === "tenant" ? data.content.locale : undefined);
   const errors: Record<string, string> = {};
-  if (!firstNameKey(name)) errors.name = "اكتب اسمك";
-  if (!isPhoneKey(phoneKey(phone))) errors.phone = "اكتب رقم صحيح";
+  if (!firstNameKey(name)) errors.name = t.enterName;
+  if (!isPhoneKey(phoneKey(phone))) errors.phone = t.badPhone;
   if (Object.keys(errors).length) return json({ ok: false, errors }, 422);
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "?";
-  if (limited(ip)) return json({ ok: false, error: "محاولات كتير. استنى شوية وجرّب تاني." }, 429);
+  if (limited(ip)) return json({ ok: false, error: t.tooMany }, 429);
 
-  const data = await getSiteData(decodeURIComponent((await ctx.params).site));
   const id = Number(body.exam);
   // Exam results are part of the "exams" plan bundle (lib/permissions.ts).
   if (data.kind !== "tenant" || !data.permissions.exams || !Number.isInteger(id) || !hasDb()) return json({ ok: false, error: "not found" }, 404);
@@ -52,12 +54,12 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/r"
     const tenantId = await activeTenantId(data.slug);
     if (!tenantId) return json({ ok: false, error: "not found" }, 404);
     const r = await lookupResult(tenantId, data.env, id, name, phone);
-    if (r === "missing") return json({ ok: false, error: "النتيجة دي مش متاحة دلوقتي." }, 404);
+    if (r === "missing") return json({ ok: false, error: t.resultMissing }, 404);
     // Dated counts for the dashboards (the exam's own counters have no dates).
     await record(tenantId, new Map([["lookup\u0000", 1], ...(r ? [["lookup_found\u0000", 1] as [string, number]] : [])]), data.env).catch(() => {});
     return json(r ? { ok: true, found: true, result: r } : { ok: true, found: false });
   } catch (e) {
     console.error("result lookup", e);
-    return json({ ok: false, error: "حصلت مشكلة، حاول تاني." }, 500);
+    return json({ ok: false, error: t.error }, 500);
   }
 }

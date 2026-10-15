@@ -54,7 +54,7 @@ const BY_KEY: Record<string, string> = {
   seo: "جوجل والمشاركة",
   description: "الوصف",
   ogImage: "صورة المشاركة (واتساب/فيسبوك)",
-  locale: "اللغة (مثل ar-EG)",
+  locale: "لغة الموقع",
   dir: "اتجاه الكتابة",
   slug: "المعرّف",
   // hero
@@ -447,6 +447,7 @@ const HINTS: Record<string, string> = {
   "schedule.slots.startsOn": "بعد التاريخ ده علامة «لسه مبدأتش» بتختفي لوحدها.",
   "schedule.messages.waitlist": "فاضي = رسالة جاهزة. يمكن استخدام {grade} و{subject} و{days} و{time} و{location} و{area}.",
   "schedule.messages.reserve": "فاضي = رسالة جاهزة. يمكن استخدام {start} (تاريخ البداية) و{grade} و{subject} و{days} و{time} و{location} و{area}.",
+  "locale": "عربي = الموقع من اليمين للشمال. English = الموقع كله من الشمال لليمين، والنصوص الثابتة (الأزرار، العدادات، رسائل الأخطاء، الاختبارات والتصويتات) بالإنجليزي. نصوصك انت (العناوين، الأوصاف، رسائل الواتساب، أسماء الأيام...) اكتبها بنفسك باللغة اللي اخترتها. لوحة التحكم بتفضل بالعربي.",
   "faq.cta.to": "واتساب: رقم دولي (فارغ = رقم الموقع). تيليجرام/ماسنجر: اسم المستخدم. اتصال: رقم الهاتف. رابط: https://...",
 };
 
@@ -487,6 +488,7 @@ export function hintFor(path: string): string | undefined {
 
 /** Choices whose meaning depends on the field (the same value means something else elsewhere). */
 const ENUMS_BY_KEY: Record<string, Record<string, string>> = {
+  locale: { "ar-EG": "عربي (من اليمين للشمال)", en: "English (من الشمال لليمين)" },
   status: { available: "فيه أماكن", full: "كامل العدد", notStarted: "لسه مبدأتش" },
   display: {
     auto: "تلقائي: سحب على الموبايل، شبكة على الكمبيوتر",

@@ -7,6 +7,8 @@ import { dateParts } from "@/lib/format";
 import { Icon } from "./Icon";
 import { FormFields, checkFields } from "./FormFields";
 import { useAboveKeyboard } from "./useAboveKeyboard";
+import { useUI } from "./UIText";
+import { tf } from "@/lib/i18n";
 
 type Field = LeadFormT["fields"][number];
 export type PastExamItem = { id: number; title: string; date: string };
@@ -29,6 +31,7 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
   nameId: string;
   phoneId: string;
 }) {
+  const tx = useUI();
   const [step, setStep] = useState<Step | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -37,8 +40,8 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
   const layerRef = useAboveKeyboard<HTMLDivElement>(step !== null);
 
   const fields: Field[] = [
-    { id: nameId, label: "اسم الطالب", type: "text", required: true, remember: true, options: [], placeholder: "زي ما هو مكتوب عند المستر" },
-    { id: phoneId, label: "رقم الموبايل", type: "tel", required: true, remember: true, options: [], placeholder: "01xxxxxxxxx" },
+    { id: nameId, label: tx.studentName, type: "text", required: true, remember: true, options: [], placeholder: tx.studentNameHint },
+    { id: phoneId, label: tx.phone, type: "tel", required: true, remember: true, options: [], placeholder: "01xxxxxxxxx" },
   ];
 
   const remembered = useCallback((): Record<string, string> => {
@@ -60,14 +63,14 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
         setStep({ at: "ask", exam });
         return;
       }
-      if (!res.ok) { setErrors({ _: data.error ?? "حصلت مشكلة، حاول تاني." }); setStep({ at: "ask", exam }); return; }
+      if (!res.ok) { setErrors({ _: data.error ?? tx.error }); setStep({ at: "ask", exam }); return; }
       if (data.found) {
         // Same storage as the form buttons: next time (and on any form) the student isn't asked again.
         try { localStorage.setItem(memKey, JSON.stringify({ ...remembered(), [nameId]: name, [phoneId]: phone })); } catch { /* storage blocked */ }
       }
       setStep({ at: "result", exam, result: data.found ? data.result : null });
     } catch {
-      setErrors({ _: "مفيش اتصال بالإنترنت؟ حاول تاني." });
+      setErrors({ _: tx.offline });
       setStep({ at: "ask", exam });
     } finally {
       setBusy(false);
@@ -95,7 +98,7 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
     e.preventDefault();
     if (step?.at !== "ask") return;
     const answers = { [nameId]: (values[nameId] ?? "").trim(), [phoneId]: (values[phoneId] ?? "").trim() };
-    const problems = checkFields(fields, answers);
+    const problems = checkFields(fields, answers, tx);
     if (Object.keys(problems).length) { setErrors(problems); return; }
     void lookup(step.exam, answers[nameId], answers[phoneId]);
   };
@@ -114,12 +117,12 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
         <div ref={layerRef} className="pop-layer lead-layer" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
           <div className="pop lead" role="dialog" aria-modal="true" aria-labelledby="exr-title">
             <span className="pop-grip" aria-hidden="true" />
-            <button type="button" className="pop-close" aria-label="إغلاق" onClick={close}><Icon name="close" /></button>
+            <button type="button" className="pop-close" aria-label={tx.close} onClick={close}><Icon name="close" /></button>
 
             {step.at === "list" && (
               <div className="pop-body lead-form">
                 <h2 id="exr-title">{label}</h2>
-                <p>اختار الامتحان اللي عايز تعرف نتيجتك فيه.</p>
+                <p>{tx.pickExam}</p>
                 <ul className="exr-list">
                   {exams.map((x) => (
                     <li key={x.id}>
@@ -130,14 +133,14 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
                     </li>
                   ))}
                 </ul>
-                {busy && <p className="exr-wait" role="status">جاري البحث عن نتيجتك…</p>}
+                {busy && <p className="exr-wait" role="status">{tx.searching}</p>}
               </div>
             )}
 
             {step.at === "ask" && exam && (
               <form className="pop-body lead-form" onSubmit={submit} noValidate>
-                <h2 id="exr-title">نتيجتك في {exam.title}</h2>
-                <p>اكتب اسمك ورقم الموبايل اللي مسجّل بيه عند المستر.</p>
+                <h2 id="exr-title">{tf(tx.yourResult, { exam: exam.title })}</h2>
+                <p>{tx.enterDetails}</p>
                 <FormFields
                   fields={fields}
                   values={values}
@@ -147,9 +150,9 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
                 />
                 {errors._ && <p className="lead-err" role="alert">{errors._}</p>}
                 <button type="submit" className="btn btn-wa btn-block" disabled={busy}>
-                  <Icon name="trophy" />{busy ? "جاري البحث…" : "اعرف نتيجتك"}
+                  <Icon name="trophy" />{busy ? tx.searchingShort : tx.findResult}
                 </button>
-                <button type="button" className="lead-edit" onClick={() => setStep({ at: "list" })}>← امتحان تاني</button>
+                <button type="button" className="lead-edit" onClick={() => setStep({ at: "list" })}>← {tx.otherExam}</button>
               </form>
             )}
 
@@ -159,15 +162,15 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
                 <p>{when(exam.date)}</p>
                 {step.result ? <Score r={step.result} /> : (
                   <div className="exr-miss" role="status">
-                    <b>مش لاقيين نتيجة بالاسم والرقم دول.</b>
-                    <span>اتأكد إنك كاتب اسمك الأول صح، ونفس رقم الموبايل اللي سجلت بيه عند المستر.</span>
+                    <b>{tx.noResult}</b>
+                    <span>{tx.noResultHint}</span>
                   </div>
                 )}
                 <p className="lead-known">
                   {values[nameId]} · <span dir="ltr">{values[phoneId]}</span>
-                  <button type="button" className="lead-edit" onClick={() => setStep({ at: "ask", exam })}>{step.result ? "مش انت؟ عدّل" : "عدّل البيانات"}</button>
+                  <button type="button" className="lead-edit" onClick={() => setStep({ at: "ask", exam })}>{step.result ? tx.notYou : tx.editDetails}</button>
                 </p>
-                <button type="button" className="btn btn-ghost btn-block" onClick={() => setStep({ at: "list" })}>امتحان تاني</button>
+                <button type="button" className="btn btn-ghost btn-block" onClick={() => setStep({ at: "list" })}>{tx.otherExam}</button>
               </div>
             )}
           </div>

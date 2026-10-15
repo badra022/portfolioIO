@@ -7,18 +7,12 @@ import { Icon } from "./Icon";
 import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
 import { Carousel } from "./Carousel";
+import { useUI } from "./UIText";
 
-/** Ready-made texts when the teacher leaves them empty. */
-const STATUS_TEXT = { available: "فيه أماكن", full: "كامل العدد", notStarted: "لسه مبدأتش" } as const;
-const WAITLIST_LABEL = "سجّلني في قائمة الانتظار";
-const RESERVE_LABEL = "احجز مكانك من دلوقتي";
-const WAITLIST_MSG = "السلام عليكم، مجموعة {grade} ({subject}) {days} {time} كاملة. ممكن تسجلني في قائمة الانتظار لو فضي مكان؟";
-const RESERVE_MSG = "السلام عليكم، عايز أحجز مكان في مجموعة {grade} ({subject}) اللي هتبدأ {start}. ممكن التفاصيل؟";
-
-/** "السبت 10 أكتوبر", in Cairo time so the server and the phone agree. */
-function startDay(iso: string, locale: string) {
+/** "السبت 10 أكتوبر" / "Saturday 10 October", in Cairo time so the server and the phone agree. */
+function startDay(iso: string, intl: string) {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00Z`) : new Date(iso);
-  return new Intl.DateTimeFormat(`${locale}-u-nu-latn`, { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Cairo" }).format(d);
+  return new Intl.DateTimeFormat(`${intl}-u-nu-latn`, { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Cairo" }).format(d);
 }
 
 type Props = {
@@ -26,11 +20,11 @@ type Props = {
   stages: { id: string; name: string }[];
   dayLabels: Record<string, string>;
   joiner: string;
-  locale: string;
   chat: ChatConfig;
 };
 
-export function Schedule({ data, stages, dayLabels, joiner, locale, chat }: Props) {
+export function Schedule({ data, stages, dayLabels, joiner, chat }: Props) {
+  const tx = useUI();
   const [stage, setStage] = useState("all");
   const [day, setDay] = useState("all");
   const [area, setArea] = useState("all");
@@ -98,13 +92,13 @@ export function Schedule({ data, stages, dayLabels, joiner, locale, chat }: Prop
             const place = [s.area?.trim(), center].filter(Boolean).join(" - ");
             const vars = { grade: s.grade, subject: s.subject, days, time: t ? `${t.clock} ${t.period}` : "", location: center, area: s.area?.trim() ?? "" };
             const status = s.status;
-            const statusText = status ? (L[status]?.trim() || STATUS_TEXT[status]) : null;
-            const start = status === "notStarted" && s.startsOn ? startDay(s.startsOn, locale) : "";
+            const statusText = status ? (L[status]?.trim() || tx[status]) : null;
+            const start = status === "notStarted" && s.startsOn ? startDay(s.startsOn, tx.intl) : "";
             // Full: the button joins the waiting list. Not started: it books a place early.
             const kind = status === "full" ? "waitlist" : status === "notStarted" ? "reserve" : t ? "book" : "ask";
-            const label = kind === "waitlist" ? L.waitlist?.trim() || WAITLIST_LABEL : kind === "reserve" ? L.reserve?.trim() || RESERVE_LABEL : kind === "book" ? L.book : L.ask;
-            const template = kind === "waitlist" ? data.messages.waitlist?.trim() || WAITLIST_MSG : kind === "reserve" ? data.messages.reserve?.trim() || RESERVE_MSG : data.messages[kind];
-            const msg = fill(template, { ...vars, start: start || "قريب" }).replace(/ {2,}/g, " ");
+            const label = kind === "waitlist" ? L.waitlist?.trim() || tx.waitlist : kind === "reserve" ? L.reserve?.trim() || tx.reserve : kind === "book" ? L.book : L.ask;
+            const template = kind === "waitlist" ? data.messages.waitlist?.trim() || tx.waitlistMsg : kind === "reserve" ? data.messages.reserve?.trim() || tx.reserveMsg : data.messages[kind];
+            const msg = fill(template, { ...vars, start: start || tx.soon }).replace(/ {2,}/g, " ");
             const strong = kind === "book" || kind === "reserve";
             return (
               <article className={`slot${t ? "" : " tbd"}${status ? ` st-${status}` : ""}`} key={s.id}>
@@ -115,7 +109,7 @@ export function Schedule({ data, stages, dayLabels, joiner, locale, chat }: Prop
                 {statusText && (
                   <span className={`slot-status is-${status}`}>
                     <i aria-hidden="true" />{statusText}
-                    {start && <small>· {L.startsOn?.trim() || "تبدأ"} {start}</small>}
+                    {start && <small>· {L.startsOn?.trim() || tx.startsOn} {start}</small>}
                   </span>
                 )}
                 <div className="when">

@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { deadline } from "@/lib/dates";
+import { useUI } from "./UIText";
 
 const n = (v: number) => String(v);
 
 /** "ينتهي خلال ٢ يوم ٥ ساعة ١٢ دقيقة": time left until an end date (Cairo time), updated every 30 s. */
 export function OfferCountdown({ until }: { until: string }) {
+  const t = useUI();
   const [left, setLeft] = useState<number | null>(null);
   useEffect(() => {
     const end = deadline(until).getTime();
@@ -20,10 +22,10 @@ export function OfferCountdown({ until }: { until: string }) {
   const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
   return (
     <p className="ft-count" role="timer">
-      <span>ينتهي خلال</span>
-      {d > 0 && <b><span className="num">{n(d)}</span> يوم</b>}
-      {(d > 0 || h > 0) && <b><span className="num">{n(h)}</span> ساعة</b>}
-      {d === 0 && <b><span className="num">{n(m)}</span> دقيقة</b>}
+      <span>{t.endsIn}</span>
+      {d > 0 && <b><span className="num">{n(d)}</span> {t.day}</b>}
+      {(d > 0 || h > 0) && <b><span className="num">{n(h)}</span> {t.hour}</b>}
+      {d === 0 && <b><span className="num">{n(m)}</span> {t.minute}</b>}
     </p>
   );
 }

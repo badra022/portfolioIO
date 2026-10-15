@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { Icon } from "./Icon";
+import { useUI } from "./UIText";
 
 export type Photo = { src: string; alt: string; caption?: string };
 
@@ -13,8 +14,9 @@ export function Lightbox({ photos, index, onIndex, onClose, closeLabel }: {
   index: number;
   onIndex: (i: number) => void;
   onClose: () => void;
-  closeLabel: string;
+  closeLabel?: string;
 }) {
+  const t = useUI();
   const ref = useRef<HTMLDialogElement>(null);
   const startX = useRef<number | null>(null);
   const n = photos.length;
@@ -53,13 +55,13 @@ export function Lightbox({ photos, index, onIndex, onClose, closeLabel }: {
         go((dx < 0) === rtl ? 1 : -1);
       }}
     >
-      <button type="button" className="viewer-close" aria-label={closeLabel} onClick={() => ref.current?.close()}>
+      <button type="button" className="viewer-close" aria-label={closeLabel ?? t.close} onClick={() => ref.current?.close()}>
         <Icon name="close" />
       </button>
       {n > 1 && (
         <>
-          <button type="button" className="viewer-nav prev" aria-label="السابق" onClick={() => go(-1)}><Icon name="arrow" /></button>
-          <button type="button" className="viewer-nav next" aria-label="التالي" onClick={() => go(1)}><Icon name="arrow" /></button>
+          <button type="button" className="viewer-nav prev" aria-label={t.prev} onClick={() => go(-1)}><Icon name="arrow" /></button>
+          <button type="button" className="viewer-nav next" aria-label={t.next} onClick={() => go(1)}><Icon name="arrow" /></button>
         </>
       )}
       <figure>
