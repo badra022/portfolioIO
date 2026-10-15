@@ -80,7 +80,7 @@ async function Body({ params }: { params: Props["params"] }) {
     return (
       <>
         {header}
-        <main className="wrap quiz-wrap"><PollApp base={data.base} poll={summary} /></main>
+        <main className="wrap quiz-wrap"><PollApp base={data.base} slug={data.slug} poll={summary} /></main>
       </>
     );
   }

@@ -64,7 +64,7 @@ export function checkAnswers(form: LeadFormT, values: Record<string, string>, t:
  * Stores a submission. The same student sending the same thing again within ten
  * minutes (double tap, retry) is stored once.
  */
-export async function saveSubmission(tenantId: string, s: { formId: string; source: string; place: string; fields: Record<string, string>; context: Record<string, string>; env: SiteEnv }): Promise<void> {
+export async function saveSubmission(tenantId: string, s: { formId: string; source: string; place: string; fields: Record<string, string>; context: Record<string, string>; env: SiteEnv; ref?: string | null }): Promise<void> {
   const d = db();
   const recent = await d.select({ fields: submissions.fields, context: submissions.context, source: submissions.source })
     .from(submissions)
@@ -83,6 +83,8 @@ export type SubmissionRow = {
   id: number; formId: string; source: string; place: string;
   fields: Record<string, string>; context: Record<string, string>;
   status: StatusT; createdAt: string;
+  /** Referral partner's code (content.referrals), when the student came through their link. */
+  ref: string | null;
 };
 
 export type Filter = { env?: SiteEnv; form?: string; status?: StatusT; q?: string; limit?: number; offset?: number };
@@ -119,7 +121,7 @@ export async function listSubmissions(slug: string, f: Filter = {}): Promise<{ r
     rows: rows.map((r) => ({
       id: r.id, formId: r.formId, source: r.source, place: r.place,
       fields: r.fields as Record<string, string>, context: r.context as Record<string, string>,
-      status: r.status as StatusT, createdAt: r.createdAt.toISOString(),
+      status: r.status as StatusT, createdAt: r.createdAt.toISOString(), ref: r.ref,
     })),
     total: total[0]?.n ?? 0,
     counts,
@@ -157,7 +159,8 @@ const STATUS_AR: Record<StatusT, string> = { new: "جديد", contacted: "تم �
  * shows), one column per form question (by its label) and per attached detail.
  * Cells that start like a formula are prefixed so Excel never runs them.
  */
-export function toCsv(rows: SubmissionRow[], forms: LeadFormT[]): string {
+export function toCsv(rows: SubmissionRow[], forms: LeadFormT[], partners: { code: string; name: string }[] = []): string {
+  const partner = new Map(partners.map((p) => [p.code, p.name]));
   const label = new Map<string, string>();
   const phone = new Set<string>();
   for (const f of forms) for (const x of f.fields) {
@@ -172,12 +175,12 @@ export function toCsv(rows: SubmissionRow[], forms: LeadFormT[]): string {
     return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
   const when = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso)).replace(",", "");
-  const head = ["التاريخ", "النموذج", "الزر", "مكان الزر", "الحالة", ...fieldIds.map((k) => label.get(k) ?? k), ...ctxKeys];
+  const head = ["التاريخ", "النموذج", "الزر", "مكان الزر", "الحالة", "الشريك", ...fieldIds.map((k) => label.get(k) ?? k), ...ctxKeys];
   const lines = rows.map((r) => [
-    when(r.createdAt), formTitle.get(r.formId) ?? r.formId, r.source, PLACE[r.place] ?? r.place, STATUS_AR[r.status],
+    when(r.createdAt), formTitle.get(r.formId) ?? r.formId, r.source, PLACE[r.place] ?? r.place, STATUS_AR[r.status], r.ref ? partner.get(r.ref) ?? r.ref : "",
     ...fieldIds.map((k) => r.fields[k] ?? ""), ...ctxKeys.map((k) => r.context[k] ?? ""),
   ].map((v, i) => {
-    const id = fieldIds[i - 5];
+    const id = fieldIds[i - 6];
     // Excel would turn 01012345678 into a number and drop the 0; ="..." keeps it as text (validated digits only).
     return id && phone.has(id) && /^\+?\d{8,15}$/.test(v) ? `"=""${v}"""` : cell(v);
   }).join(","));

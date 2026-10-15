@@ -36,6 +36,7 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
   const quiz = content?.quizzes.find((q) => q.path === decodeURIComponent(path));
   if (!slug || !t || !content || !quiz) notFound();
   const form = quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined;
+  const partnerOf = new Map(content.referrals.map((p) => [p.code, p.name]));
   const [rows, set] = await Promise.all([listAttempts(slug, quiz, env, form), quizResultSet(slug, quiz)]);
   const m = quizMetrics(quiz, rows);
   const q = await searchParams;
@@ -176,6 +177,7 @@ export default async function QuizResults({ params, searchParams }: PageProps<"/
                     <b className={`qz-score ${passed ? "pass" : "fail"}`} dir="ltr">{r.graded.score}/{r.graded.max} · {r.graded.percent}%</b>
                   )}
                   <span className="a-sub">{formatWhen(r.startedAt)} · {mins(r.seconds)}</span>
+                  {r.ref && <span className="rq-badge rf-badge">🤝 عن طريق {partnerOf.get(r.ref) ?? r.ref}</span>}
                 </div>
                 <dl className="rq-data">
                   {Object.entries(r.fields).map(([k, v]) => (

@@ -1,8 +1,8 @@
 import { connection } from "next/server";
 import { hasDb } from "@/lib/env";
-import { slugForSite } from "@/lib/server/site";
+import { getSiteData } from "@/lib/server/site";
+import { refTargets } from "@/lib/server/referrals";
 import { activeTenantId, record, toCounters } from "@/lib/server/analytics";
-import { siteEnv } from "@/lib/environments";
 
 // Link-preview fetchers never run the page's JavaScript, so only scripted browsers need catching here.
 // Keep this narrow: in-app browsers (Facebook, Instagram, TikTok...) carry their app's name in the user agent.
@@ -28,9 +28,9 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/v"
   try { body = JSON.parse(text); } catch { return done(); }
 
   try {
-    const slug = await slugForSite(site);
-    const tenantId = slug ? await activeTenantId(slug) : null;
-    if (tenantId) await record(tenantId, toCounters(body), siteEnv(site));
+    const data = await getSiteData(site);
+    const tenantId = data.kind === "tenant" ? await activeTenantId(data.slug) : null;
+    if (tenantId && data.kind === "tenant") await record(tenantId, toCounters(body, refTargets(data.content)), data.env);
   } catch (e) {
     console.error("analytics", e);
   }

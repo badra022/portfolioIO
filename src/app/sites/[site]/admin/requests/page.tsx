@@ -43,6 +43,7 @@ export default async function Requests({ params, searchParams }: PageProps<"/sit
   const { rows, total, counts } = await listSubmissions(slug, { env, form, status, q: search, limit: PAGE, offset: (page - 1) * PAGE });
   const forms = copyFor(t, env).content.forms;
   const formOf = new Map(forms.map((f) => [f.id, f]));
+  const partnerOf = new Map(copyFor(t, env).content.referrals.map((p) => [p.code, p.name]));
   const base = baseForSite(site);
   const qs = (patch: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
@@ -118,7 +119,7 @@ export default async function Requests({ params, searchParams }: PageProps<"/sit
                   ))}
                 </dl>
                 <div className="rq-foot">
-                  <span className="a-sub">{r.source}{r.place ? ` · ${PLACE[r.place] ?? r.place}` : ""}</span>
+                  <span className="a-sub">{r.source}{r.place ? ` · ${PLACE[r.place] ?? r.place}` : ""}{r.ref && <> · <span className="rq-badge rf-badge">🤝 عن طريق {partnerOf.get(r.ref) ?? r.ref}</span></>}</span>
                   <span className="rq-actions">
                     {STATUSES.filter((s) => s !== r.status).map((s) => (
                       <form key={s} action={setRequestStatusAction.bind(null, site, [r.id], s)}>

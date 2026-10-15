@@ -95,6 +95,8 @@ export const submissions = pgTable("submissions", {
   studentId: bigint("student_id", { mode: "number" }),
   /** Where it came from: the public site or the private preview (lib/environments.ts). */
   env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
+  /** The referral partner's code (content.referrals) when the student came through their link. */
+  ref: text("ref"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("submissions_tenant_created_idx").on(t.tenantId, t.createdAt)]);
 
@@ -131,6 +133,8 @@ export const quizAttempts = pgTable("quiz_attempts", {
    * (exam_results.quiz_path) and students can look them up.
    */
   result: jsonb("result"),
+  /** The referral partner's code (content.referrals) when the student came through their link. */
+  ref: text("ref"),
   /** The student profile this attempt belongs to (lib/server/students.ts), set when profiles are synced. */
   studentId: bigint("student_id", { mode: "number" }),
   approvedAt: timestamp("approved_at", { withTimezone: true }),

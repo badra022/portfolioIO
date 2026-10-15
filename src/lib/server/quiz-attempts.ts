@@ -73,7 +73,7 @@ export type StartResult =
  * form, the same number gets its existing attempt back (continue, or "already
  * submitted") instead of a new one, on any device.
  */
-export async function startAttempt(tenantId: string, env: SiteEnv, quiz: QuizT, form: LeadFormT | undefined, values: Record<string, string>, locale?: string): Promise<StartResult> {
+export async function startAttempt(tenantId: string, env: SiteEnv, quiz: QuizT, form: LeadFormT | undefined, values: Record<string, string>, locale?: string, ref?: string | null): Promise<StartResult> {
   let fields: Record<string, string> = {};
   if (form) {
     const checked = checkAnswers(form, values, ui(locale));
@@ -98,9 +98,9 @@ export async function startAttempt(tenantId: string, env: SiteEnv, quiz: QuizT, 
   const [row] = await d.insert(quizAttempts).values({
     tenantId, env, quizPath: quiz.path, token: randomBytes(24).toString("base64url"), contact,
     fields, answers: {}, questions: publicQuestions(quiz),
-    startedAt: new Date(now), deadlineAt: deadline === null ? null : new Date(deadline),
+    startedAt: new Date(now), deadlineAt: deadline === null ? null : new Date(deadline), ref: ref ?? null,
   }).onConflictDoNothing().returning();
-  if (!row) return startAttempt(tenantId, env, quiz, form, values, locale); // the same number started at the same moment: resume it
+  if (!row) return startAttempt(tenantId, env, quiz, form, values, locale, ref); // the same number started at the same moment: resume it
   return { ok: true, attempt: stateOf(row), resumed: false };
 }
 
@@ -158,6 +158,8 @@ export type AttemptRow = {
   reviewedBy: string | null;
   /** Name and phone from the student's form, for a new grade. */
   student: { name: string; phone: string };
+  /** Referral partner's code (content.referrals), when the student came through their link. */
+  ref: string | null;
 };
 
 async function tenantIdOf(slug: string): Promise<string | null> {
@@ -197,6 +199,7 @@ export async function listAttempts(slug: string, quiz: QuizT, env: SiteEnv = "pr
     approvedAt: r.approvedAt?.toISOString() ?? null,
     reviewedBy: r.reviewedBy,
     student: studentOf(form, r.fields as Record<string, string>, r.contact),
+    ref: r.ref,
   }));
 }
 
