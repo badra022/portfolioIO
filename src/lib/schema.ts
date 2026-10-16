@@ -704,8 +704,8 @@ export const ContentSchema = z.object({
   };
   walk(c, []);
   for (const key of c.sections) {
-    if (key !== "hero" && !c[key]) {
-      ctx.addIssue({ code: "custom", path: ["sections"], message: `القسم "${key}" ظاهر في ترتيب الأقسام لكن بياناته غير موجودة. أضف بياناته أو أخفِه.` });
+    if (key !== "hero" && key !== "complaints" && !c[key]) {
+      ctx.addIssue({ code: "custom", path: ["sections"], message: `القسم "${key}" ظاهر في ترتيب صفحتك لكن بياناته غير موجودة. أضف بياناته أو أخفِه.` });
     }
   }
 });

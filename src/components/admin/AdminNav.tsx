@@ -27,15 +27,15 @@ const initials = (name: string) => name.replace(/^(أ\.|م\.|د\.|مستر|مي�
 function Links({ base, rest, isSuper, counts, onPick }: { base: string; rest: string; isSuper: boolean; counts: Props["counts"]; onPick?: () => void }) {
   const here = locate(rest);
   const badge = (it: NavItem) => (it.badge ? counts[it.badge] : 0);
+  const visible = (items: NavItem[]) => items.filter((it) => !it.superOnly || isSuper);
   return (
     <nav className="an-nav" aria-label="القائمة">
       <a href={`${base}/admin`} className={rest === "" ? "on" : undefined} aria-current={rest === "" ? "page" : undefined} onClick={onPick}>
-        <Icon name="home" />الرئيسية
+        <Icon name="home" />الرئيسية وترتيب الصفحة
       </a>
       {NAV.map((g) => {
-        const items = g.items.filter((it) => !it.superOnly || isSuper);
         const open = here?.group.id === g.id;
-        const total = items.reduce((n, it) => n + badge(it), 0);
+        const total = g.subs.reduce((n, sub) => n + visible(sub.items).reduce((m, it) => m + badge(it), 0), 0);
         return (
           <details key={g.id} className="an-group" open={open || undefined}>
             <summary>
@@ -43,14 +43,31 @@ function Links({ base, rest, isSuper, counts, onPick }: { base: string; rest: st
               {total > 0 && !open && <span className="an-badge">{total}</span>}
               <i className="an-chev" aria-hidden="true" />
             </summary>
-            <div className="an-items">
-              {items.map((it) => {
-                const on = here?.item === it;
+            <div className="an-subs">
+              {g.subs.map((sub) => {
+                const items = visible(sub.items);
+                if (!items.length) return null;
+                const subOpen = here?.sub.id === sub.id;
+                const subTotal = items.reduce((n, it) => n + badge(it), 0);
                 return (
-                  <a key={it.path} href={`${base}/admin${it.path}`} className={on ? "on" : undefined} aria-current={on ? "page" : undefined} onClick={onPick}>
-                    <span>{it.label}</span>
-                    {badge(it) > 0 && <span className="an-badge">{badge(it)}</span>}
-                  </a>
+                  <details key={sub.id} className="an-sub" open={subOpen || undefined}>
+                    <summary>
+                      <span>{sub.label}</span>
+                      {subTotal > 0 && !subOpen && <span className="an-badge">{subTotal}</span>}
+                      <i className="an-chev" aria-hidden="true" />
+                    </summary>
+                    <div className="an-items">
+                      {items.map((it) => {
+                        const on = here?.item === it;
+                        return (
+                          <a key={it.path} href={`${base}/admin${it.path}`} className={on ? "on" : undefined} aria-current={on ? "page" : undefined} onClick={onPick}>
+                            <span>{it.label}</span>
+                            {badge(it) > 0 && <span className="an-badge">{badge(it)}</span>}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </details>
                 );
               })}
             </div>
@@ -136,7 +153,7 @@ export function Breadcrumb({ base }: { base: string }) {
   return (
     <span className="an-crumb">
       <a href={`${base}/admin`}>الرئيسية</a>
-      {here && <><i aria-hidden="true">‹</i><span>{here.group.label}</span><i aria-hidden="true">‹</i><a href={`${base}/admin${here.item.path}`}><b>{here.item.label}</b></a></>}
+      {here && <><i aria-hidden="true">‹</i><span>{here.group.label}</span><i aria-hidden="true">‹</i><span>{here.sub.label}</span><i aria-hidden="true">‹</i><a href={`${base}/admin${here.item.path}`}><b>{here.item.label}</b></a></>}
     </span>
   );
 }

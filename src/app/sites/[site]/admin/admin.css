@@ -561,3 +561,88 @@ details.a-result summary { cursor: pointer; font-weight: 600; }
 .cp-msg { margin: 0; font-size: 16px; line-height: 1.8; white-space: pre-line; overflow-wrap: anywhere; }
 .cp-bulk { margin: 0 0 12px; }
 .cp-item .rq-top .hm-chip { padding: 1px 10px; font-size: 12px; }
+
+/* ---------- menu: category › group › page (lib/admin/nav.ts) ---------- */
+.an-subs { display: grid; gap: 2px; padding: 2px 0 6px; margin-inline-start: 21px; padding-inline-start: 8px; border-inline-start: 1px solid var(--a-line); }
+.an-sub > summary {
+  list-style: none; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 10px; border-radius: 10px;
+  color: var(--a-muted); font-weight: 600; font-size: 14px; cursor: pointer;
+}
+.an-sub > summary::-webkit-details-marker { display: none; }
+.an-sub > summary span:first-child { flex: 1; }
+.an-sub > summary:hover { background: var(--a-bg); color: var(--a-text); }
+.an-sub[open] > summary { color: var(--a-text); }
+.an-sub[open] > summary .an-chev { transform: rotate(135deg); margin-top: 4px; }
+.an-sub .an-chev { width: 7px; height: 7px; }
+.an-sub .an-items { margin-inline-start: 10px; }
+
+/* ---------- page structure on the home page (components/admin/PageStructure.tsx) ---------- */
+.ps { display: grid; gap: 12px; padding: 18px; background: var(--a-card); border: 1px solid var(--a-line); border-radius: 18px; }
+.ps-sub { margin: -6px 0 4px; }
+.ps-grid { display: grid; gap: 16px; }
+@media (min-width: 900px) { .ps-grid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; } }
+.ps-page { padding: 12px; border-radius: 18px; background: var(--a-bg); border: 1px solid var(--a-line); }
+.ps-bar { display: flex; gap: 6px; padding: 2px 4px 10px; }
+.ps-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--a-sky-2); }
+.ps-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ps-block { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 8px; background: #fff; border: 1px solid var(--a-line); border-radius: 14px; transition: box-shadow .15s; }
+.ps-block.first { min-height: 74px; border-color: var(--a-sky-2); }
+.ps-block:hover { box-shadow: 0 3px 12px rgb(15 35 64 / .06); }
+.ps-n { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--a-sky); color: var(--a-deep); font-size: 12px; font-weight: 700; }
+.ps-block .hm-ico { width: 38px; height: 38px; }
+.ps-name { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.ps-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-tools { flex: none; display: inline-flex; gap: 4px; }
+.ps-tools button { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--a-line); background: #fff; color: var(--a-text); cursor: pointer; font-size: 15px; }
+.ps-tools button:hover:not(:disabled) { border-color: #9CC4F7; background: #F8FBFF; }
+.ps-tools button:disabled { opacity: .35; cursor: default; }
+.ps-tools button.danger { color: var(--a-bad); }
+.ps-side h3 { margin: 0 0 8px; font-size: 15px; }
+.ps-add { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ps-add button, .ps-not-ready { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 10px; border-radius: 14px; font: inherit; text-align: start; }
+.ps-add button { border: 1.5px dashed #9CC4F7; background: #fff; color: var(--a-text); cursor: pointer; font-weight: 600; }
+.ps-add button:hover:not(:disabled) { background: var(--a-sky); border-style: solid; }
+.ps-add button span:nth-child(2) { flex: 1; }
+.ps-add button b { color: var(--a-primary); font-size: 20px; }
+.ps-add .hm-ico { width: 34px; height: 34px; }
+.ps-not-ready { border: 1px solid var(--a-line); color: var(--a-muted); background: var(--a-bg); }
+.ps-not-ready .hm-ico { background: #EEF1F5; color: var(--a-muted); }
+.ps-not-ready > span:last-child { display: grid; }
+.ps-not-ready small { font-size: 12px; }
+.ps-save { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin: 4px -18px -18px; padding: 12px 18px; border-top: 1px solid var(--a-line); background: #fffffff2; border-radius: 0 0 18px 18px; backdrop-filter: blur(6px); }
+.ps-save .a-status { margin-inline-end: auto; font-size: 14px; color: var(--a-muted); }
+@media (max-width: 959px) { .an-shell .ps-save { bottom: calc(58px + env(safe-area-inset-bottom)); } }
+@media (max-width: 600px) {
+  .ps-save .a-status { flex-basis: 100%; }
+  .ps-save .btn-sm { flex: 1; padding-inline: 8px; }
+}
+
+/* ---------- edit pop-up: eases in and out instead of appearing at once (SchemaForm ItemDialog) ---------- */
+@keyframes fd-in { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes fd-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(10px) scale(.97); } }
+@keyframes fd-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes fd-down { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes fd-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fd-fade-out { from { opacity: 1; } to { opacity: 0; } }
+.f-dialog[open] { animation: fd-in .22s cubic-bezier(.2, .8, .2, 1); }
+.f-dialog[open]::backdrop { animation: fd-fade-in .22s ease-out; }
+.f-dialog.closing { animation: fd-out .18s ease-in forwards; }
+.f-dialog.closing::backdrop { animation: fd-fade-out .18s ease-in forwards; }
+@media (max-width: 600px) {
+  .f-dialog[open] { animation: fd-up .28s cubic-bezier(.2, .8, .2, 1); }
+  .f-dialog.closing { animation: fd-down .22s ease-in forwards; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .f-dialog[open], .f-dialog[open]::backdrop, .f-dialog.closing, .f-dialog.closing::backdrop { animation: none; }
+}
+.hm, .ps, .ps-grid { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .ps-grid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } }
+@media (max-width: 600px) {
+  .ps { padding: 14px; }
+  .ps-save { margin: 4px -14px -14px; padding-inline: 14px; }
+  .ps-page { padding: 8px; }
+  .ps-block { gap: 8px; padding: 8px; }
+  .ps-block .hm-ico { display: none; }
+  .ps-name b { white-space: normal; }
+  .ps-tools button { width: 38px; height: 40px; }
+}

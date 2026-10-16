@@ -56,7 +56,7 @@ export default async function ComplaintsPage({ params, searchParams }: PageProps
       <p className={`cp-state ${on ? "on" : "off"}`}>
         <span className={`st-chip ${on ? "on" : "off"}`}>{on ? "ظاهر في الموقع" : "مقفول"}</span>
         {on ? "الطلاب يقدروا يبعتوا دلوقتي. " : "القسم مش ظاهر في موقعك، فمحدش يقدر يبعت. "}
-        <a href={`${base}/admin/edit/layout`}>{on ? "اقفله" : "شغّله"} من «ترتيب الأقسام»</a>
+        <a href={`${base}/admin`}>{on ? "اقفله" : "شغّله"} من «ترتيب صفحتك» في الرئيسية</a>
         {" · "}
         <a href={`${base}/admin/edit/complaints`}>عدّل الكلام والمواضيع</a>
       </p>

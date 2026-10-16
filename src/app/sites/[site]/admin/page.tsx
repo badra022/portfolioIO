@@ -1,5 +1,5 @@
 import { baseForSite } from "@/lib/routing";
-import { SECTIONS, sectionById } from "@/lib/admin/sections";
+import { SECTIONS } from "@/lib/admin/sections";
 import { requireAdmin } from "@/lib/server/auth";
 import { slugForSite } from "@/lib/server/site";
 import { getTenant } from "@/lib/server/repo";
@@ -14,6 +14,8 @@ import { sameJson } from "@/lib/content-utils";
 import { SectionKey } from "@/lib/schema";
 import { PreviewPanel } from "@/components/admin/PreviewPanel";
 import { Icon } from "@/components/Icon";
+import { PageStructure } from "@/components/admin/PageStructure";
+import { SECTION_META } from "@/lib/sections-meta";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const cairoDay = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(d);
@@ -59,8 +61,6 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
   const nextExam = (content.exams?.items ?? []).filter((e) => e.date.slice(0, 10) >= today).sort((a, b) => a.date.localeCompare(b.date))[0];
   const finished = Object.values(counts.perQuiz).reduce((s, q) => s + q.finished, 0);
 
-  const shown = t.content.sections;
-  const hidden = SectionKey.options.filter((k) => !shown.includes(k));
   const first = t.content.profile.name || t.name;
 
   const todo: { href: string; icon: string; tone?: string; title: string; sub: string }[] = [];
@@ -138,28 +138,20 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
         </ul>
       </section>
 
-      <section aria-labelledby="hm-sec-h">
-        <div className="hm-h-row">
-          <h2 id="hm-sec-h" className="hm-h">أقسام موقعك</h2>
-          <a href={`${admin}/edit/layout`} className="f-link">رتّب أو اخفي أقسام</a>
-        </div>
-        <ul className="hm-sections">
-          {[...shown, ...hidden].map((key) => {
-            const def = sectionById(key);
-            if (!def) return null;
-            const state = changed.has(key) ? "draft" : shown.includes(key) ? "on" : "off";
-            return (
-              <li key={key}>
-                <a href={`${admin}/edit/${key}`}>
-                  <span className="hm-sec-text"><b>{def.title}</b><small>{def.description}</small></span>
-                  <span className={`st-chip ${state}`}>{state === "draft" ? "مش منشور" : state === "on" ? "ظاهر" : "مخفي"}</span>
-                  <i className="hm-go" aria-hidden="true" />
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <PageStructure
+        site={site}
+        initial={t.preview.content.sections}
+        live={t.content.sections}
+        sections={SectionKey.options.map((key) => ({
+          key,
+          label: SECTION_META[key].label,
+          icon: SECTION_META[key].icon,
+          ready: key === "hero" || key === "complaints" || (t.preview.content as Record<string, unknown>)[key] !== undefined,
+        }))}
+        version={t.version}
+        previewVersion={t.preview.version}
+        previewUrl={`${base}${PREVIEW_PATH}/`}
+      />
     </div>
   );
 }
