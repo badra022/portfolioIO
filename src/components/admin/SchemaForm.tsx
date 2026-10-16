@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { defaultFor, isComplex, kindOf, unwrap, type JS } from "@/lib/admin/schema-tools";
 import { enumLabel, hintFor, labelFor, sectionEnumLabel } from "@/lib/admin/labels";
 import { shrinkForUpload } from "@/lib/shrink-image";
@@ -227,7 +227,11 @@ function ArrayField({ s, value, onChange, path, name, ctx, depth }: FieldProps) 
     <span className="f-tools">
       <button type="button" aria-label="لأعلى" disabled={i === 0} onClick={() => onChange(move(items, i, i - 1))}>↑</button>
       <button type="button" aria-label="لأسفل" disabled={i === items.length - 1} onClick={() => onChange(move(items, i, i + 1))}>↓</button>
-      <button type="button" aria-label="حذف" className="danger" onClick={() => onChange(items.filter((_, j) => j !== i))}>✕</button>
+      <button type="button" aria-label="حذف" className="danger" onClick={() => {
+        // Whole items (cards) ask first; small inline rows don't.
+        if (!compact && !window.confirm(`تمسح «${summaryOf(items[i]) || "العنصر ده"}»؟`)) return;
+        onChange(items.filter((_, j) => j !== i));
+      }}>✕</button>
     </span>
   );
 
@@ -252,23 +256,134 @@ function ArrayField({ s, value, onChange, path, name, ctx, depth }: FieldProps) 
           }
           const hasError = Object.keys(ctx.errors).some((k) => k === itemPath || k.startsWith(`${itemPath}.`));
           return (
-            <details key={i} className="f-item" open={items.length <= 3 || openIdx === i || hasError}>
-              <summary>
-                <span className="f-item-n">{i + 1}</span>
-                <span className="f-item-title">{summaryOf(item) || "عنصر جديد"}</span>
-              </summary>
-              <div className="f-item-head">{tools(i)}</div>
-              <div className="f-item-body">
-                <Field s={itemSchema} value={item} onChange={set} path={itemPath} name={name} required ctx={ctx} depth={depth + 1} bare />
-              </div>
-            </details>
+            <ItemCard key={i} n={i + 1} item={item} s={itemInner} ctx={ctx} hasError={hasError} tools={tools(i)} onOpen={() => setOpenIdx(i)} />
           );
         })}
       </div>
-      <button type="button" className="f-add" onClick={() => { onChange([...items, defaultFor(itemSchema)]); setOpenIdx(items.length); }}>
-        + إضافة
-      </button>
+      {complex && !compact ? (
+        <button type="button" className="f-add" onClick={() => setOpenIdx(items.length)}>+ إضافة</button>
+      ) : (
+        <button type="button" className="f-add" onClick={() => onChange([...items, defaultFor(itemSchema)])}>+ إضافة</button>
+      )}
+      {openIdx !== null && (
+        <ItemDialog
+          title={openIdx < items.length ? `تعديل: ${summaryOf(items[openIdx]) || labelFor(path, name)}` : `إضافة: ${labelFor(path, name)}`}
+          initial={openIdx < items.length ? items[openIdx] : defaultFor(itemSchema)}
+          s={itemSchema} path={join(path, openIdx)} name={name} ctx={ctx} depth={depth}
+          onSave={(v) => { onChange(openIdx < items.length ? items.map((x, j) => (j === openIdx ? v : x)) : [...items, v]); setOpenIdx(null); }}
+          onClose={() => setOpenIdx(null)}
+        />
+      )}
     </fieldset>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Lists of items: a preview card each; the form opens in a pop-up      */
+/* ------------------------------------------------------------------ */
+
+const SKIP_FACT = new Set(["id", "ref", "form", "message", "correct", "draft", "stage"]);
+const MAX_FACT = 42;
+
+/** Short lines that tell items apart on their card: dates, times, choices, counts... */
+function factsOf(item: unknown, s: JS): string[] {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+  const o = item as Record<string, unknown>;
+  const title = summaryOf(item);
+  const out: string[] = [];
+  for (const [key, ps] of Object.entries(s.properties ?? {})) {
+    if (out.length >= 3) break;
+    // Ids, button wording and ready messages don't tell items apart.
+    if (HIDDEN.has(key) || SKIP_FACT.has(key) || /(Label|Message)$/.test(key)) continue;
+    const v = o[key];
+    const inner = unwrap(ps).inner;
+    const kind = kindOf(inner);
+    if (v === undefined || v === null || v === "") continue;
+    if (kind === "enum" && typeof v === "string") out.push(enumLabel(v, key));
+    else if (kind === "string" && typeof v === "string" && inner.widget !== "image" && v !== title) {
+      const t = v.trim();
+      if (inner.widget === "date") out.push(t.replace("T", " "));
+      else if (t.length <= MAX_FACT) out.push(key === "path" ? `/${t}` : t);
+    } else if (kind === "array" && Array.isArray(v) && v.length) {
+      const itemInner = unwrap(inner.items ?? {}).inner;
+      if (itemInner.enum) out.push(v.map((x) => enumLabel(String(x), key)).join("، "));
+      else if (kindOf(itemInner) === "object") out.push(`${labelFor("", key)}: ${v.length}`);
+    }
+  }
+  return out;
+}
+
+/** The item's picture for its card: its own image, or the first in a list of images. */
+function imageOf(item: unknown, s: JS): string | null {
+  if (!item || typeof item !== "object") return null;
+  const o = item as Record<string, unknown>;
+  for (const [key, ps] of Object.entries(s.properties ?? {})) {
+    const inner = unwrap(ps).inner;
+    if (inner.widget === "image" && typeof o[key] === "string" && o[key]) return o[key] as string;
+    if (kindOf(inner) === "array" && Array.isArray(o[key])) {
+      const first = (o[key] as unknown[])[0] as Record<string, unknown> | undefined;
+      if (first && typeof first.image === "string" && first.image) return first.image;
+    }
+  }
+  return null;
+}
+
+const srcOf = (v: string, ctx: FormCtx) => (/^(https?:)?\//.test(v) ? v : `${ctx.assetBase}/${v.split("/").map(encodeURIComponent).join("/")}`);
+
+function ItemCard({ n, item, s, ctx, hasError, tools, onOpen }: { n: number; item: unknown; s: JS; ctx: FormCtx; hasError: boolean; tools: React.ReactNode; onOpen: () => void }) {
+  const img = imageOf(item, s);
+  const facts = factsOf(item, s);
+  return (
+    <div className={`f-card${hasError ? " bad" : ""}`}>
+      <button type="button" className="f-card-main" onClick={onOpen}>
+        {img ? <img className="f-card-img" src={srcOf(img, ctx)} alt="" /> : <span className="f-item-n">{n}</span>}
+        <span className="f-card-text">
+          <b>{summaryOf(item) || "من غير عنوان"}</b>
+          {facts.length > 0 && <small>{facts.join(" · ")}</small>}
+          {hasError && <small className="f-card-err">فيه حاجة محتاجة تتصلح، افتحها</small>}
+        </span>
+        <span className="f-card-edit">تعديل</span>
+      </button>
+      {tools}
+    </div>
+  );
+}
+
+/** One item's form in a pop-up. Changes stay in the pop-up until «حفظ». */
+function ItemDialog({ title, initial, s, path, name, ctx, depth, onSave, onClose }: {
+  title: string; initial: unknown; s: JS; path: string; name: string; ctx: FormCtx; depth: number;
+  onSave: (v: unknown) => void; onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [draft, setDraft] = useState(() => structuredClone(initial));
+  const start = useRef(JSON.stringify(initial));
+  const dirty = JSON.stringify(draft) !== start.current;
+  useEffect(() => {
+    const d = ref.current;
+    if (d && !d.open) d.showModal();
+  }, []);
+  const cancel = () => {
+    if (dirty && !window.confirm("في تعديلات مش محفوظة في العنصر ده. تقفل من غير حفظ؟")) return;
+    onClose();
+  };
+  return (
+    <dialog ref={ref} className="f-dialog" aria-label={title}
+      onCancel={(e) => { e.preventDefault(); cancel(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) cancel(); }}>
+      <div className="f-dialog-box">
+        <header className="f-dialog-head">
+          <h2>{title}</h2>
+          <button type="button" className="f-dialog-x" aria-label="إغلاق" onClick={cancel}>✕</button>
+        </header>
+        <div className="f-dialog-body">
+          <Field s={s} value={draft} onChange={setDraft} path={path} name={name} required ctx={ctx} depth={depth + 1} bare />
+        </div>
+        <footer className="f-dialog-foot">
+          <button type="button" className="btn-sm ghost" onClick={cancel}>إلغاء</button>
+          <button type="button" className="btn-sm primary" onClick={() => onSave(draft)}>حفظ</button>
+        </footer>
+      </div>
+    </dialog>
   );
 }
 
