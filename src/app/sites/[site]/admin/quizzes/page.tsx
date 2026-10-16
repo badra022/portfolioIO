@@ -26,7 +26,6 @@ export default async function Quizzes({ params }: PageProps<"/sites/[site]/admin
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href={`${base}/admin`}>→ كل الأقسام</a>
         <h1>الاختبارات</h1>
         <p className="a-sub">كل اختبار له صفحة خاصة ونتايجه لوحدها. الأسئلة والإجابات الصحيحة بتتعدل من <a href={`${base}/admin/edit/quizzes`}>تعديل الاختبارات</a>.</p>
         <div className="a-actions"><a className="btn-sm primary" href={`${base}/admin/edit/quizzes`}>+ اختبار جديد / تعديل</a></div>

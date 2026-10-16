@@ -49,7 +49,6 @@ export default async function Referrals({ params, searchParams }: PageProps<"/si
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href={`${base}/admin`}>→ كل الأقسام</a>
         <h1>روابط الشركاء</h1>
         <p className="a-sub">
           لكل شريك (إنفلونسر، صفحة، سنتر، جروب) روابط خاصة بيه للموقع وللاختبارات والتصويتات والنماذج. أي حد يفتح رابط الشريك بيتحسب له،

@@ -33,7 +33,6 @@ export default async function Analytics({ params, searchParams }: PageProps<"/si
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href={`${base}/admin`}>→ كل الأقسام</a>
         <h1>الإحصائيات</h1>
         <p className="a-sub">زيارات موقع {t.name} والضغط على أزرار التواصل. الأيام بتوقيت القاهرة، والأرقام بتتحدث لحظياً.</p>
         <nav className="an-ranges" aria-label="الفترة">

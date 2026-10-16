@@ -25,6 +25,7 @@ export const SECTIONS: SectionDef[] = [
   { id: "featured", title: "قسم مميز (عروض وإعلانات)", description: "عرض لفترة محدودة، كورس جديد، فيديو، صورة، سعر، عداد تنازلي، وأزرار تواصل.", keys: ["featured"] },
   { id: "honors", title: "لوحة الشرف", description: "أوائل الطلاب ونتايجهم: صور (شبكة لو أكتر من صورة)، الدرجة، أيقونات، فيديو، وصف طويل، وزر.", keys: ["honors"] },
   { id: "faq", title: "الأسئلة الشائعة", description: "أسئلة الطلاب وأولياء الأمور وإجاباتها، وزر «لسه عندك سؤال؟».", keys: ["faq"] },
+  { id: "complaints", title: "صندوق الشكاوى", description: "شكاوى واقتراحات من الطلاب من غير اسم ولا رقم. اقرأها من صفحة «الشكاوى». شغّله أو اقفله من «ترتيب الأقسام».", keys: ["complaints"] },
   { id: "services", title: "خدمات أخرى", description: "خدمات إضافية بصورة وزر تواصل (أي رقم أو تطبيق) وروابط.", keys: ["services"] },
   { id: "profile", title: "الملف الشخصي", description: "الاسم، اللقب، الصورة، واللوجو.", keys: ["profile"] },
   { id: "contact", title: "التواصل", description: "رقم الواتساب، أرقام الهاتف، وكود التتبع.", keys: ["contact"] },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { saveSectionAction, uploadImageAction } from "@/app/sites/[site]/admin/actions";
 import type { JS } from "@/lib/admin/schema-tools";
 import { labelFor } from "@/lib/admin/labels";
@@ -32,13 +32,28 @@ export function SectionEditor(props: {
   previewUrl: string;
   forms?: { id: string; title: string }[];
 }) {
-  const { site, sectionId, schema, assetBase, viewUrl, previewUrl } = props;
+  const { site, sectionId, schema, assetBase, previewUrl } = props;
   const [value, setValue] = useState(props.initial);
+  // The last saved value, for «تراجع».
+  const [saved, setSaved] = useState(props.initial);
+  // Remounting the form after an undo drops any pop-up it had open.
+  const [formKey, setFormKey] = useState(0);
+  const [live, setLive] = useState(false);
+  const [frameKey, setFrameKey] = useState(0);
+  const frame = useRef<HTMLIFrameElement>(null);
   const [versions, setVersions] = useState({ production: props.version, preview: props.previewVersion });
   const [pending, setPending] = useState(props.pending);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+
+  useEffect(() => {
+    try { setLive(window.matchMedia("(min-width: 1200px)").matches && localStorage.getItem("a-live") !== "0"); } catch { /* storage blocked */ }
+  }, []);
+  const toggleLive = () => setLive((on) => {
+    try { localStorage.setItem("a-live", on ? "0" : "1"); } catch { /* storage blocked */ }
+    return !on;
+  });
 
   useEffect(() => {
     if (!dirty) return;
@@ -66,18 +81,20 @@ export function SectionEditor(props: {
       setPending(target === "preview" && r.pending);
       setIssues([]);
       setDirty(false);
+      setSaved(value);
+      setFrameKey((k) => k + 1);
       setStatus({
         kind: "saved",
         text: target === "preview"
           ? (r.pending ? "اتحفظ في المعاينة بس. راجعه، وبعدين انشره على الموقع." : "اتحفظ في المعاينة (زي الموقع بالظبط).")
-          : "اتنشر. التعديل ظاهر دلوقتي على الموقع.",
+          : "اتنشر. الطلاب شايفين التعديل دلوقتي.",
       });
       return;
     }
     switch (r.reason) {
       case "invalid":
         setIssues(r.issues);
-        setStatus({ kind: "error", text: "في بيانات محتاجة تصحيح قبل الحفظ." });
+        setStatus({ kind: "error", text: "في خانات محتاجة تصحيح قبل الحفظ." });
         break;
       case "conflict":
         setStatus({ kind: "error", text: "حد تاني حفظ تعديلات بعد ما فتحت الصفحة. انسخ تعديلاتك ثم أعد تحميل الصفحة." });
@@ -90,29 +107,53 @@ export function SectionEditor(props: {
     }
   }
 
+  const undo = () => {
+    if (!confirm("هترجع لآخر نسخة محفوظة وتتشال التعديلات اللي عملتها. متأكد؟")) return;
+    setValue(saved);
+    setFormKey((k) => k + 1);
+    setDirty(false);
+    setIssues([]);
+    setStatus({ kind: "idle" });
+  };
+  const busy = status.kind === "saving";
+  const state = busy ? "saving" : status.kind === "error" ? "error" : dirty ? "dirty" : pending ? "draft" : "clean";
+  const stateText = busy ? "جاري الحفظ…"
+    : status.text ?? (dirty ? "عندك تعديلات مش محفوظة" : pending ? "محفوظ في المعاينة، لسه مش منشور" : "كله محفوظ ومنشور");
+
   return (
-    <form className="editor" onSubmit={(e) => { e.preventDefault(); void save("preview"); }}>
-      {pending && !dirty && (
-        <p className="a-envnote">
-          القسم ده متعدّل في المعاينة ولسه مش منشور على الموقع. اللي قدامك هو نسخة المعاينة.{" "}
-          <a href={previewUrl} target="_blank" rel="noopener">افتح المعاينة ↗</a>
-        </p>
+    <form className={`editor${live ? " live" : ""}`} onSubmit={(e) => { e.preventDefault(); void save("preview"); }}>
+      <div className="ed-form">
+        {pending && !dirty && (
+          <p className="a-envnote">
+            القسم ده متعدّل في المعاينة ولسه مش منشور على الموقع. اللي قدامك هو نسخة المعاينة.{" "}
+            <a href={previewUrl} target="_blank" rel="noopener">افتح المعاينة ↗</a>
+          </p>
+        )}
+        {issues.length > 0 && (
+          <div className="a-alert" role="alert">
+            <strong>راجع الخانات دي:</strong>
+            <ul>{issues.map((i) => <li key={i.path}>{issueLabel(i.path)}: {i.message}</li>)}</ul>
+          </div>
+        )}
+        <SchemaForm key={formKey} schema={schema} value={value} onChange={(v) => { setValue(v); setDirty(true); setStatus({ kind: "idle" }); }} ctx={ctx} />
+      </div>
+      {live && (
+        <aside className="ed-live" aria-label="معاينة حية">
+          <div className="ed-live-head">
+            <b>معاينة حية</b>
+            <small>{dirty ? "احفظ عشان تشوف آخر تعديلاتك هنا" : "دي نسخة المعاينة، الطلاب مش شايفينها"}</small>
+            <button type="button" className="f-link" onClick={() => frame.current?.contentWindow?.location.reload()}>تحديث</button>
+          </div>
+          <iframe key={frameKey} ref={frame} src={`${previewUrl}#${sectionId}`} title="معاينة الموقع" loading="lazy" />
+        </aside>
       )}
-      {issues.length > 0 && (
-        <div className="a-alert" role="alert">
-          <strong>راجع الحقول التالية:</strong>
-          <ul>{issues.map((i) => <li key={i.path}>{issueLabel(i.path)}: {i.message}</li>)}</ul>
-        </div>
-      )}
-      <SchemaForm schema={schema} value={value} onChange={(v) => { setValue(v); setDirty(true); setStatus({ kind: "idle" }); }} ctx={ctx} />
       <div className="a-savebar">
-        <span className={`a-status ${status.kind}`} aria-live="polite">
-          {status.kind === "saving" ? "جاري الحفظ…" : status.text ?? (dirty ? "لديك تعديلات غير محفوظة." : "")}
-        </span>
-        <a className="btn-sm ghost" href={previewUrl} target="_blank" rel="noopener">المعاينة ↗</a>
-        <a className="btn-sm ghost" href={viewUrl} target="_blank" rel="noopener">الموقع ↗</a>
-        <button type="submit" className="btn-sm ghost" disabled={status.kind === "saving" || !dirty}>حفظ في المعاينة</button>
-        <button type="button" className="btn-sm primary" disabled={status.kind === "saving" || (!dirty && !pending)} onClick={() => void save("production")}>نشر على الموقع</button>
+        <span className={`a-status ${state}`} aria-live="polite"><i className="a-dot" aria-hidden="true" />{stateText}</span>
+        <button type="button" className="btn-sm ghost ed-live-btn" aria-pressed={live} onClick={toggleLive}>{live ? "اقفل المعاينة" : "معاينة حية"}</button>
+        <a className="btn-sm ghost ed-preview-link" href={previewUrl} target="_blank" rel="noopener">معاينة ↗</a>
+        {dirty && <button type="button" className="btn-sm ghost" disabled={busy} onClick={undo}>تراجع</button>}
+        <button type="submit" className="btn-sm ghost" disabled={busy || !dirty}>احفظ ومتنشرش</button>
+        <button type="button" className="btn-sm primary" disabled={busy || (!dirty && !pending)} onClick={() => void save("production")}>احفظ وانشر</button>
       </div>
     </form>
   );

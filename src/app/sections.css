@@ -629,3 +629,17 @@ button.btn { font: inherit; cursor: pointer; }
 .qg-review li.bad .qg-mark { background: var(--accent); color: var(--on-accent); }
 .qg-right { color: var(--online); font-weight: 600; }
 @media (max-width: 480px) { .qg-score { flex-direction: column; text-align: center; } }
+
+/* ---------- anonymous complaints box (components/Complaints.tsx) ---------- */
+.cp-wrap .sec-head { margin-inline: auto; text-align: center; align-items: center; }
+.cp-box { max-width: 680px; margin-inline: auto; display: grid; gap: 14px; padding: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); }
+.cp-topics { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cp-topics > span { font-weight: 700; margin-inline-end: 4px; }
+.cp-box textarea { width: 100%; min-height: 130px; padding: 12px 14px; border-radius: var(--r-control); border: 1px solid var(--line); background: var(--raised); color: var(--text); font: inherit; font-size: 16px; line-height: 1.7; resize: vertical; }
+.cp-box textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cp-hp { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; inset-inline-start: -9999px; }
+.cp-err { margin: 0; color: #e5534b; font-weight: 600; font-size: 14px; }
+.cp-anon { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
+.cp-done { justify-items: center; text-align: center; }
+.cp-done p { margin: 0; font-weight: 600; }
+.cp-ok { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--accent-12); color: var(--accent); font-size: 24px; font-weight: 700; }

@@ -215,6 +215,23 @@ export const pollVotes = pgTable("poll_votes", {
 }, (t) => [primaryKey({ columns: [t.tenantId, t.env, t.pollPath, t.choice] })]);
 
 /**
+ * The anonymous complaints box (content.complaints, lib/server/complaints.ts).
+ * Deliberately nothing that could point to the student: no name, phone, student
+ * id, referral, device or IP, and the day only (no time of day).
+ */
+export const complaints = pgTable("complaints", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
+  /** Cairo day it was sent. */
+  day: date("day").notNull(),
+  /** One of the section's categories, or null. */
+  topic: text("topic"),
+  message: text("message").notNull(),
+  status: text("status", { enum: ["new", "read", "done"] }).notNull().default("new"),
+}, (t) => [index("complaints_tenant_idx").on(t.tenantId, t.env, t.day)]);
+
+/**
  * One profile per student and phone number (lib/server/students.ts), built from
  * their requests, quizzes and exam results. traits = their answers to profile
  * fields ({ fieldId: { label, value, at, by } }); by = "form" (latest answer wins)

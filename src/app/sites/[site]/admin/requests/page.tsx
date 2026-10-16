@@ -56,7 +56,6 @@ export default async function Requests({ params, searchParams }: PageProps<"/sit
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href={`${base}/admin`}>→ كل الأقسام</a>
         <h1>الطلبات</h1>
         <p className="a-sub">اللي بعته الطلاب من الأزرار اللي بتفتح نموذج بدل واتساب. كلّم اللي تختاره، وغيّر حالته عشان تعرف وصلت لفين.</p>
       </div>
