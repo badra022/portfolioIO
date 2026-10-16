@@ -4,7 +4,7 @@
  * relative to <base>/admin; "" is the home page. Every editor page (SECTIONS in
  * lib/admin/sections.ts) belongs to exactly one category.
  */
-export type NavItem = { label: string; path: string; badge?: "requests" | "grading"; superOnly?: boolean };
+export type NavItem = { label: string; path: string; badge?: "requests" | "grading" | "complaints"; superOnly?: boolean };
 export type NavGroup = { id: string; label: string; icon: string; items: NavItem[] };
 
 const edit = (id: string, label: string, extra: Partial<NavItem> = {}): NavItem => ({ label, path: `/edit/${id}`, ...extra });
@@ -13,6 +13,7 @@ export const NAV: NavGroup[] = [
   {
     id: "students", label: "الطلاب", icon: "users", items: [
       { label: "الطلبات", path: "/requests", badge: "requests" },
+      { label: "الشكاوى والاقتراحات", path: "/complaints", badge: "complaints" },
       { label: "ملفات الطلاب", path: "/students" },
       { label: "الإحصائيات", path: "/analytics" },
     ],
@@ -39,6 +40,7 @@ export const NAV: NavGroup[] = [
       edit("youtube", "اليوتيوب"),
       edit("services", "خدمات أخرى"),
       edit("faq", "الأسئلة الشائعة"),
+      edit("complaints", "صندوق الشكاوى"),
       edit("final", "الدعوة الأخيرة"),
       edit("layout", "ترتيب الأقسام والقوائم"),
     ],

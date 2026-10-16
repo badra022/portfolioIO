@@ -120,11 +120,22 @@ const ar = {
   enterName: "اكتب اسمك",
   tooMany: "محاولات كتير. استنى شوية وجرّب تاني.",
   resultMissing: "النتيجة دي مش متاحة دلوقتي.",
+  // the anonymous complaints box (components/Complaints.tsx)
+  complaintsEyebrow: "صندوق الشكاوى",
+  complaintsTitle: "عندك شكوى أو اقتراح؟",
+  complaintsIntro: "اكتب اللي مضايقك أو اللي نفسك يتحسن. هيوصل للمدرس من غير اسمك.",
+  complaintsTopic: "عن إيه؟",
+  complaintsPlaceholder: "اكتب هنا براحتك…",
+  complaintsSend: "ابعت من غير اسم",
+  complaintsThanks: "وصلت، شكراً إنك قلت. رأيك هيتقرا.",
+  complaintsAnon: "مش بنسجل اسمك ولا رقمك ولا جهازك.",
+  complaintsShort: "اكتب جملة على الأقل",
+  complaintsAnother: "ابعت رسالة تانية",
   // the sections menu
   sections: {
     hero: "الرئيسية", featured: "عروض وإعلانات", grades: "الصفوف والمواد", schedule: "المواعيد", method: "طريقة الشرح",
     book: "الكتاب", students: "الطلاب", reviews: "آراء الطلاب", challenge: "التحدي", exams: "الامتحانات",
-    youtube: "الفيديوهات", services: "خدمات أخرى", honors: "لوحة الشرف", faq: "أسئلة شائعة", final: "تواصل معانا",
+    youtube: "الفيديوهات", services: "خدمات أخرى", honors: "لوحة الشرف", faq: "أسئلة شائعة", complaints: "الشكاوى والاقتراحات", final: "تواصل معانا",
   } as Record<Content["sections"][number], string>,
 };
 
@@ -230,10 +241,20 @@ const en: UIText = {
   enterName: "Enter your name",
   tooMany: "Too many attempts. Please wait a bit and try again.",
   resultMissing: "This result isn't available right now.",
+  complaintsEyebrow: "Feedback box",
+  complaintsTitle: "Have a complaint or a suggestion?",
+  complaintsIntro: "Tell us what bothers you or what could be better. It reaches the teacher without your name.",
+  complaintsTopic: "What is it about?",
+  complaintsPlaceholder: "Write freely…",
+  complaintsSend: "Send anonymously",
+  complaintsThanks: "Received, thank you for telling us. It will be read.",
+  complaintsAnon: "We don't record your name, number or device.",
+  complaintsShort: "Write at least one sentence",
+  complaintsAnother: "Send another message",
   sections: {
     hero: "Home", featured: "Offers", grades: "Grades & subjects", schedule: "Schedule", method: "How I teach",
     book: "The book", students: "Students", reviews: "Reviews", challenge: "Challenge", exams: "Exams",
-    youtube: "Videos", services: "More services", honors: "Honor board", faq: "FAQ", final: "Contact",
+    youtube: "Videos", services: "More services", honors: "Honor board", faq: "FAQ", complaints: "Feedback", final: "Contact",
   },
 };
 
