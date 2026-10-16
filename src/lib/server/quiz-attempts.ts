@@ -262,7 +262,7 @@ export async function approvedRows(tenantId: string, quizPath: string, env: Site
 }
 
 /** Attempt counts per quiz path, for the admin overview. */
-export async function attemptCounts(slug: string, env: SiteEnv = "production"): Promise<Record<string, { total: number; finished: number }>> {
+export async function attemptCounts(slug: string, env: SiteEnv = "production"): Promise<Record<string, { total: number; finished: number; toGrade: number }>> {
   if (!hasDb()) return {};
   const id = await tenantIdOf(slug);
   if (!id) return {};
@@ -270,8 +270,9 @@ export async function attemptCounts(slug: string, env: SiteEnv = "production"): 
     path: quizAttempts.quizPath,
     total: sql<number>`count(*)::int`,
     finished: sql<number>`count(*) filter (where ${quizAttempts.status} <> 'in_progress')::int`,
+    toGrade: sql<number>`count(*) filter (where ${quizAttempts.status} <> 'in_progress' and ${quizAttempts.approvedAt} is null)::int`,
   }).from(quizAttempts).where(and(eq(quizAttempts.tenantId, id), eq(quizAttempts.env, env))).groupBy(quizAttempts.quizPath);
-  return Object.fromEntries(rows.map((r) => [r.path, { total: r.total, finished: r.finished }]));
+  return Object.fromEntries(rows.map((r) => [r.path, { total: r.total, finished: r.finished, toGrade: r.toGrade }]));
 }
 
 export async function deleteAttempts(slug: string, quizPath: string, ids: number[]): Promise<void> {

@@ -17,7 +17,6 @@ export default async function History({ params }: PageProps<"/sites/[site]/admin
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href={`${base}/admin`}>→ كل الأقسام</a>
         <h1>سجل التعديلات</h1>
         <p className="a-sub">كل حفظ يحتفظ بنسخة كاملة، سواء على الموقع أو في المعاينة. الاسترجاع ينشئ نسخة جديدة ولا يحذف شيئاً: نسخة الموقع ترجع للموقع، ونسخة المعاينة ترجع للمعاينة.</p>
       </div>

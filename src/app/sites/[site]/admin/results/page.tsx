@@ -30,7 +30,6 @@ export default async function Results({ params }: PageProps<"/sites/[site]/admin
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href={`${base}/admin`}>→ كل الأقسام</a>
         <h1>نتايج الامتحانات</h1>
         <p className="a-sub">
           حط درجات كل امتحان (من Excel أو بالنسخ واللصق)، ولما تنشرها الطالب يقدر يعرف درجته من الموقع في قسم الامتحانات باسمه ورقم موبايله.

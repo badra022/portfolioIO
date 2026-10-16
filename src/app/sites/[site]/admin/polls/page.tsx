@@ -29,7 +29,6 @@ export default async function Polls({ params }: PageProps<"/sites/[site]/admin/p
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href={`${base}/admin`}>→ كل الأقسام</a>
         <h1>التصويتات</h1>
         <p className="a-sub">
           كل تصويت ليه صفحة لوحده: انسخ الرابط وحطه في الستوري أو الجروب. الطلاب بيختاروا بس، من غير اسم ولا رقم، وكل جهاز بيصوّت مرة واحدة.
