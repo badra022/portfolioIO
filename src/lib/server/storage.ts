@@ -2,10 +2,13 @@ import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { env, hasSupabaseStorage } from "@/lib/env";
+import { assertStage } from "@/lib/db/stage";
 
 export const LOCAL_STORAGE_DIR = path.join(process.cwd(), ".local-storage");
 
 function supabaseHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  // Never the other environment's files (lib/db/stage.ts).
+  assertStage();
   const key = env.supabaseSecretKey;
   // New secret keys (sb_secret_...) go in `apikey` only; legacy service_role JWTs also need Authorization.
   return { apikey: key, ...(key.startsWith("eyJ") ? { Authorization: `Bearer ${key}` } : {}), ...extra };
