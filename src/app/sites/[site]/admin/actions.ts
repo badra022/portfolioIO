@@ -20,7 +20,12 @@ import * as submissionsRepo from "@/lib/server/submissions";
 import * as quizRepo from "@/lib/server/quiz-attempts";
 import * as siteFiles from "@/lib/server/site-files";
 import * as results from "@/lib/server/exam-results";
+import * as pollsRepo from "@/lib/server/polls";
+import * as studentsRepo from "@/lib/server/students";
+import { cairoNow } from "@/lib/poll";
+import { FEATURES, blockedMessage, type Feature } from "@/lib/permissions";
 import { MAX_SITE_FILE } from "@/lib/site-files";
+import { adminEnv } from "@/lib/server/admin-env";
 
 type Fail = { ok: false; reason: "forbidden" | "missing" | "error"; message?: string };
 
@@ -91,6 +96,8 @@ export async function saveSectionAction(
     }
     updateTag(tenantTag(ctx.slug));
     const after = await repo.getTenant(ctx.slug);
+    // A new quiz gets its exam results (filled by approving grades) right away.
+    if (after && section.keys?.includes("quizzes")) await results.ensureQuizResultSets(ctx.slug, after.content.quizzes);
     return { ok: true, version: r.version, previewVersion, pending: after?.preview.pending ?? false };
   } catch (e) {
     console.error(e);
@@ -105,7 +112,11 @@ export async function publishPreviewAction(site: string): Promise<{ ok: true } |
   try {
     const r = await repo.publishPreview(ctx.slug, principalName(ctx.p));
     if (!r.ok) {
-      if (r.reason === "invalid") return { ok: false, message: `المعاينة فيها بيانات محتاجة تصحيح: ${r.issues.slice(0, 3).map((i) => i.path).join("، ")}` };
+      if (r.reason === "invalid") {
+        // Outside the plan: say so plainly; otherwise point at the fields to fix.
+        const plan = r.issues.filter((i) => i.message.includes("الإدارة"));
+        return { ok: false, message: plan.length ? plan.map((i) => i.message).join(" ") : `المعاينة فيها بيانات محتاجة تصحيح: ${r.issues.slice(0, 3).map((i) => i.path).join("، ")}` };
+      }
       if (r.reason === "conflict") return { ok: false, message: "حد عدّل المعاينة من شوية. حدّث الصفحة وراجعها تاني قبل النشر." };
       return { ok: false, message: "المدرس مش موجود." };
     }
@@ -235,6 +246,20 @@ export async function primaryDomainAction(slug: string, domain: string): Promise
   refresh();
 }
 
+/** The teacher's plan: which bundles their site includes, and the forms limit (lib/permissions.ts). */
+export async function setPermissionsAction(slug: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {
+  await requireSuper(PLATFORM);
+  const raw = String(form.get("maxForms") ?? "").trim();
+  const max = raw === "" ? null : Number(raw);
+  if (max !== null && (!Number.isInteger(max) || max < 0 || max > 100)) return { ok: false, message: "حد النماذج رقم من 0 لـ 100، أو فاضي = من غير حد." };
+  const p = { ...Object.fromEntries(FEATURES.map((f) => [f, form.get(f) === "on"])) as Record<Feature, boolean>, maxForms: max };
+  await repo.setPermissions(slug, p);
+  // The public site drops (or shows again) the parts the plan changed.
+  updateTag(tenantTag(slug));
+  refresh();
+  return { ok: true, message: "اتحفظت الباقة. الموقع اتحدّث على طول." };
+}
+
 export async function setStatusAction(slug: string, status: "active" | "disabled"): Promise<void> {
   await requireSuper(PLATFORM);
   await repo.setTenantStatus(slug, status);
@@ -329,6 +354,126 @@ export async function deleteAttemptAction(site: string, path: string, ids: numbe
   refresh();
 }
 
+/** The teacher's grade and comment on one attempt; approved grades are looked up by students right away. */
+export async function gradeAttemptAction(site: string, path: string, id: number, input: { name: string; phone: string; score: string; note: string }, approved: boolean): Promise<{ ok: true } | { ok: false; message: string }> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
+  try {
+    await quizRepo.reviewAttempt(ctx.slug, path, id, input, approved === true, principalName(ctx.p));
+  } catch (e) {
+    if (e instanceof quizRepo.GradeError) return { ok: false, message: e.message };
+    console.error("grade", e);
+    return { ok: false, message: "حصلت مشكلة، حاول تاني." };
+  }
+  // The exams section lists results once they have someone in them.
+  updateTag(tenantTag(ctx.slug));
+  refresh();
+  return { ok: true };
+}
+
+/** Approves every finished attempt that isn't approved yet, with its automatic score (or draft grade). */
+export async function approveAllAction(site: string, path: string, env: SiteEnv = "production"): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!isEnv(env)) return;
+  const t = await repo.getTenant(ctx.slug);
+  const content = t ? repo.copyFor(t, env).content : null;
+  const quiz = content?.quizzes.find((q) => q.path === path);
+  if (!content || !quiz) return;
+  try {
+    await quizRepo.approveAll(ctx.slug, quiz, env, quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined, principalName(ctx.p));
+  } catch (e) {
+    // Outside the plan: the quiz page already says so.
+    if (!(e instanceof quizRepo.GradeError)) throw e;
+  }
+  updateTag(tenantTag(ctx.slug));
+  refresh();
+}
+
+/* ------------------------------------------------------------------ */
+/* Student profiles (/admin/students)                                  */
+/* ------------------------------------------------------------------ */
+
+/** Allowed on this site's plan (lib/permissions.ts), for the student pages' actions. */
+async function studentsContext(site: string): Promise<{ p: Principal; slug: string } | { ok: false; message: string }> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, message: "غير مصرح." };
+  const t = await repo.getTenant(ctx.slug);
+  if (!t?.permissions.students) return { ok: false, message: blockedMessage("students") };
+  return ctx;
+}
+
+export async function updateStudentAction(site: string, id: number, input: { name: string; traits: { key: string; label: string; value: string }[]; notes: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  const ctx = await studentsContext(site);
+  if ("ok" in ctx) return ctx;
+  try {
+    await studentsRepo.updateStudent(ctx.slug, await adminEnv(), id, input);
+  } catch (e) {
+    if (e instanceof studentsRepo.StudentError) return { ok: false, message: e.message };
+    console.error("student", e);
+    return { ok: false, message: "حصلت مشكلة، حاول تاني." };
+  }
+  refresh();
+  return { ok: true };
+}
+
+export async function createStudentAction(site: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {
+  const ctx = await studentsContext(site);
+  if ("ok" in ctx) return ctx;
+  let id: number;
+  try {
+    id = await studentsRepo.createStudent(ctx.slug, await adminEnv(), String(form.get("name") ?? ""), String(form.get("phone") ?? ""));
+  } catch (e) {
+    if (e instanceof studentsRepo.StudentError) return { ok: false, message: e.message };
+    throw e;
+  }
+  redirect(`${baseForSite(site)}/admin/students/${id}`);
+}
+
+export async function deleteStudentAction(site: string, id: number): Promise<void> {
+  const ctx = await studentsContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  await studentsRepo.deleteStudent(ctx.slug, await adminEnv(), id);
+  redirect(`${baseForSite(site)}/admin/students`);
+}
+
+/* ------------------------------------------------------------------ */
+/* Votes (/admin/polls)                                                */
+/* ------------------------------------------------------------------ */
+
+/** Open now / close now / back to its timer, or restart the timer from now. Saved like any edit. */
+export async function updatePollAction(site: string, path: string, change: "open" | "closed" | "auto" | "restart", env: SiteEnv = "production"): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!["open", "closed", "auto", "restart"].includes(change) || !isEnv(env)) return;
+  const t = await repo.getTenant(ctx.slug);
+  if (!t) return;
+  const apply = (c: Content): Content => ({
+    ...c,
+    polls: c.polls.map((p) => (p.path !== path ? p : change === "restart" ? { ...p, state: "auto" as const, startsAt: cairoNow() } : { ...p, state: change })),
+  });
+  const copy = repo.copyFor(t, env).content;
+  if (!copy.polls.some((p) => p.path === path)) return;
+  const note = `${change === "restart" ? "بداية جديدة لتصويت" : change === "open" ? "فتح تصويت" : change === "closed" ? "قفل تصويت" : "تصويت حسب الوقت"}: ${path}`;
+  const r = env === "preview"
+    ? await repo.savePreview(ctx.slug, { content: apply(copy) }, null, principalName(ctx.p), note)
+    : await repo.saveTenant(ctx.slug, { content: apply(copy) }, t.version, principalName(ctx.p), note);
+  if (r.ok && env === "production" && t.preview.pending) {
+    await repo.savePreview(ctx.slug, { content: apply(t.preview.content) }, null, principalName(ctx.p), note);
+  }
+  if (r.ok) updateTag(tenantTag(ctx.slug));
+  refresh();
+}
+
+/** Starts a vote's counts from zero. */
+export async function resetVotesAction(site: string, path: string, env: SiteEnv = "production"): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!isEnv(env)) return;
+  await pollsRepo.resetVotes(ctx.slug, env, path);
+  refresh();
+}
+
 /* ------------------------------------------------------------------ */
 /* Site files (super admin): verification files etc. at the site root  */
 /* ------------------------------------------------------------------ */
@@ -409,7 +554,7 @@ export async function importResultsAction(site: string, id: number, rows: unknow
   if (!Array.isArray(rows) || (mode !== "merge" && mode !== "replace")) return { ok: false, message: "بيانات غير صالحة." };
   try {
     const r = await results.importRows(ctx.slug, id, rows, mode, principalName(ctx.p));
-    const set = await results.getResultSet(ctx.slug, id);
+    const set = await results.getResultSet(ctx.slug, id, await adminEnv());
     if (!set) return { ok: false, message: "الامتحان مش موجود." };
     return { ok: true, summary: r.summary, set };
   } catch (e) { return failed(e); }
@@ -422,7 +567,7 @@ export async function saveResultRowsAction(site: string, id: number, rows: unkno
   try {
     const r = await results.saveRows(ctx.slug, id, rows, baseVersion, principalName(ctx.p));
     if (!r.ok) return { ok: false, message: r.reason === "conflict" ? "حد تاني عدّل النتايج دي من شوية. حدّث الصفحة وكرر تعديلك." : "الامتحان مش موجود." };
-    const set = await results.getResultSet(ctx.slug, id);
+    const set = await results.getResultSet(ctx.slug, id, await adminEnv());
     return set ? { ok: true, set } : { ok: false, message: "الامتحان مش موجود." };
   } catch (e) { return failed(e); }
 }

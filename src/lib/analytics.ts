@@ -49,7 +49,9 @@ export type TrackEvent =
   | { t: "view"; dev: string; src: string; u: PeriodT[] }
   | { t: "sec"; k: string }
   | { t: "click"; ch: string; at: string; u: Partial<Record<GroupT, PeriodT[]>> }
-  | { t: "dwell"; s: number };
+  | { t: "dwell"; s: number }
+  /** Landed through a referral partner's link (components/ReferralLanding.tsx): code, page, first time on this device. */
+  | { t: "ref"; c: string; pg: string; u: boolean };
 
 /** "2026-10-06" in Cairo, the day every counter is filed under. */
 export function cairoDay(at: Date = new Date()): string {

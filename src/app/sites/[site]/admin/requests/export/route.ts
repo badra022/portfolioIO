@@ -14,11 +14,12 @@ export async function GET(req: Request, ctx: RouteContext<"/sites/[site]/admin/r
   const slug = await slugForSite(site);
   const t = slug ? await getTenant(slug) : null;
   if (!slug || !t) return new Response("Not found", { status: 404 });
+  if (!t.permissions.forms) return new Response("Not in this site's plan.", { status: 403 });
   const q = new URL(req.url).searchParams;
   const status = (STATUSES as readonly string[]).includes(q.get("status") ?? "") ? (q.get("status") as StatusT) : undefined;
   const env = await adminEnv();
   const { rows } = await listSubmissions(slug, { env, form: q.get("form") || undefined, status, q: q.get("q")?.slice(0, 60) || undefined, limit: 20_000 });
-  return new Response(toCsv(rows, copyFor(t, env).content.forms), {
+  return new Response(toCsv(rows, copyFor(t, env).content.forms, copyFor(t, env).content.referrals), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="requests-${slug}${env === "preview" ? "-preview" : ""}-${cairoDay()}.csv"`,

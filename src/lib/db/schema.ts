@@ -22,6 +22,8 @@ export const tenants = pgTable("tenants", {
   previewVersion: integer("preview_version").notNull().default(0),
   previewUpdatedAt: timestamp("preview_updated_at", { withTimezone: true }),
   previewUpdatedBy: text("preview_updated_by"),
+  /** What the teacher's plan includes (lib/permissions.ts). Empty = nothing paid (new teachers). */
+  permissions: jsonb("permissions").notNull().default(sql`'{}'::jsonb`),
 });
 
 /** Custom domains that serve a teacher. Each must also be added to the Vercel project. */
@@ -89,8 +91,12 @@ export const submissions = pgTable("submissions", {
   /** What the button carried: { "السؤال": "...", "الإجابة": "..." }. */
   context: jsonb("context").notNull(),
   status: text("status", { enum: ["new", "contacted", "done"] }).notNull().default("new"),
+  /** The student profile this request belongs to (lib/server/students.ts), set when profiles are synced. */
+  studentId: bigint("student_id", { mode: "number" }),
   /** Where it came from: the public site or the private preview (lib/environments.ts). */
   env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
+  /** The referral partner's code (content.referrals) when the student came through their link. */
+  ref: text("ref"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("submissions_tenant_created_idx").on(t.tenantId, t.createdAt)]);
 
@@ -121,6 +127,19 @@ export const quizAttempts = pgTable("quiz_attempts", {
   finishedAt: timestamp("finished_at", { withTimezone: true }),
   /** Where it came from: the public site or the private preview (lib/environments.ts). */
   env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
+  /**
+   * The teacher's grade: { name, phone, score, note? } (lib/exam-results.ts ResultRow).
+   * Saved as a draft until approved; approved grades join the quiz's exam results
+   * (exam_results.quiz_path) and students can look them up.
+   */
+  result: jsonb("result"),
+  /** The referral partner's code (content.referrals) when the student came through their link. */
+  ref: text("ref"),
+  /** The student profile this attempt belongs to (lib/server/students.ts), set when profiles are synced. */
+  studentId: bigint("student_id", { mode: "number" }),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  reviewedBy: text("reviewed_by"),
 }, (t) => [
   index("quiz_attempts_quiz_idx").on(t.tenantId, t.quizPath, t.startedAt),
   // One attempt per number and environment: trying a quiz in preview doesn't use up the real one.
@@ -151,6 +170,11 @@ export const examResults = pgTable("exam_results", {
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   /** The exam on the page this belongs to (content.exams.items[].id), if any. */
   examId: text("exam_id"),
+  /**
+   * The online quiz (content.quizzes[].path) whose approved grades are part of these
+   * results, next to the rows entered by hand. Created automatically, one per quiz.
+   */
+  quizPath: text("quiz_path"),
   title: text("title").notNull(),
   /** YYYY-MM-DD. */
   date: text("date").notNull(),
@@ -172,4 +196,51 @@ export const examResults = pgTable("exam_results", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by"),
-}, (t) => [index("exam_results_tenant_idx").on(t.tenantId, t.date)]);
+}, (t) => [
+  index("exam_results_tenant_idx").on(t.tenantId, t.date),
+  uniqueIndex("exam_results_quiz_idx").on(t.tenantId, t.quizPath).where(sql`${t.quizPath} is not null`),
+]);
+
+/**
+ * Anonymous votes (content.polls): only a count per choice, nothing about who
+ * voted. Choices are counted by their position in the poll.
+ */
+export const pollVotes = pgTable("poll_votes", {
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  /** The public site or the private preview (lib/environments.ts). */
+  env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
+  pollPath: text("poll_path").notNull(),
+  choice: integer("choice").notNull(),
+  votes: integer("votes").notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.tenantId, t.env, t.pollPath, t.choice] })]);
+
+/**
+ * One profile per student and phone number (lib/server/students.ts), built from
+ * their requests, quizzes and exam results. traits = their answers to profile
+ * fields ({ fieldId: { label, value, at, by } }); by = "form" (latest answer wins)
+ * or "teacher" (typed in the admin, never overwritten by a form).
+ */
+export const students = pgTable("students", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  env: text("env", { enum: ["production", "preview"] }).notNull().default("production"),
+  /** lib/exam-results.ts phoneKey: digits without country code or leading zero. */
+  phoneKey: text("phone_key").notNull(),
+  phone: text("phone").notNull(),
+  name: text("name").notNull().default(""),
+  /** The teacher set the name: later forms don't change it. */
+  nameByTeacher: boolean("name_by_teacher").notNull().default(false),
+  traits: jsonb("traits").notNull().default(sql`'{}'::jsonb`),
+  notes: text("notes").notNull().default(""),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("students_phone_idx").on(t.tenantId, t.env, t.phoneKey)]);
+
+/** How far profiles are synced from requests and quiz attempts (by id), per teacher and environment. */
+export const studentSync = pgTable("student_sync", {
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  env: text("env", { enum: ["production", "preview"] }).notNull(),
+  lastSubmission: bigint("last_submission", { mode: "number" }).notNull().default(0),
+  lastAttempt: bigint("last_attempt", { mode: "number" }).notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.tenantId, t.env] })]);

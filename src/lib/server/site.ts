@@ -3,10 +3,12 @@ import { cacheLife, cacheTag } from "next/cache";
 import { env } from "@/lib/env";
 import { baseForSite } from "@/lib/routing";
 import { withLiveContent } from "@/lib/content-utils";
+import { applyPermissions, type Permissions } from "@/lib/permissions";
 import type { Content, Theme } from "@/lib/schema";
 import { splitSite, type SiteEnv } from "@/lib/environments";
 import { copyFor, findSlugByDomain, getTenant } from "./repo";
 import { resolveImages } from "./assets";
+import { localizeDefaults } from "@/lib/i18n";
 import { publishedExams, type PastExam } from "./exam-results";
 
 export const tenantTag = (slug: string) => `tenant:${slug}`;
@@ -28,6 +30,8 @@ export type SiteData =
       indexable: boolean;
       /** Prefix for links inside the site ("" or "/t/<slug>"). */
       base: string;
+      /** What the teacher's plan includes (the content is already filtered by it). */
+      permissions: Permissions;
       /** Last save (ISO), for sitemaps. */
       updatedAt: string | null;
       /** Changes with every save; added to generated URLs (share image) so caches refresh. */
@@ -75,7 +79,9 @@ export async function getSiteData(siteKey: string): Promise<SiteData> {
     kind: "tenant",
     slug,
     env: siteEnv,
-    content: resolveImages(withLiveContent(copy.content, new Date()), slug),
+    // Parts of the site outside the teacher's plan are left out right away (lib/permissions.ts).
+    content: resolveImages(localizeDefaults(withLiveContent(applyPermissions(copy.content, t.permissions), new Date())), slug),
+    permissions: t.permissions,
     theme: copy.theme,
     canonical: canonicalHost ? `https://${canonicalHost}` : null,
     // The preview is never indexed (it's also behind the admin login).
@@ -84,6 +90,6 @@ export async function getSiteData(siteKey: string): Promise<SiteData> {
     updatedAt: t.updatedAt,
     version: siteEnv === "preview" ? t.version * 10_000 + t.preview.version : t.version,
     // Publishing results refreshes this through the same tag (tenantTag).
-    pastExams: t.id ? await publishedExams(t.id, siteEnv).catch((e) => { console.error("past exams", e); return []; }) : [],
+    pastExams: t.id && t.permissions.exams ? await publishedExams(t.id, siteEnv).catch((e) => { console.error("past exams", e); return []; }) : [],
   };
 }

@@ -19,7 +19,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/sites/[site]/admin/
   const quiz = content?.quizzes.find((q) => q.path === decodeURIComponent(path));
   if (!slug || !content || !quiz) return new Response("Not found", { status: 404 });
   const form = quiz.form ? content.forms.find((f) => f.id === quiz.form) : undefined;
-  return new Response(attemptsCsv(quiz, form, await listAttempts(slug, quiz, env)), {
+  return new Response(attemptsCsv(quiz, form, await listAttempts(slug, quiz, env, form)), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="quiz-${quiz.path}${env === "preview" ? "-preview" : ""}-${cairoDay()}.csv"`,

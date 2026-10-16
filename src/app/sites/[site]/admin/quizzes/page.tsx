@@ -6,6 +6,7 @@ import { slugForSite } from "@/lib/server/site";
 import { copyFor, getTenant } from "@/lib/server/repo";
 import { adminEnv } from "@/lib/server/admin-env";
 import { attemptCounts } from "@/lib/server/quiz-attempts";
+import { ensureQuizResultSets } from "@/lib/server/exam-results";
 import { availability } from "@/lib/quiz";
 import { QuizStateButtons, quizStatus } from "@/components/admin/QuizBits";
 
@@ -19,8 +20,9 @@ export default async function Quizzes({ params }: PageProps<"/sites/[site]/admin
   if (!slug || !t) notFound();
   const base = baseForSite(site);
   const env = await adminEnv();
-  const counts = await attemptCounts(slug, env);
   const quizzes = copyFor(t, env).content.quizzes;
+  // Each quiz has its own exam results, filled by approving grades.
+  const [counts] = await Promise.all([attemptCounts(slug, env), ensureQuizResultSets(slug, quizzes)]);
   return (
     <>
       <div className="a-head">

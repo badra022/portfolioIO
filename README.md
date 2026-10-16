@@ -24,6 +24,16 @@ ahmedhassan.com ┼─▶ Vercel (one project) ──┤
 |---|---|
 | Pop-up announcement (`popup`) | Title, text, optional YouTube video or image, optional button, end date. Shown a moment after the page opens: a centered card on tablet/desktop, a bottom sheet on phones (no full-screen interstitial, which Google ranks down). Once closed it stays hidden on that device for `remindAfterHours` (default 5); editing it shows it to everyone again. |
 | Student reviews (`reviews`) | Headline number + stars over a wall of review screenshots; long walls fold behind "show all"; any review opens full size. |
+| Sections menu (`menu`) | Every visible section in one list. The header's menu button (on the right in Arabic; the logo moves to the left) opens and closes it on every screen: docked at the side and open by default on computers (≥1100px; closing it is remembered on the device), sliding over the page on tablets and phones. The section being read is highlighted. On by default; the teacher can switch it off, rename it, or list their own names and order (admin → ترتيب الأقسام والقوائم). Shown when there are at least 3 sections. |
+| Schedule | Four or more groups (after the visitor's filters) swipe as a carousel; three or fewer stay as cards. Automatic, not a setting. |
+| Display of lists (`display`) | Exams, videos, method, services, featured cards and reviews each choose **auto** (swipe on phones; on bigger screens the usual grid, or swiping when there are more cards than fit in a row), **carousel** (swipe with arrows and dots everywhere), **grid**, or **list** (one under the other). |
+| Featured (`featured`) | Offers, new courses, videos, announcements: cards with a badge, title, text, YouTube video or image, check-mark points, price and crossed-out old price, a countdown to the end date, and up to two buttons (any channel or a form). Each card shows between its start and end dates; the first card can span the full width. |
+| Self-grading quizzes (`quizzes[].selfGrading`) | For quizzes shared to reach new students: the student sees their grade, pass/fail and each answer (right, wrong, or graded by the teacher; the right answers too unless `showCorrect` is off) as soon as they hand in, with an optional line and button under the grade (`resultMessage`, `resultCta`). The answer key only leaves the server after hand-in. The teacher still gets every attempt (name, phone, answers, score) to follow up, but these quizzes have no exam results and no approval step. Without it, students see no grade; the teacher grades and approves, and approved grades go to the exam results. |
+| Referral partners (`referrals`) | Affiliate marketing, part of the **promo** plan bundle. The teacher adds partners (influencer, page, center) with a short code; admin → «روابط الشركاء» lists each partner's ready links to the site, every quiz, every vote and every form (`?ref=<code>`, plus `&form=<id>` to open a form right away). Visits and unique visitors are counted per partner and page; requests, quiz attempts (started / submitted) and votes the visitor sends within 30 days are credited to the partner (last partner wins). Requests and attempts show «عن طريق …» and the requests export has a «الشريك» column. |
+| Site language (`locale`) | Each teacher picks **Arabic** (`ar-EG`, right-to-left) or **English** (`en`, left-to-right) in the admin under «اللغة والنصوص العامة». English flips the whole layout and switches every built-in text (buttons, countdowns, errors, quiz, vote and results screens, the sections menu, dates) to English (`src/lib/i18n.ts`); ready-made texts the teacher never changed (default button labels, day names, AM/PM) follow too. The teacher writes their own content in that language. One language per site; the admin panel stays Arabic, and the super admin console shows each teacher's language. |
+| Honor board (`honors`) | The teacher's top students: each entry has one or more photos (a grid when there are several, tap to open full size), a name, the grade/score shown big, the class and year, short lines with icons, an optional YouTube video, a long description folded after a few lines ("read more"), and an optional button; plus an optional button under the board. |
+| Group status (`schedule.slots[].status`) | Optional per group: **available** (green "فيه أماكن"), **full** ("كامل العدد"; the button joins the waiting list), or **not started** ("لسه مبدأتش" with its start date; the button books a place early). The not-started label drops on its own once the start date comes. |
+| FAQ (`faq`) | Questions and answers that open one at a time (no script), first one open, an optional "still have a question?" button. Described to search engines as a `FAQPage`. |
 | Other services (`services`) | Cards with image, text, a button to any channel (another WhatsApp number, Telegram, Messenger, call, or link) and optional social links. |
 | Social reach (`socials` + `youtube`) | Each social link can carry a follower count and a one-line "why follow"; the YouTube section shows them as cards under a total ("+5,000 followers on all our platforms"). |
 | Book (`book.pages`) | Inside pages are stacked behind the cover; hover fans them out, a tap opens them, and any page opens full size. |
@@ -76,9 +86,48 @@ Timed quizzes on their own page, e.g. `teacher.com/exam-oct`, managed from `/adm
 - **Set up** (admin → edit quizzes): the page name, title and intro, an optional form asked before starting (name, phone…), duration in minutes (0 = no timer), start/end dates, pass percentage, and questions. Each question has text and/or an image, is multiple choice or written, and may list its correct answers: several accepted spellings for written ones, compared without extra spaces, upper/lower case, Arabic diacritics, and with Arabic digits and decimal point equal to Latin ones. Questions without correct answers aren't graded; students can leave any question empty.
 - **Open/close**: *automatic* follows the dates; **Open now** / **Close now** buttons override them (closing also ends attempts in progress).
 - **Students**: fill the form (nothing is sent yet but the start), then answer with a countdown. Questions load only when they start, and the answer key never leaves the server. The deadline is kept by the server and answers are saved as they go, so a refresh (or another device with the same number) continues with the same answers and remaining time, and when time is up the latest answers are handed in, even if the page was closed. After handing in (button or timer), the quiz can't be taken again on that device or, if the form has a mobile number, with that number. Students don't see their score.
+- **Grading** (on the quiz's results page): each finished student gets a grade box with the score (the automatic score from the answer key is filled in, change it for written answers), a comment for the student, and **Approve** / **Save as draft** / **Unapprove**. Approved grades go straight into the quiz's own exam results (below), so the student finds their score and the comment with their name and phone. **Approve all** approves everyone not approved yet with their automatic score or draft. Filters: all / needs grading / approved.
 - **Results** (one page per quiz): started / finished / timed out / in progress, completion rate, average, median and top score, pass rate, average time, score distribution, questions from hardest with their most common wrong answers, every student ranked by score with their answers marked, tap to call/WhatsApp, delete (lets them retake), and CSV export for Excel. Scores are worked out from the current answer key, so fixing a key updates past results.
 
 Attempts live in `quiz_attempts` (run `db/migrations/0004_quizzes.sql` once on an existing database). Claude can create and edit quizzes through the connector and read results with `quiz_results`. Don't reorder questions after students start: answers are stored by question number.
+
+## Plans (what each teacher's site includes)
+
+Super admin console → a teacher → **الباقة (الصلاحيات)**: five bundles and a forms limit (`lib/permissions.ts`, stored in `tenants.permissions`).
+
+| Bundle | Covers |
+|---|---|
+| الإحصائيات | The analytics page in the teacher's admin |
+| ملفات الطلاب | Student profiles (below) |
+| النماذج والطلبات | Data-collection forms on buttons, the requests page and its export; optional **max forms** (forms used only by a quiz don't count) |
+| الاختبارات والنتايج | Online quizzes, grading, and exam results students look up |
+| التصويتات | Vote pages |
+| أدوات الإعلان | Pop-up, red bar, featured section |
+
+- **New teachers start with none; teachers created before plans existed keep everything** (migration `0010` sets them all on).
+- A bundle that's off can be prepared and **saved to the preview**, but **not saved or published to the site**. Only parts a save changes are checked, so editing the rest still works. Grading and exam-results changes are refused too.
+- It's **left out of the live site right away**: quiz and vote pages return not found, the results button and its API go, buttons that opened a removed form fall back to WhatsApp. Switching it back on brings everything back.
+- The analytics and requests pages show a "not in your plan" message instead of the data. The teacher's dashboard lists what's not included.
+- Plans apply to **everyone** editing that site in its admin panel, the super admin included, and to Claude's content edits.
+
+## Student profiles (admin → الطلاب)
+
+One profile per student, identified by their mobile number (compared like the results lookup: no country code or leading zero), built automatically from what they do on the site: form requests, quiz attempts (with the teacher's approved grade or the automatic score) and the exam results the teacher typed or imported. Votes are anonymous, so they don't count.
+
+- **Profile fields grow on their own:** every form field has **«يتحفظ في ملف الطالب»** (on by default, except long text). The student's latest answer updates their profile (grade, school…). The name follows the newest, fullest spelling.
+- **The teacher's own data:** edit the name and any field, delete fields, add their own (parent's phone, group…), and keep private notes. What the teacher types is never overwritten by a later form.
+- **Numbers and progress:** requests, quizzes taken, average quiz %, exams, average exam %, first and last activity, the change between the last two grades, and a chart of every grade over time. The profile lists the student's quizzes (with grade and comment) and requests.
+- **List:** search by name, phone or any profile value; sort by activity, name, averages or engagement; add a student by hand (e.g. from a paper list); **download all profiles as Excel (CSV)** with one column per profile field.
+- Profiles are synced from new activity whenever the students pages open (`students`, `student_sync`, and `student_id` on requests and quiz attempts; migration `0011`). The public forms and quizzes are unchanged. Plan bundle **ملفات الطلاب** (on for existing teachers); data keeps being collected while it's off.
+
+## Votes (anonymous polls)
+
+Admin → **التصويتات**. A vote has its own page (`teacher.com/<path>`, like quizzes) so the teacher can paste the link in a story or a group; it isn't part of the main page and isn't listed by search engines.
+
+- **Set up** (admin → edit votes): the question, an optional description and images, two or more choices (each with an optional image), the duration in hours, the button text, the thank-you message, and whether students see the results after voting.
+- **One countdown for everyone**: the vote runs from its start for its duration. A vote saved without a start starts when it's saved; **ابدأ العداد من دلوقتي** restarts it. If a 4-hour vote has been running for 3h50m, anyone opening the link sees 10 minutes left. The page uses the server's clock, so a wrong phone clock doesn't matter. **Open now** / **Close now** override the timer.
+- **Anonymous**: students only pick a choice. Only a count per choice is stored (`poll_votes`); a cookie on the device ("voted", no id) keeps the same browser from voting twice. Votes are counted by choice position, so don't reorder choices once voting starts.
+- **Results**: votes per choice with percentages, the share link with a copy button, and a reset. Claude: `poll_results`.
 
 ## Exam results (students look up their grade)
 
@@ -88,7 +137,9 @@ Under the upcoming exams, the exams section gets a **نتايج الامتحان
 - **Matching**: the phone is compared without the country code or leading zero (`+20 100…`, `0100…`, `100…` written by Excel and Arabic digits all match), and the **first name** with spelling noise removed (diacritics, أ/إ/آ, ة/ه, ى/ي, punctuation, extra spaces; "عبد الله" counts as one name). Brothers sharing a parent's number are told apart by first name. A miss doesn't say which part was wrong. Lookups are limited per visitor to stop guessing numbers.
 - **Admin** → **نتايج الامتحانات**: new results for an exam on the page (title and date filled in) or any other; full mark optional. **Add from Excel**: an `.xlsx`, `.csv`, or cells copied from Excel and pasted (or typed `name, phone, score` lines). Columns are recognised from their headers or values (a seat-number column isn't mistaken for the phone) and can be changed; a preview and a list of rows to check (missing or unclear numbers) come first. Importing again *adds and updates*: a student already there (same phone + first name) gets the new score, keeping their fuller name and note; or *replace all*. Then edit, add or delete rows by hand, test a name/phone as a student would, and **Publish** / hide. Each exam shows how many students looked up their result and how many found it. Excel files are read in the browser with no extra package (old `.xls` files: save as `.xlsx`, or copy-paste).
 
-Stored in `exam_results` (run `db/migrations/0006_exam_results.sql` once on an existing database). Claude: `exam_results` and `manage_exam_results`.
+- **Online quizzes**: every quiz gets its own exam results automatically (created empty, already published; students only see it once a grade is approved). Approved grades appear there read-only, and rows can still be added by hand or from Excel (e.g. students who sat the exam on paper). Hide it with the usual buttons; it can't be deleted while the quiz exists.
+
+Stored in `exam_results` and the grade columns of `quiz_attempts` (migrations `0006_exam_results.sql` and `0008_quiz_grading.sql`, applied by the build). Claude: `exam_results`, `manage_exam_results` and `grade_quiz`.
 
 ## Preview and production
 

@@ -52,7 +52,8 @@ export function mapImages(content: Content, fn: (value: string) => string): Cont
 
 /**
  * Drops what has expired: exams whose day is over (Cairo time), the exam red line
- * after its end date, and the pop-up when it's switched off or past its end date.
+ * and featured cards after their end date (or before their start), and the pop-up
+ * when it's switched off or past its end date.
  * Runs whenever the page is (re)rendered; cached pages refresh at least hourly, and
  * the red line and pop-up also check their end date in the visitor's browser.
  */
@@ -66,6 +67,18 @@ export function withLiveContent(content: Content, now: Date): Content {
       .filter((it) => !(it.endsAt && isOver(deadline(it.endsAt), now)) && startState(it.startsAt, now) !== "later")
       .map((it) => ({ ...it, startsAt: startState(it.startsAt, now) === "soon" ? it.startsAt : undefined }));
     c = { ...c, bar: { ...c.bar, items } };
+  }
+  if (c.featured) {
+    const items = c.featured.items
+      .filter((it) => !(it.endsAt && isOver(deadline(it.endsAt), now)) && startState(it.startsAt, now) !== "later")
+      .map((it) => ({ ...it, startsAt: startState(it.startsAt, now) === "soon" ? it.startsAt : undefined }));
+    c = { ...c, featured: { ...c.featured, items } };
+  }
+  if (c.schedule) {
+    // A "not started yet" group whose start date has come is just a group again.
+    const slots = c.schedule.slots.map((s) =>
+      s.status === "notStarted" && s.startsOn && startState(s.startsOn, now) === "started" ? { ...s, status: undefined, startsOn: undefined } : s);
+    c = { ...c, schedule: { ...c.schedule, slots } };
   }
   if (c.popup) {
     const start = startState(c.popup.startsAt, now);

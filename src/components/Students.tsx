@@ -24,7 +24,6 @@ export function Students({ data, chat }: { data: NonNullable<Content["students"]
         <div className="wrap">
           <PhotoViewer
             className="gallery"
-            closeLabel="إغلاق"
             photos={data.gallery.map((g) => ({ src: asset(g.image), alt: g.caption ?? "", caption: g.caption }))}
           />
         </div>

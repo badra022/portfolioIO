@@ -18,17 +18,22 @@ import { Youtube } from "./Youtube";
 import { Final } from "./Final";
 import { Reviews } from "./Reviews";
 import { Services } from "./Services";
+import { Featured } from "./Featured";
+import { Honors } from "./Honors";
+import { Faq } from "./Faq";
 import { Popup } from "./Popup";
 import { DevCredit } from "./DevCredit";
 import { Tracker } from "./Tracker";
 import { jsonLdScript, structuredData } from "@/lib/structured-data";
 import { LeadForms } from "./LeadForms";
 import { Footer, StickyBar } from "./Footer";
+import { SectionMenu } from "./SectionMenu";
+import { ChatButton } from "./ChatButton";
+import { asset } from "@/lib/assets";
+import { menuItems } from "@/lib/sections-meta";
+import { ui } from "@/lib/i18n";
+import { chatConfig } from "@/lib/chat";
 
-function chatConfig(c: Content): ChatConfig {
-  const { primary, whatsapp, telegram, messenger, refCodes, refLabel } = c.contact;
-  return { primary, whatsapp, telegram, messenger, refCodes, refLabel };
-}
 
 /** Short stable hash, so editing the pop-up shows it again to visitors who closed the old one. */
 function hash(value: unknown): string {
@@ -77,7 +82,21 @@ function barMessages(c: Content, base: string): BarMessage[] {
 /** The public teacher page. Content arrives with image URLs resolved and expired items (exams, pop-up) removed. */
 export function TenantPage({ c, base, canonical, pastExams, preview = false }: { c: Content; base: string; canonical: string | null; pastExams: PastExamItem[]; preview?: boolean }) {
   const chat = chatConfig(c);
+  const t = ui(c.locale);
   const results = { exams: pastExams, slug: c.slug, base, ...contactIds(c) };
+  // Sections that have something to show (the others are skipped by their components too).
+  const shown = (key: Content["sections"][number]) => {
+    switch (key) {
+      case "exams": return c.exams ? upcomingExams(c.exams).length > 0 || pastExams.length > 0 : false;
+      case "services": return (c.services?.items.length ?? 0) > 0;
+      case "featured": return (c.featured?.items.length ?? 0) > 0;
+      case "honors": return (c.honors?.items ?? []).some((h) => h.name.trim());
+      case "faq": return (c.faq?.items ?? []).some((q) => q.question.trim() && q.answer.trim());
+      default: return true;
+    }
+  };
+  const menu = c.menu.enabled ? menuItems(c, shown) : [];
+  const hasMenu = menu.length >= 3;
   const render: Record<Content["sections"][number], () => React.ReactNode> = {
     hero: () => <Hero c={c} chat={chat} />,
     grades: () => <Grades data={c.grades!} />,
@@ -98,13 +117,25 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
     youtube: () => <Youtube data={c.youtube!} avatar={c.profile.avatar} socials={c.socials} />,
     reviews: () => <Reviews data={c.reviews!} />,
     services: () => <Services data={c.services!} chat={chat} />,
+    featured: () => <Featured data={c.featured!} chat={chat} />,
+    honors: () => <Honors data={c.honors!} chat={chat} />,
+    faq: () => <Faq data={c.faq!} chat={chat} />,
     final: () => <Final c={c} chat={chat} />,
   };
 
   return (
     <>
       {c.bar && <AnnouncementBar messages={barMessages(c, base)} />}
-      <Nav c={c} chat={chat} />
+      <Nav c={c} chat={chat} menu={hasMenu} />
+      {hasMenu && (
+        <SectionMenu
+          items={menu}
+          title={c.menu.title}
+          name={c.profile.fullTitle}
+          avatar={c.profile.avatar ? asset(c.profile.avatar) : c.profile.photo ? asset(c.profile.photo) : undefined}
+          cta={<ChatButton chat={chat} block label={c.navCta.label} message={c.navCta.message} refCode={c.navCta.ref} form={c.navCta.form} />}
+        />
+      )}
       <main>
         {c.sections.map((key, i) => (
           <div key={key} className={`section-slot slot-${key}`}>
@@ -120,7 +151,7 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
       {!preview && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData(c, { canonical })) }} />}
       <Tracker slug={c.slug} base={base} preview={preview} />
       {c.forms.length > 0 && <LeadForms forms={c.forms} slug={c.slug} base={base} />}
-      {c.popup && <Popup data={c.popup} chat={chat} storageKey={`popup:${c.slug}:${hash(c.popup)}`} closeLabel="إغلاق" />}
+      {c.popup && <Popup data={c.popup} chat={chat} storageKey={`popup:${c.slug}:${hash(c.popup)}`} closeLabel={t.close} />}
     </>
   );
 }

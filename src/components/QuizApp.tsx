@@ -6,11 +6,15 @@ import { availability, type PublicQuestion } from "@/lib/quiz";
 import { instantOf } from "@/lib/dates";
 import { FormFields, checkFields } from "./FormFields";
 import { Icon } from "./Icon";
+import { useUI } from "./UIText";
+import { tf } from "@/lib/i18n";
+import { currentRef } from "@/lib/referral";
+import type { SelfResult } from "@/lib/quiz";
 
 /** What the page knows about the quiz before it starts (no questions, no answer key). */
 export type QuizSummary = Pick<QuizT, "path" | "title" | "intro" | "image" | "durationMinutes" | "state" | "startsAt" | "endsAt" | "startLabel" | "submitLabel" | "doneMessage"> & { count: number };
 
-type Attempt = { token: string; status: "in_progress" | "submitted" | "timed_out"; questions: PublicQuestion[]; answers: Record<string, string>; deadline: number | null; now: number };
+type Attempt = { token: string; status: "in_progress" | "submitted" | "timed_out"; questions: PublicQuestion[]; answers: Record<string, string>; deadline: number | null; now: number; result?: SelfResult };
 type Saved = { token: string; answers: Record<string, string>; done?: boolean };
 type Phase = "loading" | "intro" | "quiz" | "done";
 
@@ -20,7 +24,7 @@ const fmtClock = (ms: number) => {
   const pad = (n: number) => String(n).padStart(2, "0");
   return h ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 };
-const fmtWhen = (v: string) => new Intl.DateTimeFormat("ar-EG-u-nu-latn", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Cairo" }).format(instantOf(v));
+const fmtWhen = (v: string, intl: string) => new Intl.DateTimeFormat(`${intl}-u-nu-latn`, { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Cairo" }).format(instantOf(v));
 
 /**
  * A quiz page: the quiz's form first (nothing is sent but the start), then the
@@ -29,7 +33,16 @@ const fmtWhen = (v: string) => new Intl.DateTimeFormat("ar-EG-u-nu-latn", { date
  * browser also keeps the answers, in case it was offline. Time up or the submit
  * button hands everything in; after that the quiz can't be taken again here.
  */
-export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string; quiz: QuizSummary; form: LeadFormT | null }) {
+export function QuizApp({ slug, base, quiz, form, resultMessage, resultCta }: {
+  slug: string;
+  base: string;
+  quiz: QuizSummary;
+  form: LeadFormT | null;
+  /** Self-grading quizzes: a line and a button under the grade (rendered by the page). */
+  resultMessage?: string;
+  resultCta?: React.ReactNode;
+}) {
+  const tx = useUI();
   const key = `quiz:${slug}:${quiz.path}`;
   const memKey = `lf:${slug}`;
   const endpoint = `${base}/api/quiz`;
@@ -92,7 +105,7 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
         else if (status === 404) { store(null); setPhase("intro"); } // the teacher removed the attempt: can start again
         else if (!saved!.done) setPhase("intro");
       })
-      .catch(() => { if (!saved!.done) { setNote("مفيش اتصال بالإنترنت. أعد تحميل الصفحة لما يرجع."); setPhase("intro"); } });
+      .catch(() => { if (!saved!.done) { setNote(tx.quizOffline); setPhase("intro"); } });
   }, [key, memKey, form, call, enter, store]);
 
   // Opening time: re-check every 15 s while waiting for the quiz to open.
@@ -106,7 +119,7 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
     if (!attempt || submitting.current) return;
     submitting.current = true;
     setBusy(true);
-    setNote(auto ? "انتهى الوقت، جاري تسليم إجاباتك…" : "جاري التسليم…");
+    setNote(auto ? tx.quizTimeUp : tx.quizSubmitting);
     clearTimeout(saveTimer.current);
     for (let tries = 0; tries < 20; tries++) {
       try {
@@ -117,7 +130,7 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
           return;
         }
       } catch { /* offline: retry */ }
-      setNote("مفيش اتصال… هنحاول نسلّم تاني تلقائياً، متقفلش الصفحة.");
+      setNote(tx.quizRetrying);
       await new Promise((r) => setTimeout(r, 5000));
     }
     submitting.current = false;
@@ -165,13 +178,13 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
   const start = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form) {
-      const problems = checkFields(form.fields, values);
+      const problems = checkFields(form.fields, values, tx);
       if (Object.keys(problems).length) { setErrors(problems); return; }
     }
     setBusy(true);
     setNote("");
     try {
-      const { data } = await call({ op: "start", quiz: quiz.path, values });
+      const { data } = await call({ op: "start", quiz: quiz.path, values, ref: currentRef(slug) });
       if (data.ok && data.attempt) {
         if (form) {
           try {
@@ -183,9 +196,9 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
         enter(data.attempt, undefined, data.resumed && data.attempt.status !== "in_progress");
         window.scrollTo({ top: 0 });
       } else if (data.errors) setErrors(data.errors);
-      else setNote(data.error === "notYet" ? "الاختبار لسه مبدأش." : data.error === "over" || data.error === "closed" ? "الاختبار اتقفل." : "حصلت مشكلة، حاول تاني.");
+      else setNote(data.error === "notYet" ? tx.quizNotYet : data.error === "over" || data.error === "closed" ? tx.quizClosed : tx.error);
     } catch {
-      setNote("مفيش اتصال بالإنترنت؟ حاول تاني.");
+      setNote(tx.offline);
     } finally {
       setBusy(false);
     }
@@ -197,7 +210,7 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
 
   return (
     <div className="quiz">
-      {phase === "loading" && <p className="quiz-muted">جاري التحميل…</p>}
+      {phase === "loading" && <p className="quiz-muted">{tx.loading}</p>}
 
       {phase === "intro" && (
         <form className="quiz-card" onSubmit={start} noValidate>
@@ -205,9 +218,9 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
           <h1>{quiz.title}</h1>
           {quiz.intro && <p className="quiz-intro">{quiz.intro}</p>}
           <div className="quiz-facts">
-            <span><Icon name="check" />{quiz.count} سؤال</span>
-            <span><Icon name="calendar" />{quiz.durationMinutes > 0 ? `${quiz.durationMinutes} دقيقة` : "بدون وقت محدد"}</span>
-            {quiz.state === "auto" && quiz.endsAt && avail.open && <span>متاح حتى {fmtWhen(quiz.endsAt)}</span>}
+            <span><Icon name="check" />{tf(tx.quizQuestions, { n: quiz.count })}</span>
+            <span><Icon name="calendar" />{quiz.durationMinutes > 0 ? tf(tx.quizMinutes, { n: quiz.durationMinutes }) : tx.quizNoTimer}</span>
+            {quiz.state === "auto" && quiz.endsAt && avail.open && <span>{tf(tx.quizUntil, { when: fmtWhen(quiz.endsAt, tx.intl) })}</span>}
           </div>
           {avail.open ? (
             <>
@@ -218,15 +231,15 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
                     onChange={(id, v) => { setValues((x) => ({ ...x, [id]: v })); setErrors((x) => ({ ...x, [id]: "" })); }} />
                 </div>
               )}
-              {quiz.durationMinutes > 0 && <p className="quiz-muted">الوقت بيبدأ أول ما تضغط، ومش هتقدر تدخل الاختبار تاني بعد التسليم.</p>}
+              {quiz.durationMinutes > 0 && <p className="quiz-muted">{tx.quizTimerNote}</p>}
               {note && <p className="lead-err" role="alert">{note}</p>}
-              <button type="submit" className="btn btn-wa btn-block" disabled={busy}><Icon name="bolt" />{busy ? "لحظة…" : quiz.startLabel}</button>
+              <button type="submit" className="btn btn-wa btn-block" disabled={busy}><Icon name="bolt" />{busy ? tx.wait : quiz.startLabel}</button>
             </>
           ) : (
             <p className="quiz-closed">
-              {avail.reason === "notYet" && avail.at ? `الاختبار هيبدأ ${fmtWhen(avail.at)}. الصفحة هتفتح لوحدها.` :
-                avail.reason === "over" ? "الاختبار انتهى." :
-                avail.reason === "empty" ? "الاختبار لسه بيتجهز." : "الاختبار مقفول دلوقتي."}
+              {avail.reason === "notYet" && avail.at ? tf(tx.quizStartsAt, { when: fmtWhen(avail.at, tx.intl) }) :
+                avail.reason === "over" ? tx.quizOver :
+                avail.reason === "empty" ? tx.quizEmpty : tx.quizClosedNow}
             </p>
           )}
         </form>
@@ -244,7 +257,7 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
           <ol className="quiz-qs">
             {questions.map((q, i) => (
               <li key={i} className="q quiz-q">
-                <span className="q-lvl">سؤال {i + 1}</span>
+                <span className="q-lvl">{tf(tx.question, { n: i + 1 })}</span>
                 {q.image && <img className="quiz-img" src={q.image} alt="" loading="lazy" />}
                 {q.text && <h3>{q.text}</h3>}
                 {q.type === "choice" && q.options.length > 0 ? (
@@ -257,7 +270,7 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
                     ))}
                   </div>
                 ) : (
-                  <textarea className="quiz-text" rows={2} value={answers[String(i)] ?? ""} placeholder="اكتب إجابتك"
+                  <textarea className="quiz-text" rows={2} value={answers[String(i)] ?? ""} placeholder={tx.yourAnswer}
                     onChange={(e) => answer(i, e.target.value)} disabled={busy} />
                 )}
               </li>
@@ -267,10 +280,10 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
             {note && <p className="quiz-muted" role="status">{note}</p>}
             {confirming ? (
               <>
-                <p>{answered < questions.length ? `فاضل ${questions.length - answered} سؤال من غير إجابة. ` : ""}متأكد؟ مش هتقدر تعدّل بعد التسليم.</p>
+                <p>{answered < questions.length ? tf(tx.unanswered, { n: questions.length - answered }) : ""}{tx.confirmSubmit}</p>
                 <div className="cta-row">
-                  <button type="button" className="btn btn-wa" disabled={busy} onClick={() => void submit(false)}><Icon name="check" />تأكيد التسليم</button>
-                  <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setConfirming(false)}>رجوع</button>
+                  <button type="button" className="btn btn-wa" disabled={busy} onClick={() => void submit(false)}><Icon name="check" />{tx.confirm}</button>
+                  <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setConfirming(false)}>{tx.back}</button>
                 </div>
               </>
             ) : (
@@ -280,14 +293,75 @@ export function QuizApp({ slug, base, quiz, form }: { slug: string; base: string
         </>
       )}
 
-      {phase === "done" && (
+      {phase === "done" && attempt?.result && (
+        <SelfGrade title={quiz.title} attempt={attempt} result={attempt.result} timedOut={doneHow === "timed_out"} message={resultMessage} cta={resultCta} base={base} />
+      )}
+      {phase === "done" && !attempt?.result && (
         <div className="quiz-card quiz-done">
           <span className="lead-check" aria-hidden="true"><Icon name="check" /></span>
           <h1>{quiz.title}</h1>
-          <p>{doneHow === "timed_out" ? "انتهى الوقت وتم تسليم إجاباتك تلقائياً." : doneHow === "already" ? "انت سلّمت الاختبار ده قبل كده." : quiz.doneMessage}</p>
-          <a className="btn btn-ghost" href={`${base}/`}>الرجوع للموقع</a>
+          <p>{doneHow === "timed_out" ? tx.quizTimedOut : doneHow === "already" ? tx.quizAlready : quiz.doneMessage}</p>
+          <a className="btn btn-ghost" href={`${base}/`}>{tx.backToSite}</a>
         </div>
       )}
+    </div>
+  );
+}
+
+/** A self-grading quiz after handing in: the grade, then each question with the student's answer (and the right one). */
+function SelfGrade({ title, attempt, result, timedOut, message, cta, base }: {
+  title: string;
+  attempt: Attempt;
+  result: SelfResult;
+  timedOut: boolean;
+  message?: string;
+  cta?: React.ReactNode;
+  base: string;
+}) {
+  const tx = useUI();
+  const pct = result.percent ?? 0;
+  return (
+    <div className="quiz-card qg">
+      <h1>{title}</h1>
+      {timedOut && <p className="quiz-muted">{tx.quizTimedOut}</p>}
+      {result.max > 0 && (
+        <div className={`qg-score ${result.passed ? "pass" : "fail"}`} style={{ ["--pct" as string]: `${pct}%` }}>
+          <div className="qg-ring"><b className="num">{pct}%</b></div>
+          <div>
+            <small>{tx.yourGrade}</small>
+            <b className="num" dir="ltr">{result.score} / {result.max}</b>
+            <span>{result.passed ? tx.gradePassed : tx.gradeFailed}</span>
+          </div>
+        </div>
+      )}
+      {result.ungraded > 0 && <p className="quiz-muted">{tf(tx.ungradedNote, { n: result.ungraded })}</p>}
+      {(message || cta) && (
+        <div className="qg-cta">
+          {message && <p>{message}</p>}
+          {cta}
+        </div>
+      )}
+      <h2 className="qg-review-title">{tx.reviewAnswers}</h2>
+      <ol className="qg-review">
+        {attempt.questions.map((q, i) => {
+          const mine = (attempt.answers[String(i)] ?? "").trim();
+          const mark = result.marks[i];
+          const right = result.correct?.[i] ?? [];
+          return (
+            <li key={i} className={mark === true ? "ok" : mark === false ? "bad" : "na"}>
+              <div className="qg-q">
+                <span className="qg-mark" aria-hidden="true">{mark === true ? "✓" : mark === false ? "✗" : "…"}</span>
+                <span>{tf(tx.question, { n: i + 1 })}{q.text ? ` · ${q.text}` : ""}</span>
+              </div>
+              {q.image && <img className="quiz-img" src={q.image} alt="" loading="lazy" />}
+              <p><small>{tx.yourAnswerWas}:</small> {mine || <em>{tx.noAnswer}</em>}</p>
+              {mark === false && right.length > 0 && <p className="qg-right"><small>{tx.rightAnswer}:</small> {right.join(" / ")}</p>}
+              {mark === null && <p className="quiz-muted">{tx.notGraded}</p>}
+            </li>
+          );
+        })}
+      </ol>
+      <a className="btn btn-ghost" href={`${base}/`}>{tx.backToSite}</a>
     </div>
   );
 }

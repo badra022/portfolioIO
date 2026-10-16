@@ -6,6 +6,14 @@ import { formatTime } from "@/lib/format";
 import { Icon } from "./Icon";
 import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
+import { Carousel } from "./Carousel";
+import { useUI } from "./UIText";
+
+/** "السبت 10 أكتوبر" / "Saturday 10 October", in Cairo time so the server and the phone agree. */
+function startDay(iso: string, intl: string) {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00Z`) : new Date(iso);
+  return new Intl.DateTimeFormat(`${intl}-u-nu-latn`, { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Cairo" }).format(d);
+}
 
 type Props = {
   data: NonNullable<Content["schedule"]>;
@@ -16,6 +24,7 @@ type Props = {
 };
 
 export function Schedule({ data, stages, dayLabels, joiner, chat }: Props) {
+  const tx = useUI();
   const [stage, setStage] = useState("all");
   const [day, setDay] = useState("all");
   const [area, setArea] = useState("all");
@@ -74,38 +83,57 @@ export function Schedule({ data, stages, dayLabels, joiner, chat }: Props) {
           {!perGroupPlaces && <span className="place"><Icon name="pin" />{data.location}</span>}
         </div>
 
-        <div className="sched">
+        {/* Four groups or more swipe (with arrows and dots) instead of filling the page; fewer stay as cards. */}
+        <Carousel key={`${stage}|${day}|${area}`} display={visible.length >= 4 ? "carousel" : "grid"} className="sched" label={data.eyebrow}>
           {visible.map((s) => {
             const t = s.time ? formatTime(s.time, L.am, L.pm) : null;
             const days = s.days.map((d) => dayLabels[d]).join(joiner);
             const center = s.center?.trim() || data.location;
             const place = [s.area?.trim(), center].filter(Boolean).join(" - ");
             const vars = { grade: s.grade, subject: s.subject, days, time: t ? `${t.clock} ${t.period}` : "", location: center, area: s.area?.trim() ?? "" };
-            const msg = fill(t ? data.messages.book : data.messages.ask, vars);
+            const status = s.status;
+            const statusText = status ? (L[status]?.trim() || tx[status]) : null;
+            const start = status === "notStarted" && s.startsOn ? startDay(s.startsOn, tx.intl) : "";
+            // Full: the button joins the waiting list. Not started: it books a place early.
+            const kind = status === "full" ? "waitlist" : status === "notStarted" ? "reserve" : t ? "book" : "ask";
+            const label = kind === "waitlist" ? L.waitlist?.trim() || tx.waitlist : kind === "reserve" ? L.reserve?.trim() || tx.reserve : kind === "book" ? L.book : L.ask;
+            const template = kind === "waitlist" ? data.messages.waitlist?.trim() || tx.waitlistMsg : kind === "reserve" ? data.messages.reserve?.trim() || tx.reserveMsg : data.messages[kind];
+            const msg = fill(template, { ...vars, start: start || tx.soon }).replace(/ {2,}/g, " ");
+            const strong = kind === "book" || kind === "reserve";
             return (
-              <article className={`slot${t ? "" : " tbd"}`} key={s.id}>
+              <article className={`slot${t ? "" : " tbd"}${status ? ` st-${status}` : ""}`} key={s.id}>
                 <div className="slot-top">
                   <div><h3>{s.grade}</h3><span className="subj">{s.subject}</span></div>
                   {s.mode && <span className="mode">{s.mode}</span>}
                 </div>
+                {statusText && (
+                  <span className={`slot-status is-${status}`}>
+                    <i aria-hidden="true" />{statusText}
+                    {start && <small>· {L.startsOn?.trim() || tx.startsOn} {start}</small>}
+                  </span>
+                )}
                 <div className="when">
                   {t ? <span className="time num">{t.clock}<small>{t.period}</small></span> : <span className="time">{L.tbd}</span>}
                   {s.days.length > 0 && <div className="days">{s.days.map((d) => <span className="day" key={d}>{dayLabels[d]}</span>)}</div>}
                 </div>
                 {perGroupPlaces && <span className="slot-place"><Icon name="pin" />{place}</span>}
                 {data.form ? (
-                  <ChatButton chat={chat} block variant={t ? "primary" : "ghost"} label={t ? L.book : L.ask} message="" refCode={`SCH-${s.id}`} form={data.form}
-                    context={{ "المجموعة": `${s.grade} — ${s.subject}`, ...(days ? { "الأيام": days } : {}), ...(t ? { "الساعة": `${t.clock} ${t.period}` } : {}), "المكان": place || center }} />
+                  <ChatButton chat={chat} block variant={strong ? "primary" : "ghost"} label={label} message="" refCode={`SCH-${s.id}`} form={data.form}
+                    context={{
+                      "المجموعة": `${s.grade} — ${s.subject}`, ...(days ? { "الأيام": days } : {}), ...(t ? { "الساعة": `${t.clock} ${t.period}` } : {}), "المكان": place || center,
+                      ...(statusText ? { "حالة المجموعة": start ? `${statusText} (تبدأ ${start})` : statusText } : {}),
+                      ...(kind === "waitlist" ? { "الطلب": "قائمة الانتظار" } : {}),
+                    }} />
                 ) : (
-                  <a className={`btn btn-block ${t ? "btn-wa" : "btn-ghost"}`} href={chatUrl(chat, msg, `SCH-${s.id}`)} target="_blank" rel="noopener noreferrer">
-                    <Icon name={chat.primary} />{t ? L.book : L.ask}
+                  <a className={`btn btn-block ${strong ? "btn-wa" : "btn-ghost"}`} href={chatUrl(chat, msg, `SCH-${s.id}`)} target="_blank" rel="noopener noreferrer">
+                    <Icon name={chat.primary} />{label}
                   </a>
                 )}
               </article>
             );
           })}
-          {visible.length === 0 && <p className="empty">{L.empty}</p>}
-        </div>
+        </Carousel>
+        {visible.length === 0 && <p className="empty">{L.empty}</p>}
       </div>
     </section>
   );

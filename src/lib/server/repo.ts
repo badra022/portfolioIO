@@ -4,6 +4,8 @@ import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import { ContentSchema, DeploySchema, ThemeSchema, type Content, type Theme } from "@/lib/schema";
 import { sameJson, upgradeContent, validate, type Issue } from "@/lib/content-utils";
+import { stampPolls } from "@/lib/poll";
+import { ALL_PERMISSIONS, readPermissions, violations, type Permissions } from "@/lib/permissions";
 import type { SiteEnv } from "@/lib/environments";
 import { listBundled, readBundledJson } from "./bundled";
 
@@ -26,6 +28,8 @@ export type TenantRecord = {
    * edit is saved to preview; pending = it differs and waits to be published.
    */
   preview: { content: Content; theme: Theme; version: number; pending: boolean; updatedAt: string | null; updatedBy: string | null };
+  /** What the teacher's plan includes (lib/permissions.ts). */
+  permissions: Permissions;
 };
 
 /** The content and theme a given environment shows. */
@@ -64,6 +68,7 @@ function bundledRecord(slug: string): TenantRecord | null {
     domains: deploy.domains.map((d, i) => ({ domain: d, isPrimary: i === 0 })),
     updatedAt: null, updatedBy: null,
     preview: { content, theme, version: 0, pending: false, updatedAt: null, updatedBy: null },
+    permissions: ALL_PERMISSIONS,
   };
 }
 
@@ -105,24 +110,28 @@ export async function getTenant(slug: string): Promise<TenantRecord | null> {
       updatedAt: row.previewUpdatedAt?.toISOString() ?? null,
       updatedBy: row.previewUpdatedBy,
     },
+    permissions: readPermissions(row.permissions),
   };
 }
 
-export type TenantSummary = { slug: string; name: string; status: string; domains: DomainRow[]; users: number; updatedAt: string | null };
+export type TenantSummary = { slug: string; name: string; status: string; domains: DomainRow[]; users: number; updatedAt: string | null;
+  /** The live site's language (lib/i18n.ts). */
+  locale: string };
 
 export async function listTenants(): Promise<TenantSummary[]> {
   if (!hasDb()) {
-    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null }));
+    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null, locale: t.content.locale }));
   }
   const d = db();
   const rows = await d.select({
     id: tenants.id, slug: tenants.slug, name: tenants.name, status: tenants.status, updatedAt: tenants.updatedAt,
     // Columns spelled out with their tables: unqualified, "id" would resolve to admin_users.id inside the subquery.
     users: sql<number>`(select count(*)::int from "admin_users" where "admin_users"."tenant_id" = "tenants"."id")`,
+    locale: sql<string | null>`"tenants"."content"->>'locale'`,
   }).from(tenants).orderBy(tenants.name);
   const domains = await d.select().from(tenantDomains);
   return rows.map((r) => ({
-    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(),
+    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(), locale: r.locale ?? "ar-EG",
     domains: domains.filter((x) => x.tenantId === r.id).map((x) => ({ domain: x.domain, isPrimary: x.isPrimary }))
       .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
   }));
@@ -158,6 +167,11 @@ export async function saveTenant(
     const row = (await tx.select().from(tenants).where(eq(tenants.slug, slug)).for("update").limit(1))[0];
     if (!row) return { ok: false, reason: "missing" } as const;
     if (row.version !== baseVersion) return { ok: false, reason: "conflict", version: row.version } as const;
+    // The plan: parts of the site it doesn't include can't be published (the preview still takes them).
+    if (content) {
+      const blocked = violations(content, withDefaults<Content>(ContentSchema, upgradeContent(row.content), `content for ${slug}`), readPermissions(row.permissions));
+      if (blocked.length) return { ok: false, reason: "invalid", issues: blocked } as const;
+    }
     const next = {
       content: content ?? (row.content as Content),
       theme: theme ?? (row.theme as Theme),
@@ -179,7 +193,8 @@ function checkPatch(slug: string, patch: { content?: unknown; theme?: unknown })
   let theme: Theme | undefined;
   if (patch.content !== undefined) {
     const r = validate(ContentSchema, patch.content);
-    if (r.ok) content = r.data as Content; else issues.push(...r.issues);
+    // A vote's countdown starts when it's saved, unless it has its own start.
+    if (r.ok) content = stampPolls(r.data as Content); else issues.push(...r.issues);
     if (r.ok && content!.slug !== slug) issues.push({ path: "slug", message: "لا يمكن تغيير المعرّف (slug)." });
   }
   if (patch.theme !== undefined) {
@@ -234,6 +249,8 @@ export async function publishPreview(slug: string, author: string): Promise<Save
     if (!row) return { ok: false, reason: "missing" } as const;
     // Someone saved the preview meanwhile: publish what they see now, not the older copy.
     if (row.previewVersion !== current.preview.version) return { ok: false, reason: "conflict", version: row.previewVersion } as const;
+    const blocked = violations(checked.content!, current.content, readPermissions(row.permissions));
+    if (blocked.length) return { ok: false, reason: "invalid", issues: blocked } as const;
     const version = row.version + 1;
     await tx.update(tenants).set({
       content: checked.content!, theme: checked.theme!, version, name: checked.content!.profile.name, updatedAt: new Date(), updatedBy: author,
@@ -314,6 +331,11 @@ export async function upsertBundledTenant(slug: string, author: string, overwrit
     await d.insert(tenantDomains).values({ domain: dom.domain, tenantId: (await getTenant(slug))!.id!, isPrimary: dom.isPrimary }).onConflictDoNothing();
   }
   return existing ? "updated" : "created";
+}
+
+/** The teacher's plan (super admin). */
+export async function setPermissions(slug: string, p: Permissions): Promise<void> {
+  await requireDb().update(tenants).set({ permissions: p }).where(eq(tenants.slug, slug));
 }
 
 export async function setTenantStatus(slug: string, status: "active" | "disabled"): Promise<void> {

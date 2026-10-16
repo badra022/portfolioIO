@@ -14,7 +14,7 @@ export function Phone({ number, highlight }: { number: string; highlight?: numbe
 export function Final({ c, chat }: { c: Content; chat: ChatConfig }) {
   const f = c.final!;
   return (
-    <section className="final">
+    <section className="final" id="final">
       <div className="wrap">
         <h2><Rich value={f.title} /></h2>
         <p>{f.text}</p>

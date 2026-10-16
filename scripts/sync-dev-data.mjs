@@ -1,9 +1,9 @@
 // Copies the teachers' pages from production to the dev environment, without any
 // student data. Run from GitHub Actions ("refresh-dev-data" workflow, Run workflow).
 //
-// Copied:    tenants (content, theme, the admin preview copy, status) and every image in
+// Copied:    tenants (content, theme, the admin preview copy, status, plan) and every image in
 //            the storage bucket.
-// Never:     submissions, quiz_attempts, analytics_daily, exam_results (students' names,
+// Never:     submissions, quiz_attempts, students, analytics_daily, exam_results (students' names,
 //            phones, grades), admin_users (teachers' passwords), tenant_domains (dev serves
 //            teachers at /t/<slug> only), tenant_revisions, tenant_files.
 //
@@ -30,16 +30,18 @@ const enc = (p) => p.split("/").map(encodeURIComponent).join("/");
 const src = postgres(prodDb, { prepare: false, max: 1 });
 const dst = postgres(devDb, { prepare: false, max: 1 });
 try {
-  const rows = await src`select slug, name, status, content, theme, version, preview_content, preview_theme, preview_version from tenants`;
+  // select *: production may not have the permissions column yet (before its release); it then had everything.
+  const rows = await src`select * from tenants`;
+  const ALL = { analytics: true, students: true, forms: true, exams: true, votes: true, promo: true };
   for (const r of rows) {
     await dst`
-      insert into tenants (slug, name, status, content, theme, version, preview_content, preview_theme, preview_version, updated_by)
+      insert into tenants (slug, name, status, content, theme, version, preview_content, preview_theme, preview_version, permissions, updated_by)
       values (${r.slug}, ${r.name}, ${r.status}, ${dst.json(r.content)}, ${dst.json(r.theme)}, ${r.version},
-              ${r.preview_content === null ? null : dst.json(r.preview_content)}, ${r.preview_theme === null ? null : dst.json(r.preview_theme)}, ${r.preview_version}, 'sync from production')
+              ${r.preview_content === null ? null : dst.json(r.preview_content)}, ${r.preview_theme === null ? null : dst.json(r.preview_theme)}, ${r.preview_version}, ${dst.json(r.permissions ?? ALL)}, 'sync from production')
       on conflict (slug) do update set
         name = excluded.name, status = excluded.status, content = excluded.content, theme = excluded.theme,
         version = excluded.version, preview_content = excluded.preview_content, preview_theme = excluded.preview_theme,
-        preview_version = excluded.preview_version, updated_at = now(), updated_by = excluded.updated_by`;
+        preview_version = excluded.preview_version, permissions = excluded.permissions, updated_at = now(), updated_by = excluded.updated_by`;
   }
   console.log(`pages: ${rows.length} teacher(s) copied (${rows.map((r) => r.slug).join(", ")})`);
 } finally {

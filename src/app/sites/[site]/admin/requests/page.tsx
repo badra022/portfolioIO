@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { hasDb } from "@/lib/env";
 import { baseForSite } from "@/lib/routing";
 import { requireAdmin } from "@/lib/server/auth";
+import { PlanBlocked } from "@/components/admin/PlanBlocked";
+import { baseForSite as planBase } from "@/lib/routing";
 import { slugForSite } from "@/lib/server/site";
 import { copyFor, getTenant } from "@/lib/server/repo";
 import { adminEnv } from "@/lib/server/admin-env";
@@ -29,6 +31,8 @@ export default async function Requests({ params, searchParams }: PageProps<"/sit
   if (!slug) notFound();
   const t = await getTenant(slug);
   if (!t) notFound();
+  // Outside the site's plan (lib/permissions.ts): an error instead of the data, for everyone.
+  if (!t.permissions.forms) return <PlanBlocked feature="forms" back={`${planBase(site)}/admin`} />;
   const q = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
   const status = (STATUSES as readonly string[]).includes(one(q.status)) ? (one(q.status) as StatusT) : undefined;
@@ -39,6 +43,7 @@ export default async function Requests({ params, searchParams }: PageProps<"/sit
   const { rows, total, counts } = await listSubmissions(slug, { env, form, status, q: search, limit: PAGE, offset: (page - 1) * PAGE });
   const forms = copyFor(t, env).content.forms;
   const formOf = new Map(forms.map((f) => [f.id, f]));
+  const partnerOf = new Map(copyFor(t, env).content.referrals.map((p) => [p.code, p.name]));
   const base = baseForSite(site);
   const qs = (patch: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
@@ -114,7 +119,7 @@ export default async function Requests({ params, searchParams }: PageProps<"/sit
                   ))}
                 </dl>
                 <div className="rq-foot">
-                  <span className="a-sub">{r.source}{r.place ? ` · ${PLACE[r.place] ?? r.place}` : ""}</span>
+                  <span className="a-sub">{r.source}{r.place ? ` · ${PLACE[r.place] ?? r.place}` : ""}{r.ref && <> · <span className="rq-badge rf-badge">🤝 عن طريق {partnerOf.get(r.ref) ?? r.ref}</span></>}</span>
                   <span className="rq-actions">
                     {STATUSES.filter((s) => s !== r.status).map((s) => (
                       <form key={s} action={setRequestStatusAction.bind(null, site, [r.id], s)}>

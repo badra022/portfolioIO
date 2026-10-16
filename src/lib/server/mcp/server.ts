@@ -17,7 +17,9 @@ import { ImageError, SLUG_RE, USERNAME_RE, loginUrlFor, normalizeDomain, sniffIm
 import { makeUploadLink } from "../upload-link";
 import { RANGES, report } from "../analytics";
 import { STATUSES, listSubmissions, setStatus } from "../submissions";
-import { listAttempts, quizMetrics } from "../quiz-attempts";
+import { GradeError, approveAll, listAttempts, quizMetrics, reviewAttempt } from "../quiz-attempts";
+import { resultsFor as pollResultsFor } from "../polls";
+import { pollStatus, pollTimes } from "@/lib/poll";
 import * as examResults from "../exam-results";
 import { SiteFileError, deleteSiteFile, filesTag, listSiteFiles, putSiteFile } from "../site-files";
 import { applyOps, contentOutline, deepMerge, schemaFor, type Op } from "./content-ops";
@@ -36,7 +38,7 @@ Onboarding a new teacher:
 5. Send the user preview_url to review; adjust with edit_content (small changes) or update_content (whole sections).
 6. When ready: manage_domain (also add the domain in Vercel → Settings → Domains), manage_login to create the teacher's account (the password is shown once; pass it to the user).
 
-Forms: any WhatsApp button can open a form instead (the student leaves name/phone/etc. for the teacher). Define forms in content "forms" (get_schema part "forms"), then set "form": "<form id>" on the button (hero.primaryCta, navCta, sticky.cta, final.cta, students.cta, schedule.form, book.order.form, exams.items[].form, challenge.form, services/popup cta.form). Fields with remember=true (name, phone) are asked once per device; the button's own details (challenge answer, chosen group, exam) are attached automatically. Submissions: list_requests / update_requests.
+Forms: any WhatsApp button can open a form instead (the student leaves name/phone/etc. for the teacher). Define forms in content "forms" (get_schema part "forms"), then set "form": "<form id>" on the button (hero.primaryCta, navCta, sticky.cta, final.cta, students.cta, schedule.form, book.order.form, exams.items[].form, challenge.form, services/popup/featured/honors/faq cta.form). Fields with remember=true (name, phone) are asked once per device; the button's own details (challenge answer, chosen group, exam) are attached automatically. Submissions: list_requests / update_requests.
 
 Quizzes: content "quizzes" (get_schema part "quizzes"): each has a page at /<path>, an optional form asked before starting, a timer, start/end dates, state (auto/open/closed) and questions (text and/or image, choice or written, optional correct answers that students never see). Results: quiz_results.
 
@@ -498,13 +500,74 @@ export function buildMcpServer(origin: string): McpServer {
     const t = await repo.getTenant(slug);
     const quiz = t && repo.copyFor(t, env ?? "production").content.quizzes.find((q) => q.path === path);
     if (!quiz) return fail(`No quiz "${path}" for ${slug}.`);
-    const rows = await listAttempts(slug, quiz, env ?? "production");
+    const form = quiz.form ? t.content.forms.find((f) => f.id === quiz.form) : undefined;
+    const rows = await listAttempts(slug, quiz, env ?? "production", form);
     return ok({ metrics: quizMetrics(quiz, rows), ...(attempts === false ? {} : { attempts: rows.map(({ questions: _q, ...r }) => r) }) });
+  }));
+
+  server.registerTool("poll_results", {
+    title: "Vote results",
+    description: "Anonymous votes (content.polls, each on its own page /<path>): per vote, whether it's open, when its countdown ends, and the number of votes per choice. Votes are counts only; nothing about voters is stored. Create or edit votes with edit_content on \"polls\".",
+    inputSchema: { slug: slugArg, env: envArg },
+    annotations: { readOnlyHint: true },
+  }, safe(async ({ slug, env }) => {
+    const t = await repo.getTenant(slug);
+    if (!t) return fail(`No teacher ${slug}.`);
+    const e = env ?? "production";
+    const polls = repo.copyFor(t, e).content.polls;
+    return ok(await Promise.all(polls.map(async (p) => {
+      const r = await pollResultsFor(slug, e, p);
+      const { end } = pollTimes(p);
+      return { path: p.path, title: p.title, status: pollStatus(p), endsAt: end ? new Date(end).toISOString() : null, total: r.total, choices: p.choices.map((c, i) => ({ label: c.label, votes: r.counts[i] })) };
+    })));
+  }));
+
+  server.registerTool("grade_quiz", {
+    title: "Grade quiz attempts",
+    description: "The teacher's grade on finished quiz attempts. grade: one attempt (attempt id from quiz_results) with score, optional note (comment the student sees) and name/phone (default: from the student's form); approve=true publishes it in the quiz's exam results so the student can look it up by name and phone, approve=false keeps it as a draft (or takes an approved grade back). approve_all: approves every finished, not-yet-approved attempt with the automatic score (or its draft grade).",
+    inputSchema: {
+      slug: slugArg,
+      path: z.string().describe("The quiz's path."),
+      action: z.enum(["grade", "approve_all"]),
+      attempt: z.number().int().optional(),
+      score: z.union([z.string(), z.number()]).optional(),
+      note: z.string().optional(),
+      name: z.string().optional(),
+      phone: z.string().optional(),
+      approve: z.boolean().optional().describe("Default true."),
+      env: envArg,
+    },
+  }, safe(async (a) => {
+    const t = await repo.getTenant(a.slug);
+    const env = a.env ?? "production";
+    const quiz = t && repo.copyFor(t, env).content.quizzes.find((q) => q.path === a.path);
+    if (!t || !quiz) return fail(`No quiz "${a.path}" for ${a.slug}.`);
+    const form = quiz.form ? t.content.forms.find((f) => f.id === quiz.form) : undefined;
+    await examResults.ensureQuizResultSets(a.slug, [quiz]);
+    try {
+      if (a.action === "approve_all") {
+        const n = await approveAll(a.slug, quiz, env, form, AUTHOR);
+        refreshTeacher(a.slug);
+        return ok({ approved: n });
+      }
+      if (a.attempt === undefined) return fail("attempt is required.");
+      const r = (await listAttempts(a.slug, quiz, env, form)).find((x) => x.id === a.attempt);
+      if (!r) return fail(`No attempt ${a.attempt}.`);
+      await reviewAttempt(a.slug, quiz.path, r.id, {
+        name: a.name ?? r.result?.name ?? r.student.name, phone: a.phone ?? r.result?.phone ?? r.student.phone,
+        score: a.score ?? r.result?.score ?? (r.graded.max ? r.graded.score : ""), note: a.note ?? r.result?.note,
+      }, a.approve ?? true, AUTHOR);
+      refreshTeacher(a.slug);
+      return ok({ graded: r.id, approved: a.approve ?? true });
+    } catch (e) {
+      if (e instanceof GradeError) return fail(e.message);
+      throw e;
+    }
   }));
 
   server.registerTool("exam_results", {
     title: "Exam results",
-    description: "Without id: every exam's results (title, date, full mark, published, students, how many looked up / found their result). With id: also every row {name, phone, score, note}.",
+    description: "Without id: every exam's results (title, date, full mark, published, students, how many looked up / found their result; quizPath = an online quiz's own results, filled by approved grades). With id: also every row {name, phone, score, note} entered by hand, and quizRows (the quiz's approved grades; change them with grade_quiz).",
     inputSchema: { slug: slugArg, id: z.number().int().optional() },
     annotations: { readOnlyHint: true },
   }, safe(async ({ slug, id }) => {

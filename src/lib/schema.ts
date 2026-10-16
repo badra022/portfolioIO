@@ -71,7 +71,16 @@ const FormField = z.object({
   /** Choices for "select". */
   options: z.array(z.string()).default([]),
   placeholder: z.string().optional(),
+  /**
+   * Keep the answer on the student's profile (lib/server/students.ts), updated by
+   * their latest answer. Empty = yes, except long text ("textarea"). Name and phone
+   * are always the profile's own.
+   */
+  profile: z.boolean().optional(),
 });
+
+/** Whether a form field's answer goes on the student's profile. */
+export const inProfile = (f: { type: string; profile?: boolean }) => f.profile ?? f.type !== "textarea";
 
 /** A form a button can open instead of WhatsApp. Submissions appear in the admin panel ("Requests"). */
 export const LeadForm = z.object({
@@ -113,13 +122,20 @@ const SectionHead = {
 /** YouTube video id (11 chars) or any common YouTube link to one video. */
 export const YOUTUBE_RE = /^(?:[\w\-]{11}|https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)[\w\-]{11}(?:[?&#][^\s]*)?)$/;
 
+/**
+ * How a section shows its list (exams, videos, cards...): auto = swipe on phones and
+ * the usual grid on bigger screens; carousel = swipe/arrows everywhere; grid = cards
+ * side by side; list = one under the other.
+ */
+export const Display = z.enum(["auto", "carousel", "grid", "list"]).default("auto");
+
 export const DayKey = z.enum(["sat", "sun", "mon", "tue", "wed", "thu", "fri"]);
 
 /* ---------- sections ---------- */
 
 export const SectionKey = z.enum([
   "hero", "grades", "schedule", "method", "book",
-  "students", "reviews", "challenge", "exams", "youtube", "services", "final",
+  "students", "reviews", "challenge", "exams", "youtube", "services", "featured", "honors", "faq", "final",
 ]);
 
 const Hero = z.object({
@@ -145,6 +161,9 @@ const Grades = z.object({
   })),
 });
 
+/** A group's status: still has places, full, or not started yet. */
+export const GROUP_STATUS = ["available", "full", "notStarted"] as const;
+
 const Schedule = z.object({
   ...SectionHead,
   location: z.string(),
@@ -159,6 +178,16 @@ const Schedule = z.object({
     area: z.string().optional(),
     pm: z.string(), am: z.string(), tbd: z.string(), empty: z.string(),
     book: z.string(), ask: z.string(),
+    /** Group status labels and the full group's button (defaults in components/Schedule.tsx). */
+    available: z.string().optional(),
+    full: z.string().optional(),
+    notStarted: z.string().optional(),
+    /** "Starts on" before a not-started group's start date. */
+    startsOn: z.string().optional(),
+    /** Button of a full group (joins the waiting list). */
+    waitlist: z.string().optional(),
+    /** Button of a group that hasn't started (books a place early). */
+    reserve: z.string().optional(),
   }),
   slots: z.array(z.object({
     id: z.string(),
@@ -172,14 +201,29 @@ const Schedule = z.object({
     /** Where this group meets. Empty = the section's default location. */
     area: z.string().optional(),
     center: z.string().optional(),
+    /**
+     * Optional label on the group: still has places, full (the button joins the
+     * waiting list instead), or not started yet (shows its start date; the button
+     * books a place early).
+     */
+    status: z.enum(GROUP_STATUS).optional(),
+    /** When a not-started group begins. */
+    startsOn: StartDate.optional(),
   })),
-  messages: z.object({ book: z.string(), ask: z.string() }),
+  messages: z.object({
+    book: z.string(), ask: z.string(),
+    /** Message of a full group's button (waiting list). Empty = a ready-made one. */
+    waitlist: z.string().optional(),
+    /** Message of a not-started group's button. Empty = a ready-made one. */
+    reserve: z.string().optional(),
+  }),
   /** Booking buttons open this form instead of WhatsApp (the group's details are attached). */
   form: FormRef.optional(),
 });
 
 const Method = z.object({
   ...SectionHead,
+  display: Display,
   items: z.array(z.object({
     icon: z.enum(["book", "chat", "check", "loop", "trophy", "bolt", "star", "users"]),
     title: z.string(),
@@ -245,6 +289,7 @@ const Challenge = z.object({
 
 const Exams = z.object({
   ...SectionHead,
+  display: Display,
   labels: z.object({
     scope: z.string(), prize: z.string(), trackLabel: z.string(),
     countdown: z.string(), days: z.string(), hours: z.string(), minutes: z.string(), today: z.string(),
@@ -271,6 +316,8 @@ const Exams = z.object({
 
 const Youtube = z.object({
   ...SectionHead,
+  /** How the videos are shown. */
+  display: Display,
   channelName: z.string(),
   channelUrl: z.string().url(),
   subscribeLabel: z.string(),
@@ -293,6 +340,8 @@ const Final = z.object({ title: RichText, text: z.string(), cta: ChatCta });
 /** Students' feedback: screenshots of messages/reviews under a headline number. */
 const Reviews = z.object({
   ...SectionHead,
+  /** auto = the wall of screenshots (with "show all"). */
+  display: Display,
   metric: z.object({ value: z.string(), label: z.string() }).optional(),
   stars: z.boolean().default(true),
   images: z.array(z.object({ image: ImageRef, alt: z.string().optional() })).default([]),
@@ -302,6 +351,7 @@ const Reviews = z.object({
 /** Other services the teacher offers, each with its own button and links. */
 const Services = z.object({
   ...SectionHead,
+  display: Display,
   items: z.array(z.object({
     title: z.string(),
     text: z.string(),
@@ -309,6 +359,80 @@ const Services = z.object({
     cta: Action.optional(),
     socials: z.array(Social).default([]),
   })).default([]),
+});
+
+/** Questions students and parents ask, with the teacher's answers (open/close one at a time). */
+const Faq = z.object({
+  ...SectionHead,
+  items: z.array(z.object({ question: z.string(), answer: z.string() })).default([]),
+  /** The first answer is open when the page loads. */
+  openFirst: z.boolean().default(true),
+  /** "Still have a question?" line and button under the questions. */
+  moreText: z.string().optional(),
+  cta: Action.optional(),
+});
+
+/**
+ * Anything the teacher wants to put forward: a limited-time offer, a new course,
+ * a video, an announcement. Each card can have a video or an image, a badge, a
+ * price (and the old price), short points, a countdown to its end date, and up
+ * to two buttons. Cards appear and disappear on their own dates.
+ */
+const Featured = z.object({
+  ...SectionHead,
+  items: z.array(z.object({
+    /** Small label on the card, e.g. "عرض لفترة محدودة" or "جديد". */
+    badge: z.string().optional(),
+    title: z.string(),
+    text: z.string().optional(),
+    /** YouTube link played on the card (takes the place of the image). */
+    video: z.string().regex(YOUTUBE_RE, { error: "الصق رابط فيديو يوتيوب" }).optional(),
+    image: OptionalImageRef.optional(),
+    /** Short lines with a check mark, e.g. what the offer includes. */
+    points: z.array(z.string()).default([]),
+    price: z.string().optional(),
+    /** Shown crossed out next to the price. */
+    oldPrice: z.string().optional(),
+    priceNote: z.string().optional(),
+    startsAt: StartDate.optional(),
+    endsAt: EndDate.optional(),
+    /** A countdown to the end date ("ends in 2 days 5 hours"). */
+    countdown: z.boolean().default(true),
+    cta: Action.optional(),
+    secondaryCta: Action.optional(),
+  })).default([]),
+  /** auto = the first card spans the full width (spotlight), the others under it. */
+  display: Display,
+});
+
+/**
+ * The honor board: the teacher's top students and results. Each entry is one
+ * student (or a group, e.g. "the class of 2025's top ten") with one or more
+ * photos (a grid when there are several), their grade, short lines with icons
+ * ("full mark", "first in the school"), an optional YouTube video, a description
+ * that can be long (folded after a few lines), and an optional button.
+ */
+export const HONOR_ICONS = ["trophy", "medal", "crown", "star", "bolt", "check", "book", "users"] as const;
+const Honors = z.object({
+  ...SectionHead,
+  items: z.array(z.object({
+    name: z.string(),
+    /** The result, shown big, e.g. "50/50" or "98.5%". */
+    score: z.string().optional(),
+    /** e.g. "3 ثانوي - 2025". */
+    grade: z.string().optional(),
+    icon: z.enum(HONOR_ICONS).default("trophy"),
+    images: z.array(z.object({ image: ImageRef, alt: z.string().optional() })).default([]),
+    /** Short lines, each with its icon, e.g. "الأول على المدرسة". */
+    highlights: z.array(z.object({ icon: z.enum(HONOR_ICONS).default("star"), text: z.string() })).default([]),
+    video: z.string().regex(YOUTUBE_RE, { error: "الصق رابط فيديو يوتيوب" }).optional(),
+    description: z.string().optional(),
+    cta: Action.optional(),
+  })).default([]),
+  /** auto = one entry under the other (swipes when there are more than two). */
+  display: Display,
+  /** Button under the board, e.g. "احجز مكانك واكتب اسمك هنا السنة الجاية". */
+  cta: Action.optional(),
 });
 
 /**
@@ -347,6 +471,18 @@ const Popup = z.object({
   delaySeconds: z.number().min(0).max(60).default(2),
   /** After a visitor closes it, show it to them again after this many hours. */
   remindAfterHours: z.number().min(0).max(24 * 60).default(5),
+});
+
+/**
+ * The sections menu: a sidebar on tablets and computers, a full-screen menu on
+ * phones (button in the top bar), so visitors see everything on the page at once.
+ * Lists the visible sections in page order, with their usual names, unless the
+ * teacher lists them here (own names, order, or fewer).
+ */
+const Menu = z.object({
+  enabled: z.boolean().default(true),
+  title: z.string().default("محتوى الصفحة"),
+  items: z.array(z.object({ section: SectionKey, label: z.string().optional() })).default([]),
 });
 
 /* ---------- quizzes ---------- */
@@ -389,6 +525,19 @@ export const Quiz = z.object({
   endsAt: EndDate.optional(),
   /** Percentage that counts as passing, for the results page. */
   passPercent: z.number().min(0).max(100).default(50),
+  /**
+   * Self-grading: the student sees their grade (and which answers were right) as
+   * soon as they hand in, for quizzes shared to reach new students. The teacher
+   * still gets every attempt, but grades don't go to the exam results. Off: no
+   * grade on the page; the teacher grades, approves, and students look it up in the results.
+   */
+  selfGrading: z.boolean().default(false),
+  /** Self-grading: also show the right answer under each question. */
+  showCorrect: z.boolean().default(true),
+  /** Self-grading: a line under the grade, e.g. "عايز تقفل الامتحان؟ احجز حصة تجريبية مجاناً". */
+  resultMessage: z.string().optional(),
+  /** Self-grading: a button under the grade (WhatsApp, any channel, or a form). */
+  resultCta: Action.optional(),
   startLabel: z.string().default("ابدأ الاختبار"),
   submitLabel: z.string().default("سلّم الإجابات"),
   doneMessage: z.string().default("تم تسليم إجاباتك. بالتوفيق!"),
@@ -397,13 +546,58 @@ export const Quiz = z.object({
   questions: z.array(QuizQuestion).default([]),
 });
 
+/* ---------- votes (polls) ---------- */
+
+/**
+ * An anonymous vote on its own page (/<path>), to share in a story or a group:
+ * "how was the last exam?", "what prize do you want?". Students only pick a
+ * choice; nothing about them is asked or kept. The countdown is the same for
+ * everyone: it runs from the start time for durationHours.
+ */
+export const Poll = z.object({
+  /** The page address: teacher.com/<path>. */
+  path: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة، مثل vote-prize" }),
+  title: z.string(),
+  description: z.string().optional(),
+  images: z.array(z.object({ image: ImageRef })).default([]),
+  choices: z.array(z.object({ label: z.string(), image: OptionalImageRef.optional() })).min(2, { error: "اكتب اختيارين على الأقل." }),
+  /** How long the vote stays open, from its start. 0 = no end (close it by hand). */
+  durationHours: z.number().min(0).max(24 * 60).default(24),
+  /** When the countdown starts. Empty = when it's saved. */
+  startsAt: StartDate.optional(),
+  /** auto = open from the start for the duration; open = open now (no end); closed = closed now. */
+  state: z.enum(["auto", "open", "closed"]).default("auto"),
+  submitLabel: z.string().default("ابعت صوتك"),
+  doneMessage: z.string().default("شكراً! صوتك اتسجل."),
+  /** After voting, show everyone's results (percentages). */
+  showResults: z.boolean().default(true),
+});
+
+/* ---------- referral partners ---------- */
+
+/**
+ * People and pages that share the teacher's links (an influencer, a center, a
+ * Facebook group). Each gets its own code: a link with ?ref=<code> counts that
+ * partner's visits, and what those visitors send (requests, quizzes, votes) is
+ * credited to them, for 30 days after they came (admin → روابط الشركاء).
+ */
+export const Referral = z.object({
+  /** In the link: teacher.com/?ref=<code>. Don't change it after sharing. */
+  code: z.string().regex(/^[a-z0-9][a-z0-9-]{1,29}$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة، مثل ahmed-page" }),
+  name: z.string().min(1),
+  /** For the teacher only, e.g. the agreement ("10 جنيه على كل حجز"). */
+  note: z.string().optional(),
+});
+
 /* ---------- content.json ---------- */
 
 export const ContentSchema = z.object({
   $schema: z.string().optional(),
   slug: z.string().regex(/^[a-z0-9-]+$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة فقط" }),
-  locale: z.string(),
-  dir: z.enum(["rtl", "ltr"]),
+  /** The site's language (lib/i18n.ts): Arabic reads right-to-left, English left-to-right. */
+  locale: z.enum(["ar-EG", "en"]).default("ar-EG"),
+  /** Old field, now follows the language (kept so older content still loads). */
+  dir: z.enum(["rtl", "ltr"]).optional(),
   seo: z.object({ title: z.string(), description: z.string(), ogImage: OptionalImageRef.optional() }),
   contact: z.object({
     primary: z.enum(["whatsapp", "telegram", "messenger"]).default("whatsapp"),
@@ -443,11 +637,17 @@ export const ContentSchema = z.object({
   youtube: Youtube.optional(),
   reviews: Reviews.optional(),
   services: Services.optional(),
+  featured: Featured.optional(),
+  honors: Honors.optional(),
+  faq: Faq.optional(),
   final: Final.optional(),
   popup: Popup.optional(),
   bar: AnnouncementBar.optional(),
+  menu: Menu.default({ enabled: true, title: "محتوى الصفحة", items: [] }),
   forms: z.array(LeadForm).default([]),
   quizzes: z.array(Quiz).default([]),
+  polls: z.array(Poll).default([]),
+  referrals: z.array(Referral).default([]),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),
   sticky: z.object({ secondary: LinkCta.optional(), cta: ChatCta }),
   labels: z.object({
@@ -462,10 +662,16 @@ export const ContentSchema = z.object({
   });
   // Every button that points at a form must point at one that exists.
   const paths = new Set<string>();
-  c.quizzes.forEach((q, i) => {
-    if (RESERVED_PATHS.includes(q.path)) ctx.addIssue({ code: "custom", path: ["quizzes", i, "path"], message: "الاسم ده محجوز للموقع، اختار اسم تاني." });
-    if (paths.has(q.path)) ctx.addIssue({ code: "custom", path: ["quizzes", i, "path"], message: "في اختبار تاني بنفس العنوان." });
-    paths.add(q.path);
+  // Quizzes and votes share the site's page addresses.
+  [...c.quizzes.map((q, i) => ["quizzes", i, q.path] as const), ...c.polls.map((q, i) => ["polls", i, q.path] as const)].forEach(([list, i, p]) => {
+    if (RESERVED_PATHS.includes(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "الاسم ده محجوز للموقع، اختار اسم تاني." });
+    if (paths.has(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "في اختبار أو تصويت تاني بنفس العنوان." });
+    paths.add(p);
+  });
+  const codes = new Set<string>();
+  c.referrals.forEach((r, i) => {
+    if (codes.has(r.code)) ctx.addIssue({ code: "custom", path: ["referrals", i, "code"], message: "الكود ده مستخدم لشريك تاني." });
+    codes.add(r.code);
   });
   const walk = (v: unknown, path: (string | number)[]) => {
     if (Array.isArray(v)) v.forEach((x, i) => walk(x, [...path, i]));
@@ -533,5 +739,6 @@ export type ChatCtaT = z.infer<typeof ChatCta>;
 export type ActionT = z.infer<typeof Action>;
 export type LeadFormT = z.infer<typeof LeadForm>;
 export type QuizT = z.infer<typeof Quiz>;
+export type PollT = z.infer<typeof Poll>;
 export type SocialT = z.infer<typeof Social>;
 export type DayKeyT = z.infer<typeof DayKey>;
