@@ -12,7 +12,7 @@ type Props = {
   siteLabel: string;
   siteUrl: string;
   isSuper: boolean;
-  counts: { requests: number; grading: number };
+  counts: { requests: number; grading: number; complaints: number };
 };
 
 /** The part of the address after <base>/admin ("" on the home page). */

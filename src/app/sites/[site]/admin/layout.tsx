@@ -48,7 +48,7 @@ async function Gate({ params, children }: { params: Promise<{ site: string }>; c
   const t = slug ? await getTenant(slug) : null;
 
   if (slug && t) {
-    const counts = await adminCounts(t, env).catch(() => ({ requests: 0, grading: 0 }));
+    const counts = await adminCounts(t, env).catch(() => ({ requests: 0, grading: 0, complaints: 0 }));
     return (
       <div className="an-shell">
         <IgnoreThisBrowser />
@@ -58,7 +58,7 @@ async function Gate({ params, children }: { params: Promise<{ site: string }>; c
           siteLabel={siteLabel(site, slug)}
           siteUrl={`${base}/`}
           isSuper={p.kind === "super"}
-          counts={{ requests: counts.requests, grading: counts.grading }}
+          counts={{ requests: counts.requests, grading: counts.grading, complaints: counts.complaints }}
         />
         <div className="an-body">
           <header className="an-top">

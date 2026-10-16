@@ -554,3 +554,10 @@ details.a-result summary { cursor: pointer; font-weight: 600; }
   .a-savebar .ed-preview-link { display: none; }
   .an-shell .a-main { padding-bottom: 190px; }
 }
+
+/* ---------- anonymous complaints (admin/complaints) ---------- */
+.cp-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; background: var(--a-card); border: 1px solid var(--a-line); font-size: 14px; }
+.cp-state.off { background: #FFF4E5; border-color: #F6D9A8; }
+.cp-msg { margin: 0; font-size: 16px; line-height: 1.8; white-space: pre-line; overflow-wrap: anywhere; }
+.cp-bulk { margin: 0 0 12px; }
+.cp-item .rq-top .hm-chip { padding: 1px 10px; font-size: 12px; }

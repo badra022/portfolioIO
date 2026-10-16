@@ -66,6 +66,7 @@ export default async function AdminHome({ params }: PageProps<"/sites/[site]/adm
   const todo: { href: string; icon: string; tone?: string; title: string; sub: string }[] = [];
   if (counts.requests > 0) todo.push({ href: `${admin}/requests`, icon: "chat", title: counts.requests === 1 ? "طلب جديد" : `${n(counts.requests)} طلبات جديدة`, sub: "ردّ عليهم بضغطة واتساب" });
   if (counts.grading > 0) todo.push({ href: counts.toGrade.length === 1 ? `${admin}/quizzes/${counts.toGrade[0].path}` : `${admin}/quizzes`, icon: "check", tone: "amber", title: counts.grading === 1 ? "إجابة محتاجة تصحيح" : `${n(counts.grading)} إجابات محتاجة تصحيح`, sub: counts.toGrade.map((q) => q.title).join("، ") });
+  if (counts.complaints > 0) todo.push({ href: `${admin}/complaints`, icon: "megaphone", tone: "amber", title: counts.complaints === 1 ? "شكوى أو اقتراح جديد" : `${n(counts.complaints)} شكاوى واقتراحات جديدة`, sub: "من غير أسماء، اقراها وشوف تعمل إيه" });
   if (nextExam) todo.push({ href: `${admin}/edit/exams`, icon: "calendar", tone: "deep", title: `${nextExam.title}: ${inDays(nextExam.date, now)}`, sub: "راجع البيانات والجايزة قبل الامتحان" });
 
   const quick = [

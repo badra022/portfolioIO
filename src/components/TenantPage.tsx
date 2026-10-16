@@ -26,6 +26,7 @@ import { DevCredit } from "./DevCredit";
 import { Tracker } from "./Tracker";
 import { jsonLdScript, structuredData } from "@/lib/structured-data";
 import { LeadForms } from "./LeadForms";
+import { Complaints } from "./Complaints";
 import { Footer, StickyBar } from "./Footer";
 import { SectionMenu } from "./SectionMenu";
 import { ChatButton } from "./ChatButton";
@@ -120,6 +121,7 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
     featured: () => <Featured data={c.featured!} chat={chat} />,
     honors: () => <Honors data={c.honors!} chat={chat} />,
     faq: () => <Faq data={c.faq!} chat={chat} />,
+    complaints: () => <Complaints data={c.complaints} base={base} />,
     final: () => <Final c={c} chat={chat} />,
   };
 

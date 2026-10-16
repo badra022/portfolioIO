@@ -135,7 +135,7 @@ export const DayKey = z.enum(["sat", "sun", "mon", "tue", "wed", "thu", "fri"]);
 
 export const SectionKey = z.enum([
   "hero", "grades", "schedule", "method", "book",
-  "students", "reviews", "challenge", "exams", "youtube", "services", "featured", "honors", "faq", "final",
+  "students", "reviews", "challenge", "exams", "youtube", "services", "featured", "honors", "faq", "complaints", "final",
 ]);
 
 const Hero = z.object({
@@ -370,6 +370,24 @@ const Faq = z.object({
   /** "Still have a question?" line and button under the questions. */
   moreText: z.string().optional(),
   cta: Action.optional(),
+});
+
+/**
+ * An anonymous complaints and suggestions box: the student writes a message (and
+ * picks a topic if the teacher gave some) and it reaches the admin panel with no
+ * name, phone, device or exact time. Every text is optional: the site's language
+ * has a default for each (lib/i18n.ts).
+ */
+const Complaints = z.object({
+  eyebrow: z.string().optional(),
+  title: z.string().optional(),
+  intro: z.string().optional(),
+  /** Topics the student can pick, e.g. "الشرح", "المواعيد", "السنتر". Empty = no topic. */
+  categories: z.array(z.string()).default([]),
+  placeholder: z.string().optional(),
+  button: z.string().optional(),
+  /** Shown after sending. */
+  thanks: z.string().optional(),
 });
 
 /**
@@ -639,6 +657,7 @@ export const ContentSchema = z.object({
   services: Services.optional(),
   featured: Featured.optional(),
   honors: Honors.optional(),
+  complaints: Complaints.optional(),
   faq: Faq.optional(),
   final: Final.optional(),
   popup: Popup.optional(),

@@ -19,6 +19,7 @@ export const SECTION_META: Record<Key, { id: string; label: string; icon: string
   services: { id: "services", label: "خدمات أخرى", icon: "link" },
   honors: { id: "honors", label: "لوحة الشرف", icon: "medal" },
   faq: { id: "faq", label: "أسئلة شائعة", icon: "help" },
+  complaints: { id: "complaints", label: "الشكاوى والاقتراحات", icon: "chat" },
   final: { id: "final", label: "تواصل معانا", icon: "phone" },
 };
 

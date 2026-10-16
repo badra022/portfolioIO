@@ -17,6 +17,7 @@ import { generatePassword, hashPassword } from "@/lib/server/passwords";
 import { mapImages } from "@/lib/content-utils";
 import * as repo from "@/lib/server/repo";
 import * as submissionsRepo from "@/lib/server/submissions";
+import * as complaintsRepo from "@/lib/server/complaints";
 import * as quizRepo from "@/lib/server/quiz-attempts";
 import * as siteFiles from "@/lib/server/site-files";
 import * as results from "@/lib/server/exam-results";
@@ -316,6 +317,25 @@ export async function deleteRequestAction(site: string, ids: number[]): Promise<
   const ctx = await teacherContext(site);
   if ("ok" in ctx) throw new ForbiddenError();
   await submissionsRepo.deleteSubmissions(ctx.slug, ids.filter(Number.isInteger));
+  refresh();
+}
+
+/* ------------------------------------------------------------------ */
+/* Anonymous complaints (/admin/complaints)                            */
+/* ------------------------------------------------------------------ */
+
+export async function setComplaintStatusAction(site: string, ids: number[], status: complaintsRepo.ComplaintStatus): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!complaintsRepo.COMPLAINT_STATUSES.includes(status)) return;
+  await complaintsRepo.setComplaintStatus(ctx.slug, ids.filter(Number.isInteger), status);
+  refresh();
+}
+
+export async function deleteComplaintAction(site: string, ids: number[]): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  await complaintsRepo.deleteComplaints(ctx.slug, ids.filter(Number.isInteger));
   refresh();
 }
 
