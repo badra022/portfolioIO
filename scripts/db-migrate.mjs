@@ -5,12 +5,15 @@ import fs from "node:fs";
 import path from "node:path";
 import postgres from "postgres";
 import { ROOT } from "./tenants.mjs";
+import { checkStage } from "./db-stage.mjs";
 
 const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 if (!url) { console.error("Set DATABASE_URL first."); process.exit(1); }
 const sql = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
 const dir = path.join(ROOT, "db", "migrations");
 try {
+  // Never migrate the other environment's database (scripts/db-stage.mjs).
+  await checkStage(sql, { initEmpty: true });
   await sql`create table if not exists public._portfolio_migrations (name text primary key, applied_at timestamptz not null default now())`;
   await sql`alter table public._portfolio_migrations enable row level security`;
   const done = new Set((await sql`select name from public._portfolio_migrations`).map((r) => r.name));
