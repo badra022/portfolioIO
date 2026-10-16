@@ -362,16 +362,35 @@ function ItemDialog({ title, initial, s, path, name, ctx, depth, onSave, onClose
   const [draft, setDraft] = useState(() => structuredClone(initial));
   const start = useRef(JSON.stringify(initial));
   const dirty = JSON.stringify(draft) !== start.current;
+  // Closing plays the exit animation first, then hands over (save or close).
+  const [closing, setClosing] = useState(false);
+  const after = useRef<(() => void) | null>(null);
   useEffect(() => {
     const d = ref.current;
     if (d && !d.open) d.showModal();
   }, []);
+  const finish = (fn: () => void) => {
+    if (after.current) return;
+    const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) { fn(); return; }
+    after.current = fn;
+    setClosing(true);
+    // In case the animation never reports its end (hidden tab, old browser).
+    window.setTimeout(done, 320);
+  };
+  function done() {
+    const fn = after.current;
+    if (!fn) return;
+    after.current = () => {};
+    fn();
+  }
   const cancel = () => {
     if (dirty && !window.confirm("في تعديلات مش محفوظة في العنصر ده. تقفل من غير حفظ؟")) return;
-    onClose();
+    finish(onClose);
   };
   return (
-    <dialog ref={ref} className="f-dialog" aria-label={title}
+    <dialog ref={ref} className={`f-dialog${closing ? " closing" : ""}`} aria-label={title}
+      onAnimationEnd={(e) => { if (closing && e.target === e.currentTarget) done(); }}
       onCancel={(e) => { e.preventDefault(); cancel(); }}
       onClick={(e) => { if (e.target === e.currentTarget) cancel(); }}>
       <div className="f-dialog-box">
@@ -384,7 +403,7 @@ function ItemDialog({ title, initial, s, path, name, ctx, depth, onSave, onClose
         </div>
         <footer className="f-dialog-foot">
           <button type="button" className="btn-sm ghost" onClick={cancel}>إلغاء</button>
-          <button type="button" className="btn-sm primary" onClick={() => onSave(draft)}>حفظ</button>
+          <button type="button" className="btn-sm primary" onClick={() => finish(() => onSave(draft))}>حفظ</button>
         </footer>
       </div>
     </dialog>
