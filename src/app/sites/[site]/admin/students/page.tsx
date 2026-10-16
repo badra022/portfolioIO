@@ -48,7 +48,6 @@ export default async function Students({ params, searchParams }: PageProps<"/sit
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href={`${base}/admin`}>→ كل الأقسام</a>
         <h1>الطلاب <span className="a-sub">({all.length})</span></h1>
         <p className="a-sub">
           ملف لكل طالب برقم موبايله، بيتملى لوحده من النماذج والاختبارات ونتايج الامتحانات: بياناته، طلباته، درجاته ومنحنى مستواه.

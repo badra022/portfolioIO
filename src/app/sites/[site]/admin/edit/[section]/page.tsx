@@ -37,7 +37,6 @@ export default async function EditSection({ params }: PageProps<"/sites/[site]/a
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href={`${base}/admin`}>→ كل الأقسام</a>
         <h1>{def.title}</h1>
         <p className="a-sub">{def.description}</p>
       </div>
