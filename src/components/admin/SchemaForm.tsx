@@ -28,8 +28,10 @@ type FieldProps = {
 };
 
 const HIDDEN = new Set(["$schema", "slug"]);
-const LONG_TEXT = new Set(["text", "intro", "message", "description", "note", "caption", "question", "replyNote"]);
+const LONG_TEXT = new Set(["text", "intro", "message", "description", "note", "caption", "question", "answer", "replyNote"]);
 const LTR = new Set(["whatsapp", "telegram", "messenger", "id", "ref", "locale", "href", "url", "channelUrl", "googleFontsHref", "refLabel", "display", "body", "numeric", "card", "control", "pill", "notePhone"]);
+/** Fields long enough that their item deserves a card and a pop-up (not "text": title pieces stay inline). */
+const LONG_FIELDS = new Set(["answer", "question", "description", "message", "intro", "note", "caption"]);
 const TIME_PATTERN = "^\\d{2}:\\d{2}$";
 
 /** Renders a form for an object schema; each top-level key becomes a card. */
@@ -221,7 +223,9 @@ function ArrayField({ s, value, onChange, path, name, ctx, depth }: FieldProps) 
 
   const complex = isComplex(itemSchema);
   const props = itemInner.properties ? Object.entries(itemInner.properties) : [];
-  const compact = !complex || (kindOf(itemInner) === "object" && props.length <= 2 && props.every(([, p]) => !isComplex(p) && p.widget !== "image"));
+  // Inline rows only for tiny items (one or two short fields, e.g. a link's label and address);
+  // anything with a picture or a long text (an FAQ answer) gets a card and a pop-up.
+  const compact = !complex || (kindOf(itemInner) === "object" && props.length <= 2 && props.every(([k, p]) => !isComplex(p) && p.widget !== "image" && !LONG_FIELDS.has(k)));
 
   const tools = (i: number) => (
     <span className="f-tools">
