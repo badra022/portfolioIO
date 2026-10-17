@@ -9,6 +9,7 @@ import { EnvSwitch } from "@/components/admin/EnvSwitch";
 import { adminEnv } from "@/lib/server/admin-env";
 import { PREVIEW_PATH } from "@/lib/environments";
 import { getTenant } from "@/lib/server/repo";
+import { formatWhen } from "@/lib/admin/format";
 import { adminCounts } from "@/lib/server/admin-counts";
 import { AdminNav, Breadcrumb } from "@/components/admin/AdminNav";
 import "./admin.css";
@@ -71,6 +72,11 @@ async function Gate({ params, children }: { params: Promise<{ site: string }>; c
           </header>
           {noDb}
           <main className="a-main">
+            {t.trialEndsAt && (
+              <p className="a-envnote a-trial-note">
+                ده موقع تجريبي مجاني، شغال لحد <b>{formatWhen(t.trialEndsAt)}</b>. جرّب كل حاجة براحتك، ولو عجبك كلمنا نفعّله ليك ويفضل كل اللي عملته.
+              </p>
+            )}
             {envNote}
             {children}
           </main>

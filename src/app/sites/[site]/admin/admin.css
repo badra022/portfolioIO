@@ -646,3 +646,10 @@ details.a-result summary { cursor: pointer; font-weight: 600; }
   .ps-name b { white-space: normal; }
   .ps-tools button { width: 38px; height: 40px; }
 }
+
+/* free trial sites (platform console) */
+.a-trial { border-color: var(--a-sky-2); background: #EAF3FE; }
+.a-trial.over { border-color: #F6D9A8; background: #FFF4E5; }
+.a-chip.trial { background: var(--a-sky); color: var(--a-deep); }
+.a-chip.trial.over { background: #FFF4E5; color: #B45309; }
+.a-trial-note { background: #EAF3FE !important; border-color: var(--a-sky-2) !important; color: var(--a-deep) !important; }
