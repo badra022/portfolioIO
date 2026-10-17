@@ -6,7 +6,7 @@ import { withLiveContent } from "@/lib/content-utils";
 import { applyPermissions, type Permissions } from "@/lib/permissions";
 import type { Content, Theme } from "@/lib/schema";
 import { splitSite, type SiteEnv } from "@/lib/environments";
-import { copyFor, findSlugByDomain, getTenant } from "./repo";
+import { copyFor, findSlugByDomain, getTenant, trialOver } from "./repo";
 import { resolveImages } from "./assets";
 import { localizeDefaults } from "@/lib/i18n";
 import { publishedExams, type PastExam } from "./exam-results";
@@ -17,6 +17,8 @@ export const DOMAINS_TAG = "domains";
 export type SiteData =
   | { kind: "platform" }
   | { kind: "missing" }
+  /** A free trial whose time is up (lib/server/repo.ts trialOver). */
+  | { kind: "ended"; locale: string; name: string }
   | {
       kind: "tenant";
       slug: string;
@@ -75,6 +77,12 @@ export async function getSiteData(siteKey: string): Promise<SiteData> {
   cacheTag(tenantTag(slug));
   const t = await getTenant(slug);
   if (!t || t.status !== "active") return { kind: "missing" };
+  if (t.trialEndsAt) {
+    if (trialOver(t)) return { kind: "ended", locale: t.content.locale, name: t.content.profile.fullTitle };
+    // Cached no longer than the trial has left, so the site stops on time.
+    const left = Math.max(60, Math.floor((Date.parse(t.trialEndsAt) - Date.now()) / 1000));
+    cacheLife({ stale: 60, revalidate: Math.min(left, 3600), expire: Math.max(left, 3600) });
+  }
 
   const primary = t.domains.find((d) => d.isPrimary)?.domain ?? null;
   const canonicalHost = primary ?? (env.rootDomain ? `${slug}.${env.rootDomain}` : null);

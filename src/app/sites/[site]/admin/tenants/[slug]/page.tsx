@@ -5,7 +5,7 @@ import { getTenant, listUsers } from "@/lib/server/repo";
 import { formatWhen } from "@/lib/admin/format";
 import {
   addDomainAction, createUserAction, deleteUserAction, primaryDomainAction, removeDomainAction,
-  resetPasswordAction, setStatusAction, setUserDisabledAction, putSiteFilesAction, deleteSiteFileAction, setPermissionsAction,
+  resetPasswordAction, setStatusAction, setTrialAction, setUserDisabledAction, putSiteFilesAction, deleteSiteFileAction, setPermissionsAction,
 } from "../../actions";
 import { listSiteFiles } from "@/lib/server/site-files";
 import { ActionForm } from "@/components/admin/ConsoleForms";
@@ -37,6 +37,21 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
           </form>
         </div>
       </div>
+
+      {t.trialEndsAt && (
+        <section className={`a-panel a-trial ${Date.parse(t.trialEndsAt) <= Date.now() ? "over" : ""}`}>
+          <h2>تجربة مجانية</h2>
+          <p className="a-sub">
+            {Date.parse(t.trialEndsAt) <= Date.now()
+              ? <>انتهت {formatWhen(t.trialEndsAt)}. الموقع بيظهر «الفترة التجريبية انتهت» ودخول المدرس متوقف.</>
+              : <>بتنتهي {formatWhen(t.trialEndsAt)}. بعدها الموقع يقف ودخول المدرس يتقفل لحد ما تفعّله.</>}
+          </p>
+          <div className="a-actions">
+            <form action={setTrialAction.bind(null, t.slug, "activate")}><button className="btn-sm primary">تفعيل الموقع (إلغاء التجربة)</button></form>
+            <form action={setTrialAction.bind(null, t.slug, "extend")}><button className="btn-sm ghost">مدّ التجربة 24 ساعة</button></form>
+          </div>
+        </section>
+      )}
 
       <section className="a-panel">
         <h2>الباقة (الصلاحيات)</h2>

@@ -28,7 +28,10 @@ export async function PlatformConsole() {
               <td><strong>{t.name}</strong><br /><code dir="ltr">{t.slug}</code></td>
               <td dir="ltr">{t.domains.map((d) => <div key={d.domain}>{d.domain}{d.isPrimary ? " ★" : ""}</div>)}{t.domains.length === 0 && "—"}</td>
               <td>{langOf(t.locale) === "en" ? <span className="a-lang en" dir="ltr">English</span> : <span className="a-lang">عربي</span>}</td>
-              <td>{t.status === "active" ? "منشور" : "متوقف"}</td>
+              <td>
+                {t.status === "active" ? "منشور" : "متوقف"}
+                {t.trialEndsAt && <><br /><span className={`a-chip trial${Date.parse(t.trialEndsAt) <= Date.now() ? " over" : ""}`}>{Date.parse(t.trialEndsAt) <= Date.now() ? "تجربة انتهت" : "تجربة 24 ساعة"}</span></>}
+              </td>
               <td>{t.users}</td>
               <td>{t.updatedAt ? formatWhen(t.updatedAt) : "—"}</td>
               <td className="a-row-actions">

@@ -240,7 +240,13 @@ feature/* ──PR──▶ develop ──(auto)──▶ DEV   portfolio-io-dev
 - **Rollback**: Vercel → Deployments → previous production deployment → Instant Rollback.
 - **Migrations** run during the Vercel build (`scripts/vercel-build.mjs`): for `develop` on the dev database, for production on the production database, never for feature branches. A failing migration fails the build and the previous version keeps serving. Write migrations backward compatible (add columns/tables; rename or drop only in a later release, after the code stops using them), because the old version keeps running until the new one is live. Applied migrations are recorded in `public._portfolio_migrations`.
 - **CI** (`.github/workflows/ci.yml`, on every PR into `develop`/`main`): typecheck, `npm run validate`, every migration applied twice on an empty Postgres, and a production build.
-- **Dev data**: Actions → `refresh-dev-data` → Run workflow copies the teachers' pages and images from production to dev. Never copied: requests, quiz attempts, analytics, exam grades, teacher logins, domains, history. Needs the repo secrets `PROD_DATABASE_URL`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_SECRET_KEY`, `DEV_DATABASE_URL`, `DEV_SUPABASE_URL`, `DEV_SUPABASE_SECRET_KEY`.
+- **Dev data is its own**: nothing is copied between dev and production, in either direction. Create test teachers on dev from the dev platform console (`/admin` on the dev URL); they never exist in production, and production teachers never appear on dev.
+- **Stage marker (the hard separation)**: each database holds one row in `public._portfolio_stage` saying `dev` or `production` (and which Supabase project its files live in). The build's migration step (`scripts/db-stage.mjs`) and the running app (`src/lib/db/stage.ts`) both check it against `APP_STAGE` and `SUPABASE_URL`, and refuse to read or write anything when they don't match. A dev deployment pointed at the production database fails to build and serves no data, and the other way round. A brand-new empty database is marked automatically by `npm run db:migrate`; to mark an existing one, run once in its SQL editor:
+  ```sql
+  create table public._portfolio_stage (id boolean primary key default true check (id), stage text not null check (stage in ('dev', 'production')), supabase_ref text, set_at timestamptz not null default now());
+  alter table public._portfolio_stage enable row level security;
+  insert into public._portfolio_stage (stage, supabase_ref) values ('dev', '<project ref>');  -- or 'production'
+  ```
 - Free Supabase projects pause after a week without use; resume the dev project from the Supabase dashboard if the dev site can't reach its database.
 
 | Vercel env var | Production (`main`) | Preview (`develop` and feature branches) |

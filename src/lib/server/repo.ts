@@ -30,7 +30,12 @@ export type TenantRecord = {
   preview: { content: Content; theme: Theme; version: number; pending: boolean; updatedAt: string | null; updatedBy: string | null };
   /** What the teacher's plan includes (lib/permissions.ts). */
   permissions: Permissions;
+  /** Free trial sites: when the site stops (null = a normal site). */
+  trialEndsAt: string | null;
 };
+
+/** A trial site whose time is up: the site shows «انتهت الفترة التجريبية» and its logins are refused. */
+export const trialOver = (t: { trialEndsAt: string | null }, now = Date.now()) => Boolean(t.trialEndsAt && Date.parse(t.trialEndsAt) <= now);
 
 /** The content and theme a given environment shows. */
 export const copyFor = (t: TenantRecord, env: SiteEnv) => (env === "preview" ? t.preview : { content: t.content, theme: t.theme });
@@ -69,6 +74,7 @@ function bundledRecord(slug: string): TenantRecord | null {
     updatedAt: null, updatedBy: null,
     preview: { content, theme, version: 0, pending: false, updatedAt: null, updatedBy: null },
     permissions: ALL_PERMISSIONS,
+    trialEndsAt: null,
   };
 }
 
@@ -111,16 +117,18 @@ export async function getTenant(slug: string): Promise<TenantRecord | null> {
       updatedBy: row.previewUpdatedBy,
     },
     permissions: readPermissions(row.permissions),
+    trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
   };
 }
 
 export type TenantSummary = { slug: string; name: string; status: string; domains: DomainRow[]; users: number; updatedAt: string | null;
   /** The live site's language (lib/i18n.ts). */
-  locale: string };
+  locale: string;
+  trialEndsAt: string | null };
 
 export async function listTenants(): Promise<TenantSummary[]> {
   if (!hasDb()) {
-    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null, locale: t.content.locale }));
+    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null, locale: t.content.locale, trialEndsAt: null }));
   }
   const d = db();
   const rows = await d.select({
@@ -128,10 +136,11 @@ export async function listTenants(): Promise<TenantSummary[]> {
     // Columns spelled out with their tables: unqualified, "id" would resolve to admin_users.id inside the subquery.
     users: sql<number>`(select count(*)::int from "admin_users" where "admin_users"."tenant_id" = "tenants"."id")`,
     locale: sql<string | null>`"tenants"."content"->>'locale'`,
+    trialEndsAt: tenants.trialEndsAt,
   }).from(tenants).orderBy(tenants.name);
   const domains = await d.select().from(tenantDomains);
   return rows.map((r) => ({
-    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(), locale: r.locale ?? "ar-EG",
+    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(), locale: r.locale ?? "ar-EG", trialEndsAt: r.trialEndsAt?.toISOString() ?? null,
     domains: domains.filter((x) => x.tenantId === r.id).map((x) => ({ domain: x.domain, isPrimary: x.isPrimary }))
       .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
   }));
@@ -303,13 +312,23 @@ export async function restoreRevision(slug: string, revisionId: number, author: 
 /* Tenants, domains (platform console)                                 */
 /* ------------------------------------------------------------------ */
 
-export async function createTenant(input: { slug: string; name: string; content: Content; theme: Theme; author: string }): Promise<void> {
+export async function createTenant(input: {
+  slug: string; name: string; content: Content; theme: Theme; author: string;
+  /** Free trial: the site stops at this moment, every feature is on until then. */
+  trialEndsAt?: Date; signupKey?: string;
+  /** Teacher login created in the same transaction. */
+  login?: { username: string; passwordHash: string };
+}): Promise<void> {
   const d = requireDb();
   const content = { ...input.content, slug: input.slug, profile: { ...input.content.profile, name: input.name } };
   ContentSchema.parse(content);
   ThemeSchema.parse(input.theme);
   await d.transaction(async (tx) => {
-    const [row] = await tx.insert(tenants).values({ slug: input.slug, name: input.name, content, theme: input.theme, updatedBy: input.author }).returning({ id: tenants.id });
+    const [row] = await tx.insert(tenants).values({
+      slug: input.slug, name: input.name, content, theme: input.theme, updatedBy: input.author,
+      ...(input.trialEndsAt ? { trialEndsAt: input.trialEndsAt, signupKey: input.signupKey ?? null, permissions: ALL_PERMISSIONS } : {}),
+    }).returning({ id: tenants.id });
+    if (input.login) await tx.insert(adminUsers).values({ username: input.login.username, passwordHash: input.login.passwordHash, tenantId: row.id });
     await tx.insert(tenantRevisions).values({ tenantId: row.id, version: 1, content, theme: input.theme, author: input.author, note: "إنشاء" });
   });
 }
@@ -405,7 +424,8 @@ export async function deleteUser(slug: string, userId: string): Promise<void> {
 export async function findLogin(username: string): Promise<{ id: string; hash: string; slug: string; disabled: boolean } | null> {
   if (!hasDb()) return null;
   const row = (await db()
-    .select({ id: adminUsers.id, hash: adminUsers.passwordHash, slug: tenants.slug, disabled: adminUsers.disabled })
+    // A trial whose time is up logs nobody in until it's activated.
+    .select({ id: adminUsers.id, hash: adminUsers.passwordHash, slug: tenants.slug, disabled: sql<boolean>`${adminUsers.disabled} or coalesce(${tenants.trialEndsAt} <= now(), false)` })
     .from(adminUsers)
     .innerJoin(tenants, eq(tenants.id, adminUsers.tenantId))
     .where(eq(adminUsers.username, username))
@@ -416,4 +436,32 @@ export async function findLogin(username: string): Promise<{ id: string; hash: s
 export async function touchLogin(userId: string): Promise<void> {
   if (!hasDb()) return;
   await db().update(adminUsers).set({ lastLoginAt: new Date() }).where(eq(adminUsers.id, userId));
+}
+
+/* ------------------------------------------------------------------ */
+/* Free trials                                                         */
+/* ------------------------------------------------------------------ */
+
+/** Ends a trial (null = make it a normal site) or moves its end. */
+export async function setTrial(slug: string, endsAt: Date | null): Promise<void> {
+  await requireDb().update(tenants).set({ trialEndsAt: endsAt }).where(eq(tenants.slug, slug));
+}
+
+/** How many trial sites were made recently, by one visitor (key) and in total. */
+export async function recentSignups(key: string, since: Date): Promise<{ mine: number; all: number }> {
+  const [r] = await requireDb().select({
+    mine: sql<number>`count(*) filter (where ${tenants.signupKey} = ${key})::int`,
+    all: sql<number>`count(*)::int`,
+  }).from(tenants).where(sql`${tenants.signupKey} is not null and ${tenants.createdAt} >= ${since.toISOString()}`);
+  return r ?? { mine: 0, all: 0 };
+}
+
+export async function slugTaken(slug: string): Promise<boolean> {
+  if (!hasDb()) return listBundled().includes(slug);
+  return (await db().select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1)).length > 0;
+}
+
+export async function usernameTaken(username: string): Promise<boolean> {
+  if (!hasDb()) return false;
+  return (await db().select({ id: adminUsers.id }).from(adminUsers).where(eq(adminUsers.username, username)).limit(1)).length > 0;
 }
