@@ -229,7 +229,9 @@ export async function addDomainAction(slug: string, _prev: ConsoleState, form: F
   updateTag(DOMAINS_TAG);
   updateTag(tenantTag(slug));
   refresh();
-  return { ok: true, message: `تمت إضافة ${domain}. أضفه أيضاً في Vercel (Settings → Domains).` };
+  // Subdomains of the platform domain are already covered by the *.<root> wildcard in Vercel.
+  const underRoot = Boolean(env.rootDomain) && domain.endsWith(`.${env.rootDomain}`);
+  return { ok: true, message: underRoot ? `تمت إضافة ${domain} وشغّال على طول.` : `تمت إضافة ${domain}. أضفه أيضاً في Vercel (Settings → Domains).` };
 }
 
 export async function removeDomainAction(slug: string, domain: string): Promise<void> {
