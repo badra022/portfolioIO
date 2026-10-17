@@ -15,6 +15,8 @@ import { ensureBucket, putObject } from "@/lib/server/storage";
 import { ImageError, SLUG_RE, USERNAME_RE, loginUrlFor, normalizeDomain, storeImage } from "@/lib/server/admin-ops";
 import { generatePassword, hashPassword } from "@/lib/server/passwords";
 import { mapImages } from "@/lib/content-utils";
+import { buildDemo } from "@/lib/demo/build";
+import { whatsappDigits } from "@/lib/server/signup";
 import * as repo from "@/lib/server/repo";
 import * as submissionsRepo from "@/lib/server/submissions";
 import * as complaintsRepo from "@/lib/server/complaints";
@@ -202,18 +204,41 @@ export async function createTenantAction(_prev: ConsoleState, form: FormData): P
   if (!SLUG_RE.test(slug)) return { ok: false, message: "المعرّف: حروف إنجليزية صغيرة وأرقام وشرطة فقط." };
   if (!name) return { ok: false, message: "اكتب اسم المدرس." };
   if (await repo.getTenant(slug)) return { ok: false, message: "هذا المعرّف مستخدم بالفعل." };
-  const sourceSlug = source.replace(/^tenant:/, "");
-  const from = await repo.getTenant(sourceSlug);
-  if (!from) return { ok: false, message: "اختر مدرساً لنسخ القالب منه." };
-  // Images keep pointing at the source teacher's files until replaced.
-  const content = mapImages(from.content, (v) => assetUrl(sourceSlug, v)) as Content;
+  let content: Content, theme: Theme;
+  if (source.startsWith("demo:")) {
+    // Ready-made sample content for every section (lib/demo/build.ts), not copied from anyone.
+    const locale = source === "demo:en" ? "en" : "ar-EG";
+    const phone = whatsappDigits(String(form.get("phone") ?? "")) ?? "201000000000";
+    ({ content, theme } = buildDemo({
+      slug, name: name.replace(/^(أ\.|م\.|د\.|مستر|ميس|Mr\.|Ms\.|Dr\.)\s*/, ""), title: name.match(/^(أ\.|م\.|د\.|مستر|ميس|Mr\.|Ms\.|Dr\.)/)?.[0] ?? (locale === "en" ? "Mr." : "أ."),
+      subject: String(form.get("subject") ?? "").trim(), locale, whatsapp: phone, color: "#1D6FE0", scheme: "light",
+    }));
+  } else {
+    const sourceSlug = source.replace(/^tenant:/, "");
+    const from = await repo.getTenant(sourceSlug);
+    if (!from) return { ok: false, message: "اختر مدرساً لنسخ القالب منه." };
+    // Images keep pointing at the source teacher's files until replaced.
+    content = mapImages(from.content, (v) => assetUrl(sourceSlug, v)) as Content;
+    theme = from.theme as Theme;
+  }
   try {
-    await repo.createTenant({ slug, name, content, theme: from.theme as Theme, author: principalName(p) });
+    await repo.createTenant({ slug, name, content, theme, author: principalName(p) });
   } catch (e) {
     console.error(e);
     return { ok: false, message: "تعذّر إنشاء المدرس." };
   }
   redirect(`/admin/tenants/${slug}`);
+}
+
+/** Free trials: «activate» makes it a normal site, «extend» gives it 24 more hours. */
+export async function setTrialAction(slug: string, mode: "activate" | "extend"): Promise<void> {
+  await requireSuper(PLATFORM);
+  const t = await repo.getTenant(slug);
+  if (!t) return;
+  const from = t.trialEndsAt && Date.parse(t.trialEndsAt) > Date.now() ? Date.parse(t.trialEndsAt) : Date.now();
+  await repo.setTrial(slug, mode === "activate" ? null : new Date(from + 24 * 3600_000));
+  updateTag(tenantTag(slug));
+  refresh();
 }
 
 export async function addDomainAction(slug: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {

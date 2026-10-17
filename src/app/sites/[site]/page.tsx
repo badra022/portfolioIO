@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getSiteData } from "@/lib/server/site";
 import { TenantPage } from "@/components/TenantPage";
 import { PlatformHome } from "@/components/PlatformHome";
+import { TrialEnded } from "@/components/signup/TrialEnded";
 
 export async function generateMetadata({ params }: PageProps<"/sites/[site]">): Promise<Metadata> {
   const data = await getSiteData(decodeURIComponent((await params).site));
@@ -52,5 +53,6 @@ async function SiteBody({ params }: { params: Promise<{ site: string }> }) {
   const data = await getSiteData(decodeURIComponent((await params).site));
   if (data.kind === "platform") return <PlatformHome />;
   if (data.kind === "missing") notFound();
+  if (data.kind === "ended") return <TrialEnded locale={data.locale} name={data.name} />;
   return <TenantPage c={data.content} base={data.base} canonical={data.canonical} pastExams={data.pastExams} preview={data.env === "preview"} />;
 }

@@ -24,6 +24,14 @@ export const tenants = pgTable("tenants", {
   previewUpdatedBy: text("preview_updated_by"),
   /** What the teacher's plan includes (lib/permissions.ts). Empty = nothing paid (new teachers). */
   permissions: jsonb("permissions").notNull().default(sql`'{}'::jsonb`),
+  /**
+   * Free trial sites (made from the public «جرّب موقعك» form): the site and its
+   * logins stop working after this moment until a super admin activates it.
+   * Null = a normal site.
+   */
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  /** Trial sites: a salted hash of the sign-up's address, only to limit sign-ups per visitor. */
+  signupKey: text("signup_key"),
 });
 
 /** Custom domains that serve a teacher. Each must also be added to the Vercel project. */
