@@ -49,7 +49,12 @@ export async function slugForSite(siteKey: string): Promise<string | null> {
     const twin = domain.startsWith("www.") ? domain.slice(4) : `www.${domain}`;
     return (await findSlugByDomain(domain)) ?? (await findSlugByDomain(twin));
   }
-  if (site.startsWith("s.") || site.startsWith("p.")) return site.slice(2);
+  if (site.startsWith("s.")) {
+    // A subdomain can also be a domain row (e.g. mohamedali.<root> for slug "mohamed-ali"); it wins over the slug.
+    const sub = site.slice(2);
+    return (env.rootDomain && (await findSlugByDomain(`${sub}.${env.rootDomain}`))) || sub;
+  }
+  if (site.startsWith("p.")) return site.slice(2);
   return null;
 }
 
@@ -63,7 +68,7 @@ export async function getSiteData(siteKey: string): Promise<SiteData> {
   cacheLife("hours");
   if (siteKey === "_platform") return { kind: "platform" };
   const { key: site, env: siteEnv } = splitSite(siteKey);
-  if (site.startsWith("d.")) cacheTag(DOMAINS_TAG);
+  if (site.startsWith("d.") || site.startsWith("s.")) cacheTag(DOMAINS_TAG);
   const slug = await slugForSite(site);
   if (!slug) return { kind: "missing" };
   // Saving either copy (production or preview) refreshes both through this tag.
@@ -73,7 +78,7 @@ export async function getSiteData(siteKey: string): Promise<SiteData> {
 
   const primary = t.domains.find((d) => d.isPrimary)?.domain ?? null;
   const canonicalHost = primary ?? (env.rootDomain ? `${slug}.${env.rootDomain}` : null);
-  const servedHost = site.startsWith("d.") ? site.slice(2) : site.startsWith("s.") ? `${slug}.${env.rootDomain}` : null;
+  const servedHost = site.startsWith("d.") ? site.slice(2) : site.startsWith("s.") ? `${site.slice(2)}.${env.rootDomain}` : null;
   const copy = copyFor(t, siteEnv);
   return {
     kind: "tenant",
