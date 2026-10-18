@@ -408,6 +408,19 @@ export function buildDemo(input: DemoInput, now = new Date()): { content: Conten
         durationHours: 0, state: "open", submitLabel: L("ابعت صوتك", "Send your vote"), doneMessage: L("شكراً! صوتك اتسجل.", "Thanks! Your vote counts."), showResults: true,
       },
     ],
+    pages: [
+      {
+        path: "summary-pdf", enabled: true, kind: "request", badge: L("مجاناً", "Free"),
+        title: L("ملخص الفصل الأول كامل", "The full chapter 1 summary"),
+        description: L(
+          "ملزمة ملخصة فيها كل قوانين الفصل الأول وأهم الأسئلة. سيب بياناتك وهتوصلك على واتساب.\nدي صفحة تجريبية: بدل ما تحط رابط درايف تحت الفيديو، حط رابط الصفحة دي.",
+          "A short booklet with every rule from chapter 1 and the key questions. Leave your details and get it on WhatsApp.\nThis is a sample page: instead of a Drive link under your video, share this page.",
+        ),
+        image: "/demo/book-cover.svg", points: [L("20 صفحة PDF", "A 20-page PDF"), L("أسئلة بالإجابات", "Questions with answers")],
+        countdown: true, cta: { label: L("ابعتهولي", "Send it to me"), type: "whatsapp", form: "booking" },
+        backLabel: L("ارجع للموقع", "Back to the site"), indexable: false,
+      },
+    ],
     referrals: [{ code: "sample-partner", name: L("شريك تجريبي", "Sample partner"), note: L("مثال: 10 جنيه على كل حجز", "Example: EGP 10 per booking") }],
     footer: { hashtags: [L("#ذاكر_صح", "#study_smart")] },
     sticky: { secondary: { label: L("المواعيد", "Schedule"), href: "#schedule" }, cta: { label: L("واتساب", "WhatsApp"), message: `${hello}${L("عايز أستفسر عن الحصص.", "I have a question about the classes.")}`, ref: "STICKY" } },
@@ -425,6 +438,7 @@ export function demoLinks(base: string, locale: "ar-EG" | "en") {
     { label: L("اختبار بيتصحح على طول", "Instantly graded quiz"), href: `${base}/sample-quiz` },
     { label: L("اختبار المدرس بيصححه", "Teacher-graded quiz"), href: `${base}/monthly-quiz` },
     { label: L("تصويت من غير اسم", "Anonymous vote"), href: `${base}/sample-vote` },
+    { label: L("صفحة طلب ملف (بدل رابط درايف)", "A file request page (instead of a Drive link)"), href: `${base}/summary-pdf` },
     { label: L("رابط شريك (تسويق بالعمولة)", "Partner (affiliate) link"), href: `${base}/?ref=sample-partner` },
     { label: L("الامتحانات والنتايج", "Exams and results"), href: `${base}/#exams` },
     { label: L("صندوق الشكاوى", "Complaints box"), href: `${base}/#complaints` },

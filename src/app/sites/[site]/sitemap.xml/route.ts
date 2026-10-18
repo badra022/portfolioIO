@@ -4,8 +4,8 @@ import { getSiteData } from "@/lib/server/site";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /**
- * The teacher's pages for search engines: the home page, plus quizzes the teacher
- * chose to show in Google. lastmod is the last save, so Google re-reads after edits.
+ * The teacher's pages for search engines: the home page, plus quizzes and pages
+ * (offers, requests) the teacher chose to show in Google. lastmod is the last save, so Google re-reads after edits.
  */
 export async function GET(_req: Request, ctx: RouteContext<"/sites/[site]/sitemap.xml">) {
   await connection();
@@ -15,6 +15,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/sites/[site]/sitema
   const urls = [
     `${data.canonical}/`,
     ...data.content.quizzes.filter((q) => q.indexable).map((q) => `${data.canonical}/${q.path}`),
+    ...data.content.pages.filter((p) => p.enabled && p.indexable).map((p) => `${data.canonical}/${p.path}`),
   ];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(u)}</loc>${lastmod}</url>`).join("\n")}\n</urlset>\n`;
   return new Response(xml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });

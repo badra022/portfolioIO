@@ -51,7 +51,9 @@ export type TrackEvent =
   | { t: "click"; ch: string; at: string; u: Partial<Record<GroupT, PeriodT[]>> }
   | { t: "dwell"; s: number }
   /** Landed through a referral partner's link (components/ReferralLanding.tsx): code, page, first time on this device. */
-  | { t: "ref"; c: string; pg: string; u: boolean };
+  | { t: "ref"; c: string; pg: string; u: boolean }
+  /** Opened one of the teacher's pages (offers, requests: content.pages, components/PageVisit.tsx). */
+  | { t: "page"; p: string };
 
 /** "2026-10-06" in Cairo, the day every counter is filed under. */
 export function cairoDay(at: Date = new Date()): string {

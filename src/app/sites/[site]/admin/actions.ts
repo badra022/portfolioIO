@@ -512,6 +512,30 @@ export async function updatePollAction(site: string, path: string, change: "open
   refresh();
 }
 
+/** Turns one of the teacher's pages (offers, requests) on or off, or deletes it (admin → الصفحات). */
+export async function updatePageAction(site: string, path: string, change: "on" | "off" | "delete", env: SiteEnv = "production"): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!["on", "off", "delete"].includes(change) || !isEnv(env)) return;
+  const t = await repo.getTenant(ctx.slug);
+  if (!t) return;
+  const apply = (c: Content): Content => ({
+    ...c,
+    pages: change === "delete" ? c.pages.filter((p) => p.path !== path) : c.pages.map((p) => (p.path === path ? { ...p, enabled: change === "on" } : p)),
+  });
+  const copy = repo.copyFor(t, env).content;
+  if (!copy.pages.some((p) => p.path === path)) return;
+  const note = `${change === "delete" ? "حذف صفحة" : change === "on" ? "تشغيل صفحة" : "إيقاف صفحة"}: ${path}`;
+  const r = env === "preview"
+    ? await repo.savePreview(ctx.slug, { content: apply(copy) }, null, principalName(ctx.p), note)
+    : await repo.saveTenant(ctx.slug, { content: apply(copy) }, t.version, principalName(ctx.p), note);
+  if (r.ok && env === "production" && t.preview.pending) {
+    await repo.savePreview(ctx.slug, { content: apply(t.preview.content) }, null, principalName(ctx.p), note);
+  }
+  if (r.ok) updateTag(tenantTag(ctx.slug));
+  refresh();
+}
+
 /** Starts a vote's counts from zero. */
 export async function resetVotesAction(site: string, path: string, env: SiteEnv = "production"): Promise<void> {
   const ctx = await teacherContext(site);
