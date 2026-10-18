@@ -9,7 +9,7 @@ import { slugForSite } from "./site";
  * Free trial sites turn away AI assistants, AI crawlers and copying tools
  * (proxy.ts), so a trial can't simply be handed to an AI or a scraper to rebuild.
  * Link previews (WhatsApp, Facebook) still work. A deterrent: anything a person
- * can see can still be photographed, which is what the watermark is for.
+ * can see can still be photographed, which is what the trial bars and marked sample images are for.
  */
 export const COPY_BOTS = new RegExp([
   // AI assistants fetching a page for a user, and AI crawlers

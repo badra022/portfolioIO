@@ -172,3 +172,6 @@
 .su-terms .su-card { max-width: 760px; margin: 20px auto 40px; line-height: 1.9; }
 .su-terms h1 { margin: 0 0 8px; font-size: 26px; }
 .su-terms ol { display: grid; gap: 10px; padding-inline-start: 22px; }
+.su-tel { display: flex; gap: 8px; }
+.su .su-tel select { flex: none; width: 10.5em; padding-inline: 8px; font-size: 15px; }
+.su .su-tel input { flex: 1; min-width: 0; }

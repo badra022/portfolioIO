@@ -10,12 +10,13 @@ import { signupOtps, tenants } from "@/lib/db/schema";
  * number (Twilio Verify, by SMS or WhatsApp), and the site is only built once
  * the code is entered. One trial per number.
  *
- * Settings (Vercel env vars):
- *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID  turn it on
+ * Off for now: set OTP_ENABLED=1 to turn it on. Settings (Vercel env vars):
+ *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID  the code sender
  *   OTP_CHANNEL      "sms" (default) or "whatsapp"
- *   OTP_COUNTRIES    calling codes allowed, default "20" (Egypt), e.g. "20,966,971"
+ *   OTP_COUNTRIES    calling codes codes may be sent to, e.g. "20,966,971" (default: every
+ *                    country the form accepts, lib/phone.ts)
  *   OTP_TEST_CODE    dev environment or local only: a fixed code instead of Twilio
- * Without them the form skips the code (one trial per number still applies).
+ * While off, the form skips the code; one trial per number still applies.
  */
 const twilio = {
   sid: process.env.TWILIO_ACCOUNT_SID ?? "",
@@ -23,7 +24,7 @@ const twilio = {
   service: process.env.TWILIO_VERIFY_SERVICE_SID ?? "",
 };
 const channel = process.env.OTP_CHANNEL === "whatsapp" ? "whatsapp" : "sms";
-const countries = (process.env.OTP_COUNTRIES || "20").split(",").map((c) => c.trim()).filter(Boolean);
+const countries = (process.env.OTP_COUNTRIES ?? "").split(",").map((c) => c.trim()).filter(Boolean);
 /** Never in production: a fixed code for testing the flow without sending anything. */
 const testCode = (isDev() || !process.env.VERCEL) ? process.env.OTP_TEST_CODE ?? "" : "";
 
@@ -31,11 +32,11 @@ const PER_PHONE_HOUR = 3;
 const PER_VISITOR_DAY = 8;
 const TOKEN_MINUTES = 30;
 
-export const otpEnabled = () => Boolean(testCode || (twilio.sid && twilio.token && twilio.service));
+export const otpEnabled = () => process.env.OTP_ENABLED === "1" && Boolean(testCode || (twilio.sid && twilio.token && twilio.service));
 export const otpChannel = () => channel;
 
 /** Is this number from a country the codes may be sent to? (Stops paying for codes to far-away numbers.) */
-export const allowedCountry = (digits: string) => countries.some((c) => digits.startsWith(c));
+export const allowedCountry = (digits: string) => countries.length === 0 || countries.some((c) => digits.startsWith(c));
 
 const secret = () => process.env.SIGNUP_SALT || env.mcpToken || env.adminPassword || "portfolioio";
 const sign = (payload: string) => createHmac("sha256", secret()).update(`otp|${payload}`).digest("base64url");

@@ -32,11 +32,11 @@ export const tenants = pgTable("tenants", {
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
   /** Trial sites: a salted hash of the sign-up's address, only to limit sign-ups per visitor. */
   signupKey: text("signup_key"),
-  /** Trial sites: the verified WhatsApp number (international digits), one trial per number. */
+  /** Trial sites: the WhatsApp number (international digits, lib/phone.ts); unique, so one trial per number. */
   signupPhone: text("signup_phone"),
   /** Trial sites: when the sign-up accepted the trial terms (/terms). */
   termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
-}, (t) => [index("tenants_signup_phone_idx").on(t.signupPhone)]);
+}, (t) => [uniqueIndex("tenants_signup_phone_key").on(t.signupPhone)]);
 
 /** Verification codes sent from the sign-up form (lib/server/otp.ts), only to limit how many are sent. */
 export const signupOtps = pgTable("signup_otps", {
