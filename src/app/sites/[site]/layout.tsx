@@ -7,6 +7,7 @@ import { dirOf, langOf } from "@/lib/i18n";
 import { UITextProvider } from "@/components/UIText";
 import { ReferralLanding } from "@/components/ReferralLanding";
 import { TrialMark } from "@/components/TrialMark";
+import { DevCredit } from "@/components/DevCredit";
 import { themeAttrs, themeCss } from "@/lib/theme";
 import "../../globals.css";
 import "../../sections.css";
@@ -51,6 +52,8 @@ async function SiteFrame({ params, children }: { params: Promise<{ site: string 
         {data.env === "preview" && <PreviewBar base={data.base} />}
         {data.trialEndsAt && <TrialMark endsAt={data.trialEndsAt} en={content.locale === "en"} siteName={content.profile.fullTitle} />}
         <UITextProvider locale={content.locale}>{children}</UITextProvider>
+        {/* The platform's signature under every page of the site: home, quizzes, votes, pages (hidden in /admin). */}
+        <DevCredit siteName={content.profile.fullTitle} />
         {data.trialEndsAt && <TrialMark foot endsAt={data.trialEndsAt} en={content.locale === "en"} siteName={content.profile.fullTitle} />}
         {content.referrals.length > 0 && <ReferralLanding slug={data.slug} base={data.base} codes={content.referrals.map((r) => r.code)} preview={data.env === "preview"} />}
       </div>

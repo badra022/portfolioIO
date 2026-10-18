@@ -122,17 +122,18 @@ export async function getTenant(slug: string): Promise<TenantRecord | null> {
 }
 
 export type TenantSummary = { slug: string; name: string; status: string; domains: DomainRow[]; users: number; updatedAt: string | null;
+  createdAt: string | null;
   /** The live site's language (lib/i18n.ts). */
   locale: string;
   trialEndsAt: string | null };
 
 export async function listTenants(): Promise<TenantSummary[]> {
   if (!hasDb()) {
-    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null, locale: t.content.locale, trialEndsAt: null }));
+    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null, createdAt: null, locale: t.content.locale, trialEndsAt: null }));
   }
   const d = db();
   const rows = await d.select({
-    id: tenants.id, slug: tenants.slug, name: tenants.name, status: tenants.status, updatedAt: tenants.updatedAt,
+    id: tenants.id, slug: tenants.slug, name: tenants.name, status: tenants.status, updatedAt: tenants.updatedAt, createdAt: tenants.createdAt,
     // Columns spelled out with their tables: unqualified, "id" would resolve to admin_users.id inside the subquery.
     users: sql<number>`(select count(*)::int from "admin_users" where "admin_users"."tenant_id" = "tenants"."id")`,
     locale: sql<string | null>`"tenants"."content"->>'locale'`,
@@ -140,7 +141,7 @@ export async function listTenants(): Promise<TenantSummary[]> {
   }).from(tenants).orderBy(tenants.name);
   const domains = await d.select().from(tenantDomains);
   return rows.map((r) => ({
-    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(), locale: r.locale ?? "ar-EG", trialEndsAt: r.trialEndsAt?.toISOString() ?? null,
+    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(), createdAt: r.createdAt.toISOString(), locale: r.locale ?? "ar-EG", trialEndsAt: r.trialEndsAt?.toISOString() ?? null,
     domains: domains.filter((x) => x.tenantId === r.id).map((x) => ({ domain: x.domain, isPrimary: x.isPrimary }))
       .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
   }));
@@ -361,6 +362,16 @@ export async function setTenantStatus(slug: string, status: "active" | "disabled
   await requireDb().update(tenants).set({ status, updatedAt: new Date() }).where(eq(tenants.slug, slug));
 }
 
+/**
+ * Deletes a teacher for good: the site, its logins, domains, requests, quizzes,
+ * analytics... (every table cascades). Trial requests stay as leads (tenant_id → null).
+ * The files are removed separately (storage.ts deleteFolder).
+ */
+export async function deleteTenant(slug: string): Promise<boolean> {
+  const rows = await requireDb().delete(tenants).where(eq(tenants.slug, slug)).returning({ id: tenants.id });
+  return rows.length > 0;
+}
+
 async function tenantId(slug: string): Promise<string> {
   const row = (await requireDb().select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1))[0];
   if (!row) throw new Error("Teacher not found.");
@@ -445,6 +456,38 @@ export async function touchLogin(userId: string): Promise<void> {
 /** Ends a trial (null = make it a normal site) or moves its end. */
 export async function setTrial(slug: string, endsAt: Date | null): Promise<void> {
   await requireDb().update(tenants).set({ trialEndsAt: endsAt }).where(eq(tenants.slug, slug));
+}
+
+/** Records a trial request (the lead) next to the trial site it made (trial_requests). */
+export async function addTrialRequest(r: { tenantId: string | null; slug: string; name: string; title: string; subject: string; phone: string; locale: string; username: string; notes: string }): Promise<void> {
+  await requireDb().insert(schema.trialRequests).values({ ...r, notes: r.notes || null });
+}
+
+export type TrialRequestRow = {
+  id: string; createdAt: string; slug: string; name: string; title: string | null; subject: string | null; phone: string | null;
+  locale: string | null; username: string | null; notes: string | null;
+  /** The trial site, if it still exists. */
+  tenant: { status: string; trialEndsAt: string | null } | null;
+};
+
+export async function countTrialRequestsSince(since: Date): Promise<number> {
+  if (!hasDb()) return 0;
+  const [r] = await db().select({ n: sql<number>`count(*)::int` }).from(schema.trialRequests).where(sql`${schema.trialRequests.createdAt} >= ${since.toISOString()}`);
+  return r?.n ?? 0;
+}
+
+/** Every trial request, newest first, with the state of its site. */
+export async function listTrialRequests(limit = 500): Promise<TrialRequestRow[]> {
+  if (!hasDb()) return [];
+  const rows = await db().select({
+    r: schema.trialRequests, status: tenants.status, trialEndsAt: tenants.trialEndsAt,
+  }).from(schema.trialRequests).leftJoin(tenants, eq(tenants.id, schema.trialRequests.tenantId))
+    .orderBy(desc(schema.trialRequests.createdAt)).limit(limit);
+  return rows.map(({ r, status, trialEndsAt }) => ({
+    id: r.id, createdAt: r.createdAt.toISOString(), slug: r.slug, name: r.name, title: r.title, subject: r.subject, phone: r.phone,
+    locale: r.locale, username: r.username, notes: r.notes,
+    tenant: status ? { status, trialEndsAt: trialEndsAt?.toISOString() ?? null } : null,
+  }));
 }
 
 /** How many trial sites were made in the last day and in the last `recentMinutes`, by one visitor (key) and in total. */

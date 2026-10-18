@@ -12,6 +12,8 @@ import { getTenant } from "@/lib/server/repo";
 import { formatWhen } from "@/lib/admin/format";
 import { adminCounts } from "@/lib/server/admin-counts";
 import { AdminNav, Breadcrumb } from "@/components/admin/AdminNav";
+import { PlatformNav } from "@/components/admin/PlatformNav";
+import { countTrialRequestsSince } from "@/lib/server/repo";
 import "./admin.css";
 
 export const metadata: Metadata = {
@@ -80,6 +82,21 @@ async function Gate({ params, children }: { params: Promise<{ site: string }>; c
             {envNote}
             {children}
           </main>
+        </div>
+      </div>
+    );
+  }
+
+  // The platform host: the super admin's console (teachers, trial requests, numbers).
+  if (site === "_platform" && p.kind === "super") {
+    const newTrials = await countTrialRequestsSince(new Date(Date.now() - 24 * 3600_000)).catch(() => 0);
+    return (
+      <div className="an-shell sa-shell">
+        <IgnoreThisBrowser />
+        <PlatformNav who={principalName(p)} newTrials={newTrials} />
+        <div className="an-body">
+          {noDb}
+          <main className="a-main">{children}</main>
         </div>
       </div>
     );

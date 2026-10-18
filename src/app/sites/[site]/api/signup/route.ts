@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { headers } from "next/headers";
 import { hasDb } from "@/lib/env";
 import * as repo from "@/lib/server/repo";
+import { count } from "@/lib/server/funnel";
 import { SLUG_MESSAGES, checkFields, createTrial, deviceCookie, deviceTrial, readFields, siteBase, slugStatus, tooMany, visitorKey } from "@/lib/server/signup";
 
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
@@ -22,20 +23,28 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/si
   const origin = new URL(req.url).origin;
   const mine = await deviceTrial(req.headers.get("cookie"));
   if (mine) {
+    await count(["rejected:device"]).catch(() => {});
     return json({ ok: false, built: { base: siteBase(mine.slug, origin), endsAt: mine.endsAt }, errors: [{ field: "form", message: "عملت موقع تجريبي من الجهاز ده قبل كده." }] }, 409);
   }
 
   const h = await headers();
   const key = visitorKey(h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown");
   const limit = await tooMany(key);
-  if (limit) return json({ ok: false, errors: [{ field: "form", message: limit }] }, 429);
+  if (limit) {
+    await count(["rejected:limit"]).catch(() => {});
+    return json({ ok: false, errors: [{ field: "form", message: limit }] }, 429);
+  }
 
   const fields = readFields(form);
   const errors = await checkFields(fields);
-  if (errors.length) return json({ ok: false, errors }, 422);
+  if (errors.length) {
+    await count([`rejected:${errors.some((x) => x.field === "phone") ? "phone" : errors.some((x) => x.field === "slug") ? "address" : "form"}`]).catch(() => {});
+    return json({ ok: false, errors }, 422);
+  }
   try {
     const r = await createTrial(fields, { photo: form.get("photo"), logo: form.get("logo") }, key, origin);
     if (!r.ok) return json(r, 422);
+    await count(["built"]).catch(() => {});
     return json(r, 200, { "Set-Cookie": deviceCookie(fields.slug, origin.startsWith("https:")) });
   } catch (e) {
     console.error("signup", e);
