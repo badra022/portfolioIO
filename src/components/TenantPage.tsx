@@ -22,7 +22,6 @@ import { Featured } from "./Featured";
 import { Honors } from "./Honors";
 import { Faq } from "./Faq";
 import { Popup } from "./Popup";
-import { DevCredit } from "./DevCredit";
 import { Tracker } from "./Tracker";
 import { jsonLdScript, structuredData } from "@/lib/structured-data";
 import { LeadForms } from "./LeadForms";
@@ -147,7 +146,6 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
         ))}
       </main>
       <Footer c={c} />
-      <DevCredit siteName={c.profile.fullTitle} />
       <StickyBar c={c} chat={chat} />
       {/* Machine-readable description of the teacher, classes, exams, book and videos (lib/structured-data.ts). */}
       {!preview && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData(c, { canonical })) }} />}

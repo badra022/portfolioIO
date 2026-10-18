@@ -90,3 +90,37 @@ export async function getObject(slug: string, key: string): Promise<Uint8Array |
   if (!file.startsWith(LOCAL_STORAGE_DIR + path.sep)) return null;
   return fs.readFile(file).then((b) => new Uint8Array(b)).catch(() => null);
 }
+
+/** Removes every file of a teacher (all folders). Used when the teacher is deleted. */
+export async function deleteFolder(slug: string): Promise<void> {
+  if (!/^[a-z0-9-]+$/.test(slug)) throw new Error("Invalid teacher.");
+  if (hasSupabaseStorage()) {
+    // Storage lists one folder level at a time: walk them all, then delete in batches.
+    const keys: string[] = [];
+    const walk = async (folder: string, depth: number) => {
+      const res = await fetch(`${env.supabaseUrl}/storage/v1/object/list/${env.storageBucket}`, {
+        method: "POST",
+        headers: supabaseHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ prefix: folder, limit: 1000 }),
+      });
+      if (!res.ok) throw new Error(`Listing failed: ${res.status} ${await res.text()}`);
+      for (const r of (await res.json()) as { name: string; id: string | null }[]) {
+        if (r.id) keys.push(`${folder}/${r.name}`);
+        else if (depth < 4) await walk(`${folder}/${r.name}`, depth + 1);
+      }
+    };
+    await walk(slug, 0);
+    for (let i = 0; i < keys.length; i += 100) {
+      const res = await fetch(`${env.supabaseUrl}/storage/v1/object/${env.storageBucket}`, {
+        method: "DELETE",
+        headers: supabaseHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ prefixes: keys.slice(i, i + 100) }),
+      });
+      if (!res.ok) throw new Error(`Delete failed: ${res.status} ${await res.text()}`);
+    }
+    return;
+  }
+  const dir = path.join(LOCAL_STORAGE_DIR, slug);
+  if (!dir.startsWith(LOCAL_STORAGE_DIR + path.sep)) throw new Error("Invalid path.");
+  await fs.rm(dir, { recursive: true, force: true });
+}

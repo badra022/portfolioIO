@@ -38,6 +38,39 @@ export const tenants = pgTable("tenants", {
   termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
 }, (t) => [uniqueIndex("tenants_signup_phone_key").on(t.signupPhone)]);
 
+/**
+ * Every free trial request from the platform's home page (lib/server/signup.ts):
+ * the lead's details and what they asked for. Kept when the trial site is deleted
+ * (tenant_id becomes null), so the super admin's list of leads stays complete.
+ */
+export const trialRequests = pgTable("trial_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "set null" }),
+  /** The site address asked for (still shown after the site is deleted). */
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  title: text("title"),
+  subject: text("subject"),
+  /** WhatsApp number, international digits (lib/phone.ts). */
+  phone: text("phone"),
+  locale: text("locale"),
+  username: text("username"),
+  /** «ملاحظات أو طلبات خاصة» from the form. */
+  notes: text("notes"),
+}, (t) => [index("trial_requests_created_idx").on(t.createdAt)]);
+
+/**
+ * Daily counters for the platform's own home page (lib/server/funnel.ts): views,
+ * how far visitors got in the sign-up form, builds. Cairo days.
+ */
+export const platformDaily = pgTable("platform_daily", {
+  day: date("day").notNull(),
+  metric: text("metric").notNull(),
+  key: text("key").notNull().default(""),
+  value: bigint("value", { mode: "number" }).notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.day, t.metric, t.key] })]);
+
 /** Verification codes sent from the sign-up form (lib/server/otp.ts), only to limit how many are sent. */
 export const signupOtps = pgTable("signup_otps", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -50,7 +50,7 @@ export async function proxy(request: NextRequest) {
         status: 401,
         headers: {
           // One realm per host, so a login entered on one admin page is reused on the next.
-          "WWW-Authenticate": `Basic realm="portfolioIO admin", charset="UTF-8"`,
+          "WWW-Authenticate": `Basic realm="myostaz admin", charset="UTF-8"`,
           "Cache-Control": "no-store",
         },
       });

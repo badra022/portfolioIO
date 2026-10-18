@@ -4,6 +4,8 @@ import { hasDb } from "@/lib/env";
 import { requireSuper } from "@/lib/server/auth";
 import { platformStats, statsRange, type Preset } from "@/lib/server/platform-stats";
 import { PlatformStatsView } from "@/components/admin/PlatformStatsView";
+import { FunnelView } from "@/components/admin/FunnelView";
+import { funnel } from "@/lib/server/funnel";
 
 export const metadata: Metadata = { title: "الإحصائيات العامة" };
 
@@ -17,13 +19,12 @@ export default async function PlatformStatsPage({ params, searchParams }: PagePr
   const q = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const range = statsRange({ range: one(q.range), from: one(q.from), to: one(q.to) });
-  const s = await platformStats(range);
+  const [s, f] = await Promise.all([platformStats(range), funnel(range.from, range.to)]);
 
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href="/admin">→ المدرسين</a>
-        <h1>الإحصائيات العامة</h1>
+        <h1>الإحصائيات</h1>
         <p className="a-sub">كل المدرسين مع بعض (الموقع بس، من غير المعاينة). الأيام بتوقيت القاهرة.{s ? ` الفترة: ${s.from} → ${s.range.to}.` : ""}</p>
         <nav className="an-ranges" aria-label="الفترة">
           {(Object.keys(PRESET_LABEL) as Preset[]).map((k) => (
@@ -36,7 +37,8 @@ export default async function PlatformStatsPage({ params, searchParams }: PagePr
           <button type="submit" className={`btn-sm ${range.preset === "custom" ? "primary" : "ghost"}`}>عرض</button>
         </form>
       </div>
-      {!hasDb() || !s ? <p className="an-empty">لا توجد قاعدة بيانات متصلة.</p> : <PlatformStatsView s={s} />}
+      {hasDb() && <FunnelView f={f} />}
+      {!hasDb() || !s ? <p className="an-empty">لا توجد قاعدة بيانات متصلة.</p> : <><h2 className="sa-h2">مواقع المدرسين</h2><PlatformStatsView s={s} /></>}
     </>
   );
 }

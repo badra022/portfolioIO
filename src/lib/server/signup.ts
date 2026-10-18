@@ -45,6 +45,8 @@ export type SignupFields = {
   terms: boolean;
   /** The photo had its background removed in the browser (lib/cutout.ts). */
   photoCut: boolean;
+  /** «ملاحظات أو طلبات خاصة»: for the super admin's list of trial requests. */
+  notes: string;
 };
 
 export type SignupError = { field: keyof SignupFields | "photo" | "logo" | "form"; message: string };
@@ -77,6 +79,7 @@ export function readFields(form: FormData): SignupFields {
     phoneToken: s("phoneToken", 200),
     terms: s("terms") === "1",
     photoCut: s("photoCut") === "1",
+    notes: s("notes", 1000),
   };
 }
 
@@ -187,6 +190,11 @@ export async function createTrial(f: SignupFields, files: { photo: FormDataEntry
     trialEndsAt: endsAt, signupKey: key, signupPhone: signupPhone(f)!, termsAcceptedAt: new Date(),
     login: { username: f.username, passwordHash: await hashPassword(f.password) },
   });
+  const made = await repo.getTenant(f.slug);
+  await repo.addTrialRequest({
+    tenantId: made?.id ?? null, slug: f.slug, name: `${f.title} ${f.name}`.trim(), title: f.title, subject: f.subject,
+    phone: signupPhone(f)!, locale: f.locale, username: f.username, notes: f.notes,
+  }).catch((e) => console.error("trial request", e));
   await seedSamples(f.slug, f.locale).catch((e) => console.error("trial samples", e));
   const base = siteBase(f.slug, origin);
   return { ok: true as const, base, endsAt: endsAt.toISOString(), username: f.username, links: demoLinks(base, f.locale) };

@@ -30,7 +30,9 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/v"
   try {
     const data = await getSiteData(site);
     const tenantId = data.kind === "tenant" ? await activeTenantId(data.slug) : null;
-    if (tenantId && data.kind === "tenant") await record(tenantId, toCounters(body, refTargets(data.content)), data.env);
+    if (tenantId && data.kind === "tenant") {
+      await record(tenantId, toCounters(body, refTargets(data.content), new Set(data.content.pages.map((p) => p.path))), data.env);
+    }
   } catch (e) {
     console.error("analytics", e);
   }

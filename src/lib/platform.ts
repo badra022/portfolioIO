@@ -10,6 +10,12 @@ export const BRAND = {
   home: "https://myostaz.com",
 };
 
+/** The browser-tab and home-screen icons of the platform's own pages (the logo's mark, public/brand). */
+export const BRAND_ICONS = {
+  icon: [{ url: "/brand/ostaz-mark.svg", type: "image/svg+xml" }, { url: "/brand/icon-32.png", sizes: "32x32", type: "image/png" }],
+  apple: [{ url: "/brand/apple-icon.png", sizes: "180x180" }],
+};
+
 export const DEVELOPER = {
   /** Where prospects reach out. */
   facebook: "https://www.facebook.com/badra069",

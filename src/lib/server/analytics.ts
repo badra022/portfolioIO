@@ -23,7 +23,7 @@ const periodsIn = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((p) =
  * Turns one batch from the browser into counter increments. Anything unexpected is
  * dropped, so a forged request can at most add to known counters.
  */
-export function toCounters(body: unknown, refs?: { codes: ReadonlySet<string>; pages: ReadonlySet<string> }): Map<string, number> {
+export function toCounters(body: unknown, refs?: { codes: ReadonlySet<string>; pages: ReadonlySet<string> }, sitePages?: ReadonlySet<string>): Map<string, number> {
   const out = new Map<string, number>();
   const add = (metric: string, key: string, n = 1) => out.set(`${metric}\u0000${key}`, (out.get(`${metric}\u0000${key}`) ?? 0) + n);
   const events = (body as { e?: unknown })?.e;
@@ -58,6 +58,10 @@ export function toCounters(body: unknown, refs?: { codes: ReadonlySet<string>; p
         if (e.u === true) add("ref_visitor", `${e.c}|${page}`);
         break;
       }
+      case "page":
+        // Visits per page (offers, requests): only the site's own page addresses.
+        if (typeof e.p === "string" && sitePages?.has(e.p)) add("page_view", e.p);
+        break;
       case "dwell": {
         if (dwells++ || typeof e.s !== "number" || !Number.isFinite(e.s)) break;
         const s = Math.max(0, Math.min(MAX_DWELL, Math.round(e.s)));
@@ -99,6 +103,19 @@ export async function activeTenantId(slug: string): Promise<string | null> {
 /* ------------------------------------------------------------------ */
 /* Reading                                                             */
 /* ------------------------------------------------------------------ */
+
+/** All-time visits per page address (content.pages), for the admin list of pages. */
+export async function pageVisits(slug: string, env: SiteEnv = "production"): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!hasDb()) return out;
+  const tenantId = await activeTenantId(slug);
+  if (!tenantId) return out;
+  const rows = await db().select({ key: analyticsDaily.key, n: sql<number>`sum(${analyticsDaily.value})::int` }).from(analyticsDaily)
+    .where(and(eq(analyticsDaily.tenantId, tenantId), eq(analyticsDaily.env, env), eq(analyticsDaily.metric, "page_view")))
+    .groupBy(analyticsDaily.key);
+  for (const r of rows) out.set(r.key, r.n);
+  return out;
+}
 
 export const RANGES = ["today", "month", "lastMonth", "all"] as const;
 export type RangeT = (typeof RANGES)[number];

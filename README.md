@@ -129,6 +129,16 @@ Admin → **التصويتات**. A vote has its own page (`teacher.com/<path>`,
 - **Anonymous**: students only pick a choice. Only a count per choice is stored (`poll_votes`); a cookie on the device ("voted", no id) keeps the same browser from voting twice. Votes are counted by choice position, so don't reorder choices once voting starts.
 - **Results**: votes per choice with percentages, the share link with a copy button, and a reset. Claude: `poll_results`.
 
+## Pages (offers, file requests, information)
+
+Admin → **الصفحات** (under التسويق). A page has its own address (`teacher.com/<path>`, sharing the address space with quizzes and votes) to share instead of a raw link: rather than putting a Drive link to a PDF under a YouTube video for everyone, the teacher links the page, and students see the details and ask for it there.
+
+- **Set up** (admin → **إعداد الصفحات**, or **تعديل** / **+ صفحة جديدة** on the list, which open that page's pop-up directly with `?open=pages.<n>`): the address, on/off, the kind (offer, file request, information: a label for the list), a badge, the title, a description, a video (YouTube plays on the page, a video file plays in a player, any other link gets a "watch" button) or an image, check-mark points, a price and old price, an optional end date with a countdown, the button (WhatsApp, any channel, a link, or one of the site's forms, whose replies land in **الطلبات**), the "back to the site" text, and whether Google may list it.
+- **After the end date** the button is replaced by an "offer ended" line (decided in the browser, so cached pages stop on time). A page that's off answers "not found".
+- **List**: each page's status, kind, visits (all time), link with a copy button, and on/off, edit, open and delete.
+- **Visits** are counted once per page load (`analytics_daily`, metric `page_view`, key = the page address), leaving out browsers that opened `/admin` and automated browsers, like the rest of the analytics.
+- Pages are part of the **أدوات الإعلان** (promo) bundle in the plans.
+
 ## Exam results (students look up their grade)
 
 Under the upcoming exams, the exams section gets a **نتايج الامتحانات اللي فاتت** button (text editable in the exams section) once at least one exam's results are published. The student picks an exam (title and date), types their name and phone, and sees their score (out of the full mark, with a percentage and the teacher's note). They see only their own row; nothing else leaves the server.
@@ -188,9 +198,20 @@ Each teacher sees **الإحصائيات** ("Analytics") in their `/admin`; you 
 - **Cost:** about 2–4 small requests per visit to your own server and a few dozen rows per teacher per day (~30 MB/year for 10 teachers). It fits in Supabase Free (500 MB) and Vercel Pro's included usage; nothing to subscribe to.
 - **Existing database:** run `db/migrations/0002_analytics.sql` once in Supabase's SQL Editor (or `npm run db:migrate`). New setups get it from `db/supabase-setup.sql`.
 
-## Overall stats (super admin)
+## Super admin console (the platform host's `/admin`)
 
-Platform console → **الإحصائيات العامة** (`/admin/stats` on the platform host): every teacher's public site together (the private preview is left out).
+A side menu (a tab bar on phones) with four sections:
+
+- **الرئيسية**: how many teachers and in what state (live, trial running, trial over, stopped), trial requests in the last 24 hours / 7 days / ever with the latest few, the home page's sign-ups this week, the trials that need a decision (ending within 6 hours or ended in the last 3 days), and this month's visitors across all sites.
+- **المدرسين** (`/admin/tenants`): every teacher in one table with state, time left on a trial, address, visitors this month and age. Filter by state, search, tick some (or all shown) and apply one action to all of them: turn on, turn off, extend the trial 24 hours, end the trial now, make it a normal site, or delete. Each row also has its own buttons (the teacher's admin, +24 hours, on/off, delete), and clicking a row opens the teacher's page. Turning off and ending a trial ask first; deleting asks you to type «حذف».
+- **طلبات التجربة** (`/admin/trials`): every request from the home page's trial form (`trial_requests`): when, name, subject, WhatsApp, the site and its state (running, ended, activated, stopped, deleted), and the «ملاحظات أو طلبات خاصة» the visitor wrote, with +24 hours and activate buttons, filters, search, and a CSV download. Requests stay after the site is deleted.
+- **الإحصائيات**: the home page's sign-up funnel (visits, each of the 4 form steps, pressing build, sites built, and why builds were refused; counted once per page load in `platform_daily`), then every teacher's sites together (below).
+
+A teacher's page (`/admin/tenants/<slug>`) shows their state and address, this month's visitors and contacts, all-time visitors, new requests and logins, their trial request with notes, the trial (activate, +24 hours, end now), plan, domains, logins, site files, and **delete** at the bottom. Deleting removes the teacher, everything that belongs to them (the tables cascade) and their files in storage; remove a custom domain from Vercel yourself.
+
+### Overall numbers for teachers' sites
+
+**الإحصائيات** also shows every teacher's public site together (the private preview is left out).
 
 - **Date filter**: today, last 7 / 30 days, this month, last month, all time, or any from–to range (Cairo days).
 - **Totals**: teachers (published, added in the range), page views, unique visitors, engagements, and the share of visitors who engaged. Unique visitors are exact for a day, a calendar month and all time (summed across teachers, so one person visiting two teachers counts twice); for other ranges the page says it shows the sum of each day's unique visitors.
