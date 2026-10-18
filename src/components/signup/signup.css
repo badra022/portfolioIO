@@ -175,3 +175,5 @@
 .su-tel { display: flex; gap: 8px; }
 .su .su-tel select { flex: none; width: 10.5em; padding-inline: 8px; font-size: 15px; }
 .su .su-tel input { flex: 1; min-width: 0; }
+.su textarea { width: 100%; padding: 10px 14px; border: 1px solid #D5E2F2; border-radius: 14px; background: #fff; color: var(--s-ink); font: inherit; font-size: 16px; resize: vertical; }
+.su-opt { font-style: normal; font-weight: 400; color: var(--s-muted); font-size: 13px; }

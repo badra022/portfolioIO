@@ -12,7 +12,7 @@ export default async function NewTenant({ params }: PageProps<"/sites/[site]/adm
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href="/admin">→ المدرسين</a>
+        <a className="a-back" href="/admin/tenants">→ المدرسين</a>
         <h1>مدرس جديد</h1>
         <p className="a-sub">ابدأ بمحتوى جاهز (كل أقسام الموقع بمحتوى تجريبي: مواعيد، امتحانات، اختبار، تصويت، رابط شريك...) أو انسخ مدرس موجود، ثم عدّل من لوحة التحكم.</p>
       </div>

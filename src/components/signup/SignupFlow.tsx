@@ -49,7 +49,7 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
   const [f, setF] = useState({
     title: "أ.", name: "", subject: "", locale: "ar-EG" as "ar-EG" | "en",
     slogan: "", color: COLORS[0], scheme: "light" as "light" | "dark",
-    country: DEFAULT_COUNTRY, phone: "", videos: ["", "", ""], slug: "", username: "", password: "", website: "", terms: false,
+    country: DEFAULT_COUNTRY, phone: "", videos: ["", "", ""], slug: "", username: "", password: "", website: "", terms: false, notes: "",
   });
   const [photo, setPhoto] = useState<File | null>(null);
   const [logo, setLogo] = useState<File | null>(null);
@@ -79,6 +79,18 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => { setF((x) => ({ ...x, [k]: v })); setErrors((e) => e.filter((x) => x.field !== k)); };
   const en = f.locale === "en";
   const titles = en ? TITLES_EN : TITLES_AR;
+
+  // The home page's funnel (lib/server/funnel.ts): the view and each step reached, once per page load.
+  const tracked = useRef(new Set<string>());
+  const track = (...events: string[]) => {
+    const fresh = events.filter((e) => !tracked.current.has(e));
+    if (!fresh.length || navigator.webdriver) return;
+    fresh.forEach((e) => tracked.current.add(e));
+    const body = JSON.stringify({ e: fresh });
+    if (!navigator.sendBeacon?.("/api/signup/track", body)) void fetch("/api/signup/track", { method: "POST", body, keepalive: true }).catch(() => {});
+  };
+  useEffect(() => { track("view"); }, []);
+  useEffect(() => { if (state === "form") track(`step:${step + 1}`); }, [step, state]);
 
   // A site built from this browser before: show it instead of a new form.
   useEffect(() => {
@@ -196,6 +208,7 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
    */
   async function submit() {
     const t0 = Date.now();
+    track("submit");
     setState("building"); setBuildStage(0); setBuildStart(t0);
     top.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     const at = (n: number) => t0 + BUILD_MS.slice(0, n).reduce((a, b) => a + b, 0);
@@ -352,6 +365,10 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
                   <Text label="كلمة السر" type="password" value={f.password} onChange={(v) => set("password", v)} error={err("password")} placeholder="8 حروف على الأقل" dir="ltr" autoComplete="new-password" />
                 </div>
                 <p className="su-note">هتدخل بيهم لوحة التحكم وتعدّل موقعك. الموقع شغال 24 ساعة ببلاش، ومن غير أي دفع.</p>
+                <label className="su-field"><span>ملاحظات أو طلبات خاصة <em className="su-opt">(اختياري)</em></span>
+                  <textarea rows={3} maxLength={1000} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder="مثلاً: عايز قسم للحصص الأونلاين، أو عندي سنتر وعايز موقع ليه" />
+                  <small>بنقراها بنفسنا، وبتساعدنا نجهّزلك الموقع زي ما انت عايز.</small>
+                </label>
                 <label className="su-check">
                   <input type="checkbox" checked={f.terms} onChange={(e) => set("terms", e.target.checked)} aria-invalid={Boolean(err("terms"))} />
                   <span>موافق على <a href="/terms" target="_blank" rel="noopener">شروط التجربة</a>: التصميم والمحتوى الجاهز ملك المنصة، ومش هنسخه أو نديه لحد يعمل زيه.</span>

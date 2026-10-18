@@ -1,11 +1,17 @@
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { env } from "@/lib/env";
 import { requireSuper } from "@/lib/server/auth";
-import { getTenant, listUsers } from "@/lib/server/repo";
+import { getTenant, listTrialRequests, listUsers } from "@/lib/server/repo";
+import { overview } from "@/lib/server/analytics";
+import { adminCounts } from "@/lib/server/admin-counts";
+import { siteAddress } from "@/lib/server/console";
+import { STATE_LABEL, fromNow, tenantState } from "@/lib/admin/tenant-actions";
 import { formatWhen } from "@/lib/admin/format";
 import {
   addDomainAction, createUserAction, deleteUserAction, primaryDomainAction, removeDomainAction,
   resetPasswordAction, setStatusAction, setTrialAction, setUserDisabledAction, putSiteFilesAction, deleteSiteFileAction, setPermissionsAction,
+  deleteTenantAction, tenantsAction,
 } from "../../actions";
 import { listSiteFiles } from "@/lib/server/site-files";
 import { ActionForm } from "@/components/admin/ConsoleForms";
@@ -16,8 +22,17 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
   const site = decodeURIComponent(raw);
   if (site !== "_platform") notFound();
   await requireSuper(site);
-  const [t, users, files] = await Promise.all([getTenant(slug), listUsers(slug), listSiteFiles(slug)]);
+  await connection();
+  const [t, users, files, stats, leads] = await Promise.all([
+    getTenant(slug), listUsers(slug), listSiteFiles(slug), overview().catch(() => []), listTrialRequests().catch(() => []),
+  ]);
   if (!t) notFound();
+  const counts = await adminCounts(t, "production").catch(() => ({ requests: 0, grading: 0, complaints: 0 }));
+  const st = stats.find((s) => s.slug === t.slug);
+  const lead = leads.find((l) => l.slug === t.slug);
+  const state = tenantState(t);
+  const address = siteAddress(t.slug, t.domains);
+  const num = (v: number) => v.toLocaleString("en-US");
   const active = t.status === "active";
   // Where the files are visible: the main domain, else the preview address on this host.
   const primary = t.domains.find((d) => d.isPrimary)?.domain ?? t.domains[0]?.domain;
@@ -26,17 +41,41 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
   return (
     <>
       <div className="a-head">
-        <a className="a-back" href="/admin">→ المدرسين</a>
+        <a className="a-back" href="/admin/tenants">→ المدرسين</a>
         <h1>{t.name}</h1>
-        <p className="a-sub"><code dir="ltr">{t.slug}</code> · {active ? "منشور" : "متوقف"}</p>
+        <p className="a-sub">
+          <span className={`sa-state ${state}`}>{STATE_LABEL[state]}</span>{" "}
+          {t.trialEndsAt && state !== "off" && <>{fromNow(t.trialEndsAt)} · </>}
+          <a dir="ltr" href={address.url} target="_blank" rel="noopener">{address.label}</a> · <code dir="ltr">{t.slug}</code>
+        </p>
         <div className="a-actions">
-          <a className="btn-sm ghost" href={`/t/${t.slug}`} target="_blank" rel="noopener">معاينة</a>
-          <a className="btn-sm ghost" href={`/t/${t.slug}/admin`}>تعديل المحتوى</a>
+          <a className="btn-sm ghost" href={address.url} target="_blank" rel="noopener">افتح الموقع ↗</a>
+          <a className="btn-sm ghost" href={`/t/${t.slug}/admin`}>لوحة تحكم المدرس</a>
+          <a className="btn-sm ghost" href={`/t/${t.slug}/admin/analytics`}>إحصائياته</a>
           <form action={setStatusAction.bind(null, t.slug, active ? "disabled" : "active")}>
             <button className={`btn-sm ${active ? "ghost danger" : "primary"}`}>{active ? "إيقاف الموقع" : "تشغيل الموقع"}</button>
           </form>
         </div>
       </div>
+
+      <section className="sa-kpis" aria-label="أرقام المدرس">
+        <div className="sa-kpi"><b className="num">{num(st?.visitors ?? 0)}</b><span>زوار الشهر</span></div>
+        <div className="sa-kpi"><b className="num">{num(st?.contacts ?? 0)}</b><span>تواصلوا الشهر ده</span></div>
+        <div className="sa-kpi"><b className="num">{num(st?.allTimeVisitors ?? 0)}</b><span>زوار من البداية</span></div>
+        <div className="sa-kpi"><b className="num">{num(counts.requests)}</b><span>طلبات جديدة</span></div>
+        <div className="sa-kpi"><b className="num">{num(users.length)}</b><span>حسابات</span></div>
+      </section>
+
+      {lead && (
+        <section className="a-panel">
+          <h2>طلب التجربة</h2>
+          <p className="a-sub">
+            اتطلب {fromNow(lead.createdAt)} · {lead.subject ?? ""}
+            {lead.phone && <> · <a dir="ltr" href={`https://wa.me/${lead.phone}`} target="_blank" rel="noopener">+{lead.phone}</a></>}
+          </p>
+          {lead.notes ? <blockquote className="sa-quote">{lead.notes}</blockquote> : <p className="a-sub">من غير ملاحظات.</p>}
+        </section>
+      )}
 
       {t.trialEndsAt && (
         <section className={`a-panel a-trial ${Date.parse(t.trialEndsAt) <= Date.now() ? "over" : ""}`}>
@@ -49,6 +88,9 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
           <div className="a-actions">
             <form action={setTrialAction.bind(null, t.slug, "activate")}><button className="btn-sm primary">تفعيل الموقع (إلغاء التجربة)</button></form>
             <form action={setTrialAction.bind(null, t.slug, "extend")}><button className="btn-sm ghost">مدّ التجربة 24 ساعة</button></form>
+            {Date.parse(t.trialEndsAt) > Date.now() && (
+              <form action={async () => { "use server"; await tenantsAction([t.slug], "end"); }}><button className="btn-sm ghost danger">إنهاء التجربة الآن</button></form>
+            )}
           </div>
         </section>
       )}
@@ -146,6 +188,17 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
             </div>
           </details>
         </ActionForm>
+      </section>
+      <section className="a-panel sa-danger">
+        <h2>حذف المدرس</h2>
+        <p className="a-sub">نهائي: الموقع والحسابات والدومينات والطلبات والاختبارات والإحصائيات والصور هتتمسح ومش هترجع. طلب التجربة (لو موجود) بيفضل في «طلبات التجربة». لو كان ليه دومين في Vercel امسحه من هناك كمان.</p>
+        <details className="a-confirm">
+          <summary className="btn-sm danger">حذف {t.name}</summary>
+          <form action={deleteTenantAction.bind(null, t.slug)} className="a-form inline">
+            <label className="f-field"><span className="f-label">اكتب «حذف» للتأكيد</span><input name="confirm" required pattern="حذف" autoComplete="off" /></label>
+            <button type="submit" className="btn-sm danger">احذف نهائياً</button>
+          </form>
+        </details>
       </section>
     </>
   );

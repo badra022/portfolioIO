@@ -689,3 +689,4 @@ button.btn { font: inherit; cursor: pointer; }
 .lp-body .ft-badge { justify-self: start; }
 /* The admin panel has its own trial note. */
 .site:has(.an-shell) .trial-bar { display: none; }
+.site:has(.an-shell) .devcredit { display: none; }

@@ -11,7 +11,7 @@ import { ForbiddenError, principalName, requireAdmin, requireSuper, type Princip
 import { DOMAINS_TAG, slugForSite, tenantTag } from "@/lib/server/site";
 import { assetUrl } from "@/lib/server/assets";
 import { listBundled, readBundledAssets } from "@/lib/server/bundled";
-import { ensureBucket, putObject } from "@/lib/server/storage";
+import { deleteFolder, ensureBucket, putObject } from "@/lib/server/storage";
 import { ImageError, SLUG_RE, USERNAME_RE, loginUrlFor, normalizeDomain, storeImage } from "@/lib/server/admin-ops";
 import { generatePassword, hashPassword } from "@/lib/server/passwords";
 import { mapImages } from "@/lib/content-utils";
@@ -28,6 +28,7 @@ import * as studentsRepo from "@/lib/server/students";
 import { cairoNow } from "@/lib/poll";
 import { FEATURES, blockedMessage, type Feature } from "@/lib/permissions";
 import { MAX_SITE_FILE } from "@/lib/site-files";
+import { TENANT_ACTIONS, type TenantActionT } from "@/lib/admin/tenant-actions";
 import { adminEnv } from "@/lib/server/admin-env";
 
 type Fail = { ok: false; reason: "forbidden" | "missing" | "error"; message?: string };
@@ -231,6 +232,53 @@ export async function createTenantAction(_prev: ConsoleState, form: FormData): P
 }
 
 /** Free trials: «activate» makes it a normal site, «extend» gives it 24 more hours. */
+/**
+ * One action on one or more teachers at once (the console's teachers table and
+ * a teacher's page): turn sites on/off, extend a trial 24 hours, end it now,
+ * make it a normal site, or delete for good (with its files; trial leads stay).
+ */
+export async function tenantsAction(slugs: string[], action: TenantActionT): Promise<{ ok: boolean; message: string }> {
+  await requireSuper(PLATFORM);
+  if (!TENANT_ACTIONS.includes(action) || !Array.isArray(slugs)) return { ok: false, message: "طلب غير صحيح." };
+  const list = [...new Set(slugs.map(String))].filter((x) => SLUG_RE.test(x)).slice(0, 500);
+  let done = 0;
+  for (const slug of list) {
+    const t = await repo.getTenant(slug);
+    if (!t) continue;
+    try {
+      if (action === "enable" || action === "disable") await repo.setTenantStatus(slug, action === "enable" ? "active" : "disabled");
+      else if (action === "extend") {
+        const from = t.trialEndsAt && Date.parse(t.trialEndsAt) > Date.now() ? Date.parse(t.trialEndsAt) : Date.now();
+        await repo.setTrial(slug, new Date(from + 24 * 3600_000));
+      } else if (action === "end") await repo.setTrial(slug, new Date());
+      else if (action === "activate") await repo.setTrial(slug, null);
+      else if (action === "delete") {
+        await repo.deleteTenant(slug);
+        await deleteFolder(slug).catch((e) => console.error("delete files", slug, e));
+      }
+      updateTag(tenantTag(slug));
+      done++;
+    } catch (e) {
+      console.error("tenants action", action, slug, e);
+    }
+  }
+  if (action === "delete") updateTag(DOMAINS_TAG);
+  refresh();
+  const one = done === 1;
+  const verb = {
+    enable: one ? "اتشغّل موقعه" : "اتشغّلت مواقعهم", disable: one ? "اتوقف موقعه" : "اتوقفت مواقعهم",
+    extend: one ? "اتمدّت تجربته 24 ساعة" : "اتمدّت تجاربهم 24 ساعة", end: one ? "اتقفلت تجربته" : "اتقفلت تجاربهم",
+    activate: one ? "اتفعّل كموقع عادي" : "اتفعّلوا كمواقع عادية", delete: one ? "اتمسح" : "اتمسحوا",
+  }[action];
+  return { ok: done > 0, message: done ? `${one ? "مدرس واحد" : `${done} مدرسين`} ${verb}.` : "مفيش حاجة اتغيرت." };
+}
+
+/** A teacher's page: delete, then back to the list. */
+export async function deleteTenantAction(slug: string): Promise<void> {
+  await tenantsAction([slug], "delete");
+  redirect("/admin/tenants");
+}
+
 export async function setTrialAction(slug: string, mode: "activate" | "extend"): Promise<void> {
   await requireSuper(PLATFORM);
   const t = await repo.getTenant(slug);
