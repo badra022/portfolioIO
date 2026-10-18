@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { OstazLogo } from "@/components/brand/OstazLogo";
 import { DevCredit } from "@/components/DevCredit";
-import { BRAND } from "@/lib/platform";
+import { BRAND, BRAND_ICONS } from "@/lib/platform";
 import "@/components/signup/signup.css";
 
-export const metadata: Metadata = { title: "شروط التجربة المجانية · myostaz.com", robots: { index: false, follow: true } };
+export const metadata: Metadata = { title: "شروط التجربة المجانية · myostaz", icons: BRAND_ICONS, robots: { index: false, follow: true } };
 
 /** The free trial's terms, accepted in the sign-up form (components/signup/SignupFlow.tsx). Platform host only. */
 export default async function Terms({ params }: PageProps<"/sites/[site]/terms">) {

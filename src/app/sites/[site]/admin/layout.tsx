@@ -14,10 +14,12 @@ import { adminCounts } from "@/lib/server/admin-counts";
 import { AdminNav, Breadcrumb } from "@/components/admin/AdminNav";
 import { PlatformNav } from "@/components/admin/PlatformNav";
 import { countTrialRequestsSince } from "@/lib/server/repo";
+import { BRAND_ICONS } from "@/lib/platform";
 import "./admin.css";
 
 export const metadata: Metadata = {
-  title: { default: "لوحة التحكم", template: "%s | لوحة التحكم" },
+  title: { default: "لوحة التحكم · myostaz", template: "%s · لوحة التحكم · myostaz" },
+  icons: BRAND_ICONS,
   robots: { index: false, follow: false },
 };
 
