@@ -447,13 +447,18 @@ export async function setTrial(slug: string, endsAt: Date | null): Promise<void>
   await requireDb().update(tenants).set({ trialEndsAt: endsAt }).where(eq(tenants.slug, slug));
 }
 
-/** How many trial sites were made recently, by one visitor (key) and in total. */
-export async function recentSignups(key: string, since: Date): Promise<{ mine: number; all: number }> {
+/** How many trial sites were made in the last day and in the last `recentMinutes`, by one visitor (key) and in total. */
+export async function recentSignups(key: string, recentMinutes: number): Promise<{ mineDay: number; mineRecent: number; allDay: number; allHour: number }> {
+  const recent = new Date(Date.now() - recentMinutes * 60_000).toISOString();
+  const hour = new Date(Date.now() - 3600_000).toISOString();
+  const day = new Date(Date.now() - 24 * 3600_000).toISOString();
   const [r] = await requireDb().select({
-    mine: sql<number>`count(*) filter (where ${tenants.signupKey} = ${key})::int`,
-    all: sql<number>`count(*)::int`,
-  }).from(tenants).where(sql`${tenants.signupKey} is not null and ${tenants.createdAt} >= ${since.toISOString()}`);
-  return r ?? { mine: 0, all: 0 };
+    mineDay: sql<number>`count(*) filter (where ${tenants.signupKey} = ${key})::int`,
+    mineRecent: sql<number>`count(*) filter (where ${tenants.signupKey} = ${key} and ${tenants.createdAt} >= ${recent})::int`,
+    allDay: sql<number>`count(*)::int`,
+    allHour: sql<number>`count(*) filter (where ${tenants.createdAt} >= ${hour})::int`,
+  }).from(tenants).where(sql`${tenants.signupKey} is not null and ${tenants.createdAt} >= ${day}`);
+  return r ?? { mineDay: 0, mineRecent: 0, allDay: 0, allHour: 0 };
 }
 
 export async function slugTaken(slug: string): Promise<boolean> {

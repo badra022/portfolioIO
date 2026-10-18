@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cutout, preloadCutout, type Cutout } from "@/lib/cutout";
+import { COUNTRIES, DEFAULT_COUNTRY, countryOf, normalizePhone } from "@/lib/phone";
 
 /**
  * The public «جرّب موقعك» form on the platform's home page (the page paid ads
@@ -13,6 +14,22 @@ import { cutout, preloadCutout, type Cutout } from "@/lib/cutout";
  */
 type Err = { field: string; message: string };
 type Done = { base: string; endsAt: string; username: string; links: { label: string; href: string }[] };
+type Built = { base: string; endsAt: string | null };
+
+/** The address shape the server accepts (lib/server/admin-ops.ts SLUG_RE), 3 letters at least. */
+const SLUG_SHAPE = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])$/;
+
+/* The built site's links, kept in this browser so a reload shows them instead of a new form (never the password). */
+const SAVED = "ostaz-trial-v1";
+function save(d: Done) {
+  try { localStorage.setItem(SAVED, JSON.stringify({ base: d.base, endsAt: d.endsAt, username: d.username, links: d.links })); } catch {}
+}
+function readSaved(): Done | null {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVED) ?? "null") as Done | null;
+    return d && typeof d.base === "string" && Array.isArray(d.links) && d.links.length ? d : null;
+  } catch { return null; }
+}
 
 const TITLES_AR = ["أ.", "م.", "د.", "مستر", "ميس"];
 const TITLES_EN = ["Mr.", "Ms.", "Dr."];
@@ -32,14 +49,17 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
   const [f, setF] = useState({
     title: "أ.", name: "", subject: "", locale: "ar-EG" as "ar-EG" | "en",
     slogan: "", color: COLORS[0], scheme: "light" as "light" | "dark",
-    phone: "", videos: ["", "", ""], slug: "", username: "", password: "", website: "", terms: false,
+    country: DEFAULT_COUNTRY, phone: "", videos: ["", "", ""], slug: "", username: "", password: "", website: "", terms: false,
   });
   const [photo, setPhoto] = useState<File | null>(null);
   const [logo, setLogo] = useState<File | null>(null);
   const [errors, setErrors] = useState<Err[]>([]);
-  const [state, setState] = useState<"form" | "building" | "done">("form");
+  const [state, setState] = useState<"form" | "building" | "done" | "already">("form");
   const [done, setDone] = useState<Done | null>(null);
-  const [slugFree, setSlugFree] = useState<boolean | null>(null);
+  // The trial this browser already made (its cookie, api/signup?me=1): one per device.
+  const [already, setAlready] = useState<Built | null>(null);
+  // The live address check, for the address it was made for.
+  const [slugCheck, setSlugCheck] = useState<{ slug: string; free: boolean; message: string } | null>(null);
   // The photo without its background: being made, made (null = no person found / failed), and whether to use it.
   const [cut, setCut] = useState<{ busy: boolean; result: Cutout | null }>({ busy: false, result: null });
   const [useCut, setUseCut] = useState(true);
@@ -60,14 +80,27 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
   const en = f.locale === "en";
   const titles = en ? TITLES_EN : TITLES_AR;
 
-  // Live check that the site address is free.
+  // A site built from this browser before: show it instead of a new form.
   useEffect(() => {
-    if (!/^[a-z0-9-]{3,50}$/.test(f.slug)) { setSlugFree(null); return; }
-    const t = setTimeout(() => {
-      fetch(`/api/signup?slug=${encodeURIComponent(f.slug)}`).then((r) => r.json()).then((r) => setSlugFree(r.ok ? r.free : null)).catch(() => setSlugFree(null));
-    }, 400);
+    const saved = readSaved();
+    if (saved) { setDone(saved); setState("done"); return; }
+    fetch("/api/signup?me=1").then((r) => r.json()).then((r) => { if (r.ok && r.built) { setAlready(r.built); setState("already"); } }).catch(() => {});
+  }, []);
+
+  const slugShapeOk = SLUG_SHAPE.test(f.slug);
+  const checkSlug = (slug: string) =>
+    fetch(`/api/signup?slug=${encodeURIComponent(slug)}`).then((r) => r.json())
+      .then((r) => { const c = { slug, free: Boolean(r.ok && r.free), message: String(r.message ?? "") }; setSlugCheck(c); return c; })
+      .catch(() => null);
+  // Live check that the site address is free; a result only counts for the address it was made for.
+  useEffect(() => {
+    if (!slugShapeOk) return;
+    const t = setTimeout(() => { void checkSlug(f.slug); }, 350);
     return () => clearTimeout(t);
-  }, [f.slug]);
+  }, [f.slug, slugShapeOk]);
+  const slugNow = slugCheck?.slug === f.slug ? slugCheck : null;
+  const phoneKey = normalizePhone(f.country, f.phone) ?? "";
+  const country = countryOf(f.country) ?? COUNTRIES[0];
 
   function pickPhoto(file: File | null) {
     setPhoto(file);
@@ -90,12 +123,11 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
       need(f.subject.trim().length >= 2, "subject", "اكتب المادة", out);
     }
     if (s === 2) {
-      need(/^(\+?\d[\d\s-]{8,18})$/.test(f.phone.trim()), "phone", "اكتب رقم واتساب صحيح، مثل 01012345678", out);
+      need(Boolean(phoneKey), "phone", `اكتب رقم موبايل واتساب صحيح، مثل ${country.example}`, out);
       f.videos.filter(Boolean).forEach((v) => need(/youtu\.?be/.test(v), "videos", "الصق رابط فيديو يوتيوب", out));
     }
     if (s === 3) {
-      need(/^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])$/.test(f.slug), "slug", "حروف إنجليزية صغيرة وأرقام وشرطة، مثل mohamedali", out);
-      need(slugFree !== false, "slug", "العنوان ده محجوز، جرّب عنوان تاني.", out);
+      need(slugShapeOk, "slug", "حروف إنجليزية صغيرة وأرقام وشرطة في النص، 3 حروف على الأقل، مثل mohamedali", out);
       need(/^[a-z0-9._-]{3,32}$/.test(f.username), "username", "حروف إنجليزية صغيرة وأرقام، 3 حروف على الأقل", out);
       need(f.password.length >= 8, "password", "كلمة السر 8 حروف على الأقل", out);
       need(f.terms, "terms", "لازم توافق على شروط التجربة", out);
@@ -118,24 +150,24 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
 
   /** Step 3: the number is checked (one trial per number), then confirmed with a code when codes are on. */
   async function confirmPhone(): Promise<boolean> {
-    const phone = f.phone.trim();
+    const phone = phoneKey;
     if (token?.phone === phone) return true;
     if (codeFor !== phone) {
-      const r = await otpCall({ action: "send", phone });
+      const r = await otpCall({ action: "send", country: f.country, phone: f.phone });
       if (!r.ok) { setErrors([{ field: "phone", message: r.message ?? "حصلت مشكلة، حاول تاني." }]); return false; }
       if (r.skip) { setToken({ phone, token: "" }); return true; }
       setCodeFor(phone); setCode(""); setResendAt(Date.now() + 60_000);
       return false;
     }
     if (!/^\d{4,8}$/.test(code.trim())) { setErrors([{ field: "code", message: "اكتب الكود اللي وصلك" }]); return false; }
-    const r = await otpCall({ action: "check", phone, code: code.trim() });
+    const r = await otpCall({ action: "check", country: f.country, phone: f.phone, code: code.trim() });
     if (!r.ok || !r.token) { setErrors([{ field: "code", message: r.message ?? "الكود مش صح" }]); return false; }
     setToken({ phone, token: r.token });
     return true;
   }
 
   async function resend() {
-    const r = await otpCall({ action: "send", phone: f.phone.trim() });
+    const r = await otpCall({ action: "send", country: f.country, phone: f.phone });
     if (!r.ok) setErrors([{ field: "code", message: r.message ?? "حصلت مشكلة، حاول تاني." }]);
     else { setCode(""); setResendAt(Date.now() + 60_000); setErrors([]); }
   }
@@ -143,6 +175,13 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
   async function next() {
     if (busy) return;
     const out = check(step);
+    // The address is checked again right before building, in case it was typed a moment ago.
+    if (step === 3 && slugShapeOk) {
+      setBusy(true);
+      const c = slugNow ?? (await checkSlug(f.slug));
+      setBusy(false);
+      if (c && !c.free) out.unshift({ field: "slug", message: c.message || "العنوان ده مستخدم بالفعل، جرّب عنوان تاني." });
+    }
     setErrors(out);
     if (out.length) return;
     if (step === 2 && !(await confirmPhone())) return;
@@ -177,18 +216,20 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
     for (const [k, v] of Object.entries(f)) if (k !== "videos" && k !== "terms") fd.set(k, String(v));
     f.videos.filter(Boolean).forEach((v) => fd.append("videos", v));
     fd.set("terms", f.terms ? "1" : "");
-    fd.set("phoneToken", token?.phone === f.phone.trim() ? token.token : "");
+    fd.set("phoneToken", token?.phone === phoneKey ? token.token : "");
     if (photoFile) fd.set("photo", photoFile);
     if (photoCut) fd.set("photoCut", "1");
     if (logo) fd.set("logo", logo);
     try {
       const res = await fetch("/api/signup", { method: "POST", body: fd });
       const r = await res.json().catch(() => ({ ok: false, errors: [{ field: "form", message: "حصلت مشكلة، حاول تاني." }] }));
+      if (!r.ok && r.built) { setAlready(r.built); setState("already"); return; }
       if (!r.ok) { fail(r.errors ?? [{ field: "form", message: "حصلت مشكلة، حاول تاني." }]); return; }
       await sleepUntil(at(2)); setBuildStage(2);
       await sleepUntil(at(3)); setBuildStage(3);
       await sleepUntil(at(4)); setBuildStage(4);
       await new Promise((ok) => setTimeout(ok, 600));
+      save(r);
       setDone(r); setState("done");
     } catch {
       fail([{ field: "form", message: "مفيش اتصال بالإنترنت؟ حاول تاني." }]);
@@ -199,7 +240,9 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
 
   return (
     <div className="su-flow" ref={top} id="start">
-      {state === "done" && done ? (
+      {state === "already" && already ? (
+        <AlreadyBuilt built={already} />
+      ) : state === "done" && done ? (
         <Result done={done} password={f.password} />
       ) : state === "building" ? (
         <Building stage={buildStage} start={buildStart} />
@@ -259,9 +302,17 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
             {step === 2 && (
               <fieldset className="su-fields">
                 <legend>التواصل والفيديوهات</legend>
-                <Text label="رقم الواتساب" value={f.phone} onChange={(v) => { set("phone", v); if (v.trim() !== codeFor) setCodeFor(""); }} error={err("phone")} placeholder="01012345678" inputMode="tel" dir="ltr" autoComplete="tel"
-                  hint={token?.phone === f.phone.trim() && token.token ? "✓ الرقم متأكد" : otp ? `الطلاب هيكلموك عليه من كل زرار في الموقع. هنبعتلك كود ${otp === "whatsapp" ? "على واتساب" : "في رسالة"} نتأكد بيه.` : "الطلاب هيكلموك عليه من كل زرار في الموقع"} />
-                {codeFor && codeFor === f.phone.trim() && token?.phone !== codeFor && (
+                <label className="su-field"><span>رقم الواتساب</span>
+                  <span className="su-tel" dir="ltr">
+                    <select aria-label="البلد" value={f.country} onChange={(e) => { set("country", e.target.value); setCodeFor(""); }}>
+                      {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.flag} +{c.code} {c.name}</option>)}
+                    </select>
+                    <input value={f.phone} onChange={(e) => { set("phone", e.target.value); setCodeFor(""); }} placeholder={country.example} inputMode="tel" autoComplete="tel-national" aria-invalid={Boolean(err("phone"))} />
+                  </span>
+                  {err("phone") ? <small className="su-err">{err("phone")}</small>
+                    : <small>{token?.phone === phoneKey && token.token ? "✓ الرقم متأكد" : otp ? `الطلاب هيكلموك عليه من كل زرار في الموقع. هنبعتلك كود ${otp === "whatsapp" ? "على واتساب" : "في رسالة"} نتأكد بيه.` : "الطلاب هيكلموك عليه من كل زرار في الموقع. رقم واحد لكل موقع تجريبي."}</small>}
+                </label>
+                {codeFor && codeFor === phoneKey && token?.phone !== codeFor && (
                   <div className="su-code">
                     <Text label={`الكود اللي وصلك ${otp === "whatsapp" ? "على واتساب" : "في رسالة"}`} value={code} onChange={(v) => { setCode(v.replace(/\D/g, "").slice(0, 8)); setErrors((e) => e.filter((x) => x.field !== "code")); }}
                       error={err("code")} placeholder="123456" inputMode="tel" dir="ltr" autoComplete="one-time-code" />
@@ -291,9 +342,10 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
                     {after && <i>{after}</i>}
                   </span>
                   {err("slug") ? <small className="su-err">{err("slug")}</small>
-                    : slugFree === true ? <small className="su-ok">✓ العنوان متاح</small>
-                    : slugFree === false ? <small className="su-err">العنوان ده محجوز</small>
-                    : <small>حروف إنجليزية صغيرة وأرقام، مثل mohamedali</small>}
+                    : !slugShapeOk ? <small>حروف إنجليزية صغيرة وأرقام، مثل mohamedali</small>
+                    : !slugNow ? <small className="su-muted">بنشوف العنوان متاح ولا لأ…</small>
+                    : slugNow.free ? <small className="su-ok">✓ العنوان متاح</small>
+                    : <small className="su-err">{slugNow.message || "العنوان ده مستخدم بالفعل"}</small>}
                 </label>
                 <div className="su-row">
                   <Text label="اسم المستخدم" value={f.username} onChange={(v) => set("username", v.toLowerCase().replace(/\s/g, ""))} error={err("username")} placeholder="mohamed" dir="ltr" autoComplete="username" />
@@ -313,7 +365,7 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
             <div className="su-nav">
               {step > 0 && <button type="button" className="su-btn ghost" onClick={() => go(step - 1)}>رجوع</button>}
               <button type="submit" className="su-btn primary" disabled={busy}>
-                {busy ? "لحظة…" : step === 2 && codeFor && codeFor === f.phone.trim() && token?.phone !== codeFor ? "أكّد الكود" : step < STEPS.length - 1 ? "التالي" : "ابني موقعي"}
+                {busy ? "لحظة…" : step === 2 && codeFor && codeFor === phoneKey && token?.phone !== codeFor ? "أكّد الكود" : step < STEPS.length - 1 ? "التالي" : "ابني موقعي"}
               </button>
             </div>
           </form>
@@ -448,10 +500,27 @@ function Result({ done, password }: { done: Done; password: string }) {
         <dl>
           <div><dt>الرابط</dt><dd dir="ltr"><a href={`${site.href.replace(/\/$/, "")}/admin`} target="_blank" rel="noopener">{`${site.href.replace(/^https?:\/\//, "").replace(/\/$/, "")}/admin`}</a></dd></div>
           <div><dt>اسم المستخدم</dt><dd dir="ltr">{done.username}</dd></div>
-          <div><dt>كلمة السر</dt><dd dir="ltr">{password.replace(/./g, "•")} <small>(اللي كتبتها)</small></dd></div>
+          <div><dt>كلمة السر</dt><dd dir="ltr">{password ? password.replace(/./g, "•") : "••••••••"} <small>(اللي كتبتها)</small></dd></div>
         </dl>
         <p className="su-note">من لوحة التحكم تقدر تغيّر أي كلمة أو صورة، تشوف الطلبات والإحصائيات، وتعمل اختبارات وتصويتات جديدة.</p>
       </div>
+    </div>
+  );
+}
+
+/** This browser already made a trial site: one per device. */
+function AlreadyBuilt({ built }: { built: Built }) {
+  const host = built.base.replace(/^https?:\/\//, "");
+  return (
+    <div className="su-card su-result">
+      <span className="su-badge">عندك موقع تجريبي</span>
+      <h2>عملت موقعك التجريبي من الجهاز ده قبل كده</h2>
+      <a className="su-site" href={built.base} target="_blank" rel="noopener" dir="ltr">{host}</a>
+      <div className="su-actions">
+        <a className="su-btn primary" href={built.base} target="_blank" rel="noopener">افتح موقعك</a>
+        <a className="su-btn ghost" href={`${built.base.replace(/\/$/, "")}/admin`} target="_blank" rel="noopener">لوحة التحكم</a>
+      </div>
+      <p className="su-note">كل جهاز ورقم ليهم موقع تجريبي واحد. عجبك؟ كلمنا على واتساب ونفعّله ليك على طول.</p>
     </div>
   );
 }

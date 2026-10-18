@@ -663,17 +663,8 @@ button.btn { font: inherit; cursor: pointer; }
 .trial-left { color: #55657D; }
 .trial-cta { padding: 3px 12px; border-radius: 99px; border: 1px solid #1D6FE0; color: #1D6FE0; text-decoration: none; }
 .trial-cta:hover { background: #1D6FE0; color: #fff; }
-.trial-watermark {
-  position: fixed; inset: 0; z-index: 60; pointer-events: none;
-  background: url("/brand/watermark.svg") 0 0 / 300px 190px repeat; opacity: .09;
-}
 .site[data-trial="true"] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .site[data-trial="true"] input, .site[data-trial="true"] textarea { -webkit-user-select: text; user-select: text; }
 .site[data-trial="true"] img { -webkit-user-drag: none; }
-/* The photo carries the mark more clearly, since that's what gets screenshotted. */
-.site[data-trial="true"] .hero-photo::before {
-  content: ""; position: absolute; z-index: 2; inset-inline-start: 6%; bottom: 14%; width: 144px; height: 28px; pointer-events: none;
-  background: url("/brand/ostaz-logo.svg") center / contain no-repeat; opacity: .75;
-  filter: drop-shadow(0 1px 2px rgb(255 255 255 / .7));
-}
+.trial-bar.foot { border-bottom: 0; border-top: 1px solid #CFE3FC; padding-bottom: 90px; /* clear of the sticky bar */ }
 @media print { .site[data-trial="true"] { display: none; } }
