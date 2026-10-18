@@ -672,7 +672,7 @@ button.btn { font: inherit; cursor: pointer; }
 .site[data-trial="true"] img { -webkit-user-drag: none; }
 /* The photo carries the mark more clearly, since that's what gets screenshotted. */
 .site[data-trial="true"] .hero-photo::before {
-  content: ""; position: absolute; z-index: 2; inset-inline-start: 6%; bottom: 14%; width: 120px; height: 28px; pointer-events: none;
+  content: ""; position: absolute; z-index: 2; inset-inline-start: 6%; bottom: 14%; width: 144px; height: 28px; pointer-events: none;
   background: url("/brand/ostaz-logo.svg") center / contain no-repeat; opacity: .75;
   filter: drop-shadow(0 1px 2px rgb(255 255 255 / .7));
 }

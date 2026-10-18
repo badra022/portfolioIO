@@ -5,7 +5,7 @@
  */
 export const BRAND = {
   /** The name in the logo (components/brand/OstazLogo.tsx). */
-  name: "ostaz.com",
+  name: "myostaz.com",
   /** Where the logo links: the platform's home page (the sign-up). */
   home: "https://myostaz.com",
 };
