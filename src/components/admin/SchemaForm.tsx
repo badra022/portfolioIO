@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { defaultFor, isComplex, kindOf, unwrap, type JS } from "@/lib/admin/schema-tools";
 import { enumLabel, hintFor, labelFor, sectionEnumLabel } from "@/lib/admin/labels";
 import { shrinkForUpload } from "@/lib/shrink-image";
+import { cutout } from "@/lib/cutout";
 
 export type UploadResult = { ok: true; key: string; url: string } | { ok: false; error: string };
 export type FormCtx = {
@@ -464,7 +465,7 @@ const SEGMENT_TEXT = /(^|\.)(title|lede|headline)(\.\d+)+\.text$/;
 function StringInput({ id, s, value, onChange, name, path, required, ctx }: { id: string; s: JS; value: string | undefined; onChange: (v: unknown) => void; name: string; path: string; required: boolean; ctx: FormCtx }) {
   const v = value ?? "";
   const set = (x: string) => onChange(x === "" && !required ? undefined : x);
-  if (s.widget === "image") return <ImageInput value={value} onChange={onChange} required={required} ctx={ctx} />;
+  if (s.widget === "image") return <ImageInput value={value} onChange={onChange} required={required} ctx={ctx} cutoutable={path === "profile.photo"} />;
   if (s.pattern === TIME_PATTERN) return <input id={id} type="time" dir="ltr" value={v} onChange={(e) => set(e.target.value)} />;
   if (s.widget === "date") return <DateTimeInput id={id} value={v} onChange={set} />;
   if (s.widget === "form") {
@@ -506,8 +507,10 @@ function DateTimeInput({ id, value, onChange }: { id: string; value: string; onC
   );
 }
 
-function ImageInput({ value, onChange, required, ctx }: { value: string | undefined; onChange: (v: unknown) => void; required: boolean; ctx: FormCtx }) {
+/** cutoutable: the teacher's main photo, which can have its background removed (lib/cutout.ts). */
+function ImageInput({ value, onChange, required, ctx, cutoutable }: { value: string | undefined; onChange: (v: unknown) => void; required: boolean; ctx: FormCtx; cutoutable?: boolean }) {
   const [busy, setBusy] = useState(false);
+  const [cutting, setCutting] = useState(false);
   const [error, setError] = useState("");
   const src = value ? (/^(https?:)?\//.test(value) ? value : `${ctx.assetBase}/${value.split("/").map(encodeURIComponent).join("/")}`) : "";
   return (
@@ -529,6 +532,19 @@ function ImageInput({ value, onChange, required, ctx }: { value: string | undefi
               if (r.ok) { setError(""); onChange(r.key); } else setError(r.error);
             }} />
         </span>
+        {cutoutable && src && !/cutout/i.test(value ?? "") && (
+          <button type="button" className="btn-sm" disabled={busy || cutting}
+            onClick={async () => {
+              setCutting(true); setError("");
+              const made = await cutout(src).catch(() => null);
+              const r = made ? await ctx.upload(made.file).catch(() => ({ ok: false as const, error: "تعذّر رفع الصورة." })) : null;
+              setCutting(false);
+              if (!r) setError("معرفناش نلاقي شخص واضح في الصورة. جرّب صورة ليك من الوسط لفوق.");
+              else if (r.ok) onChange(r.key); else setError(r.error);
+            }}>
+            {cutting ? "بنشيل الخلفية…" : "شيل الخلفية"}
+          </button>
+        )}
         {value && !required && <button type="button" className="f-link danger" onClick={() => onChange(undefined)}>إزالة</button>}
       </span>
       {error && <span className="f-err" role="alert">{error}</span>}

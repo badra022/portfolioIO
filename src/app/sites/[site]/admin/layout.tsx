@@ -108,7 +108,7 @@ async function Gate({ params, children }: { params: Promise<{ site: string }>; c
 function siteLabel(site: string, slug: string): string {
   const key = site.replace(/~preview$/, "");
   if (key.startsWith("d.")) return key.slice(2);
-  if (key.startsWith("s.") && appEnv.rootDomain) return `${slug}.${appEnv.rootDomain}`;
+  if (key.startsWith("s.") && appEnv.rootDomain) return `${key.slice(2)}.${appEnv.rootDomain}`;
   return `/t/${slug}`;
 }
 

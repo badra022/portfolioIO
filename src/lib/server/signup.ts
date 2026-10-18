@@ -8,6 +8,7 @@ import { SLUG_RE, USERNAME_RE, storeImage, ImageError } from "./admin-ops";
 import * as repo from "./repo";
 import { saveSubmission } from "./submissions";
 import { saveComplaint } from "./complaints";
+import { checkPhoneToken, otpEnabled, phoneUsed } from "./otp";
 
 /**
  * The public «جرّب موقعك» form (components/signup/SignupFlow.tsx → api/signup):
@@ -27,6 +28,12 @@ export type SignupFields = {
   slug: string; name: string; title: string; subject: string; locale: "ar-EG" | "en";
   phone: string; slogan: string; videos: string[]; color: string; scheme: "light" | "dark";
   username: string; password: string;
+  /** From the phone check (api/signup/otp) when codes are on. */
+  phoneToken: string;
+  /** The trial terms (/terms) were accepted. */
+  terms: boolean;
+  /** The photo had its background removed in the browser (lib/cutout.ts). */
+  photoCut: boolean;
 };
 
 export type SignupError = { field: keyof SignupFields | "photo" | "logo" | "form"; message: string };
@@ -55,6 +62,9 @@ export function readFields(form: FormData): SignupFields {
     scheme: s("scheme") === "dark" ? "dark" : "light",
     username: s("username", 32).toLowerCase(),
     password: String(form.get("password") ?? "").slice(0, 100),
+    phoneToken: s("phoneToken", 200),
+    terms: s("terms") === "1",
+    photoCut: s("photoCut") === "1",
   };
 }
 
@@ -65,12 +75,16 @@ export async function checkFields(f: SignupFields): Promise<SignupError[]> {
   else if (RESERVED_SLUGS.has(f.slug) || (await repo.slugTaken(f.slug))) bad("slug", "العنوان ده محجوز، جرّب عنوان تاني.");
   if (f.name.length < 2) bad("name", "اكتب اسمك");
   if (f.subject.length < 2) bad("subject", "اكتب المادة");
-  if (!whatsappDigits(f.phone)) bad("phone", "اكتب رقم واتساب صحيح، مثل 01012345678");
+  const digits = whatsappDigits(f.phone);
+  if (!digits) bad("phone", "اكتب رقم واتساب صحيح، مثل 01012345678");
+  else if (await phoneUsed(digits)) bad("phone", "الرقم ده عمل موقع تجريبي قبل كده. كلمنا على واتساب ونفعّله ليك.");
+  else if (otpEnabled() && !checkPhoneToken(digits, f.phoneToken)) bad("phone", "أكّد رقمك بالكود اللي وصلك الأول.");
   if (!/^#[0-9a-fA-F]{6}$/.test(f.color)) bad("color", "اختار لون");
   f.videos.forEach((v) => { if (!YOUTUBE_RE.test(v)) bad("videos", `الرابط ده مش فيديو يوتيوب: ${v.slice(0, 60)}`); });
   if (!USERNAME_RE.test(f.username)) bad("username", "حروف إنجليزية صغيرة وأرقام و . _ - من 3 لـ 32 حرف");
   else if (await repo.usernameTaken(f.username)) bad("username", "اسم المستخدم ده مستخدم، اختار اسم تاني.");
   if (f.password.length < 8) bad("password", "كلمة السر 8 حروف على الأقل");
+  if (!f.terms) bad("terms", "لازم توافق على شروط التجربة");
   return errors;
 }
 
@@ -99,7 +113,8 @@ export function siteBase(slug: string, origin: string): string {
 export async function createTrial(f: SignupFields, files: { photo: FormDataEntryValue | null; logo: FormDataEntryValue | null }, key: string, origin: string) {
   let photo: string | undefined, logo: string | undefined;
   try {
-    photo = await imageFrom(f.slug, files.photo, "photo");
+    // "cutout" in the file's key tells the hero it has no background (components/Hero.tsx).
+    photo = await imageFrom(f.slug, files.photo, f.photoCut ? "photo-cutout" : "photo");
     logo = await imageFrom(f.slug, files.logo, "logo");
   } catch (e) {
     if (e instanceof ImageError) return { ok: false as const, errors: [{ field: "photo" as const, message: e.message }] };
@@ -113,7 +128,7 @@ export async function createTrial(f: SignupFields, files: { photo: FormDataEntry
   const endsAt = new Date(Date.now() + TRIAL_HOURS * 3600_000);
   await repo.createTenant({
     slug: f.slug, name: f.name, content, theme, author: "تجربة مجانية",
-    trialEndsAt: endsAt, signupKey: key,
+    trialEndsAt: endsAt, signupKey: key, signupPhone: whatsappDigits(f.phone)!, termsAcceptedAt: new Date(),
     login: { username: f.username, passwordHash: await hashPassword(f.password) },
   });
   await seedSamples(f.slug, f.locale).catch((e) => console.error("trial samples", e));
