@@ -5,10 +5,20 @@ import { getSiteData } from "@/lib/server/site";
 import { TenantPage } from "@/components/TenantPage";
 import { PlatformHome } from "@/components/PlatformHome";
 import { TrialEnded } from "@/components/signup/TrialEnded";
+import { BRAND_ICONS } from "@/lib/platform";
 
 export async function generateMetadata({ params }: PageProps<"/sites/[site]">): Promise<Metadata> {
   const data = await getSiteData(decodeURIComponent((await params).site));
-  if (data.kind !== "tenant") return { title: "portfolioIO", robots: { index: false, follow: false } };
+  // The platform's home page (the trial sign-up), and trial-ended / unknown addresses.
+  if (data.kind === "platform") {
+    return {
+      title: "myostaz · موقعك كمدرس جاهز في دقيقتين",
+      description: "موقع كامل للمدرس بالمواعيد والحجز على واتساب والامتحانات ولوحة التحكم. جرّبه ببلاش 24 ساعة.",
+      icons: BRAND_ICONS,
+      robots: { index: true, follow: true },
+    };
+  }
+  if (data.kind !== "tenant") return { title: data.kind === "ended" ? `${data.name} · myostaz` : "myostaz", icons: BRAND_ICONS, robots: { index: false, follow: false } };
   const { content: c, canonical, indexable } = data;
   // Uploaded share image, else one generated from the teacher's photo and colors (og.png).
   const og = c.seo.ogImage ?? `${canonical ?? ""}${data.base}/og.png?v=${data.version}`;
