@@ -15,6 +15,7 @@ import { getObject, listObjects } from "../storage";
 import { generatePassword, hashPassword } from "../passwords";
 import { ImageError, SLUG_RE, USERNAME_RE, loginUrlFor, normalizeDomain, sniffImage, storeImage } from "../admin-ops";
 import { makeUploadLink } from "../upload-link";
+import { absolute, addressFor, siteAddress } from "../address";
 import { RANGES, report } from "../analytics";
 import { STATUSES, listSubmissions, setStatus } from "../submissions";
 import { GradeError, approveAll, listAttempts, quizMetrics, reviewAttempt } from "../quiz-attempts";
@@ -86,12 +87,13 @@ const safe = <A,>(fn: (args: A) => Promise<CallToolResult>) =>
     }
   };
 
-function saveResult(r: repo.SaveResult, slug: string, origin: string, target: SiteEnv = "production") {
+async function saveResult(r: repo.SaveResult, slug: string, origin: string, target: SiteEnv = "production") {
   if (r.ok) {
     refreshTeacher(slug);
+    const site = absolute(await addressFor(slug), origin);
     return ok(target === "preview"
-      ? { saved: "preview", preview_version: r.version, preview_url: `${origin}/t/${slug}/preview`, next: "Ask the user to check the preview, then publish_preview." }
-      : { saved: "production", version: r.version, site_url: `${origin}/t/${slug}` });
+      ? { saved: "preview", preview_version: r.version, preview_url: `${site}/preview`, next: "Ask the user to check the preview, then publish_preview." }
+      : { saved: "production", version: r.version, site_url: site });
   }
   if (r.reason === "invalid") return fail("Not saved: the content doesn't pass validation. Fix these fields and try again.", r.issues);
   if (r.reason === "conflict") return fail(`Not saved: the page changed meanwhile (now version ${r.version}). Read it again with get_teacher and redo the change.`);
@@ -117,7 +119,8 @@ function usedImages(content: Content): Set<string> {
 
 export function buildMcpServer(origin: string): McpServer {
   const server = new McpServer({ name: "portfolioio", version: "1.0.0" }, { instructions: INSTRUCTIONS });
-  const preview = (slug: string) => `${origin}/t/${slug}`;
+  /** The teacher's address (lib/server/address.ts) as a full URL. */
+  const siteUrl = (slug: string, domains: { domain: string; isPrimary: boolean }[]) => absolute(siteAddress(slug, domains), origin);
   // Local development serves files from /local-assets; make every link absolute.
   const abs = (url: string) => (url.startsWith("/") ? `${origin}${url}` : url);
 
@@ -129,7 +132,7 @@ export function buildMcpServer(origin: string): McpServer {
     annotations: { readOnlyHint: true },
   }, safe(async () => {
     const all = await repo.listTenants();
-    return ok(all.map((t) => ({ ...t, preview_url: preview(t.slug), admin_url: `${origin}/t/${t.slug}/admin` })));
+    return ok(all.map((t) => ({ ...t, site_url: siteUrl(t.slug, t.domains), preview_url: `${siteUrl(t.slug, t.domains)}/preview`, admin_url: `${siteUrl(t.slug, t.domains)}/admin` })));
   }));
 
   server.registerTool("get_teacher", {
@@ -151,7 +154,7 @@ export function buildMcpServer(origin: string): McpServer {
       version: t.version, preview_version: t.preview.version, preview_has_unpublished_edits: t.preview.pending,
       updated_at: t.updatedAt, updated_by: t.updatedBy,
       domains: t.domains, logins: await repo.listUsers(slug),
-      site_url: preview(slug), preview_url: `${preview(slug)}/preview`, image_base: abs(assetBase(slug)),
+      site_url: siteUrl(slug, t.domains), preview_url: `${siteUrl(slug, t.domains)}/preview`, image_base: abs(assetBase(slug)),
       content, ...(keys?.length && !keys.includes("theme") ? {} : { theme: copy.theme }),
     });
   }));
@@ -219,7 +222,7 @@ export function buildMcpServer(origin: string): McpServer {
     await repo.createTenant({ slug, name, content: vc.data, theme: vt.data, author: AUTHOR });
     if (active === false) await repo.setTenantStatus(slug, "disabled");
     refreshTeacher(slug, true);
-    return ok({ created: true, slug, version: 1, status: active === false ? "disabled" : "active", preview_url: preview(slug), admin_url: `${origin}/t/${slug}/admin` });
+    return ok({ created: true, slug, version: 1, status: active === false ? "disabled" : "active", site_url: siteUrl(slug, []), preview_url: `${siteUrl(slug, [])}/preview`, admin_url: `${siteUrl(slug, [])}/admin` });
   }));
 
   server.registerTool("update_content", {
@@ -449,8 +452,7 @@ export function buildMcpServer(origin: string): McpServer {
   }, safe(async ({ slug, action, name, content }) => {
     const t = await repo.getTenant(slug);
     if (!t) return fail(`No teacher "${slug}".`);
-    const site = t.domains.find((d) => d.isPrimary)?.domain ?? t.domains[0]?.domain;
-    const at = (n: string) => (site ? `https://${site}/${n}` : `${origin}/t/${slug}/${n}`);
+    const at = (n: string) => `${siteUrl(slug, t.domains)}/${n}`;
     if (action === "list") return ok((await listSiteFiles(slug)).map((f) => ({ ...f, url: at(f.name) })));
     if (!name) return fail("name is required.");
     try {

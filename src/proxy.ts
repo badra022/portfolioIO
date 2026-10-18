@@ -5,6 +5,7 @@ import { authenticate, teacherSlugFor } from "@/lib/server/auth";
 import { isSiteFileName } from "@/lib/site-files";
 import { PREVIEW_PATH, siteEnv, splitSite } from "@/lib/environments";
 import { COPY_BOTS, isTrialSite } from "@/lib/server/bots";
+import { addressFor } from "@/lib/server/address";
 
 /**
  * Every request is mapped by its host name to /sites/<site>/... (see lib/routing.ts).
@@ -20,6 +21,12 @@ export async function proxy(request: NextRequest) {
   const host = request.headers.get("host");
   const r = route(host, pathname, env.rootDomain, env.platformHosts);
   const preview = siteEnv(r.site) === "preview";
+
+  // With ROOT_DOMAIN set, /t/<slug>/... is an old link: the site lives at <slug>.<ROOT_DOMAIN> (or its own domain).
+  if (env.rootDomain && r.site.startsWith("p.")) {
+    const home = (await addressFor(splitSite(r.site).key.slice(2))).url;
+    if (!home.startsWith("/")) return NextResponse.redirect(`${home}${preview ? PREVIEW_PATH : ""}${r.rest}${search}`, 308);
+  }
 
   // One admin panel for both environments: /preview/admin is /admin.
   if (preview && isAdminPath(r.rest)) {
@@ -42,8 +49,8 @@ export async function proxy(request: NextRequest) {
       // A teacher who logs in on the platform console is sent to their own site's admin.
       const teacherSlug = r.site === "_platform" ? await teacherSlugFor(header) : null;
       if (teacherSlug) {
-        const to = request.nextUrl.clone();
-        to.pathname = `/t/${teacherSlug}${r.rest}`;
+        const home = (await addressFor(teacherSlug)).url;
+        const to = home.startsWith("/") ? new URL(`${home}${r.rest}${search}`, request.nextUrl) : `${home}${r.rest}${search}`;
         return NextResponse.redirect(to, 307);
       }
       return new NextResponse("Authentication required", {

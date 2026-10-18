@@ -117,7 +117,7 @@ export function PlatformStatsView({ s }: { s: PlatformStats }) {
                 <td><strong>{t.name}</strong>{!t.active && <span className="a-sub"> (متوقف)</span>}</td>
                 <td>{fmt(t.views)}</td><td>{fmt(t.visitors)}</td><td><b>{fmt(t.engagements)}</b></td>
                 <td>{fmt(t.contacts)}</td><td>{fmt(t.channels)}</td><td>{fmt(t.forms)}</td><td>{fmt(t.attempts)}</td><td>{fmt(t.lookups)}</td>
-                <td className="a-row-actions"><a href={`/t/${t.slug}/admin/analytics`}>التفاصيل</a></td>
+                <td className="a-row-actions"><a href={`/admin/tenants/${t.slug}`}>التفاصيل</a></td>
               </tr>
             ))}
           </tbody>

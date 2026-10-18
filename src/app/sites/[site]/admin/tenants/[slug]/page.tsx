@@ -5,7 +5,7 @@ import { requireSuper } from "@/lib/server/auth";
 import { getTenant, listTrialRequests, listUsers } from "@/lib/server/repo";
 import { overview } from "@/lib/server/analytics";
 import { adminCounts } from "@/lib/server/admin-counts";
-import { siteAddress } from "@/lib/server/console";
+import { siteAddress } from "@/lib/server/address";
 import { STATE_LABEL, fromNow, tenantState } from "@/lib/admin/tenant-actions";
 import { formatWhen } from "@/lib/admin/format";
 import {
@@ -35,8 +35,6 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
   const num = (v: number) => v.toLocaleString("en-US");
   const active = t.status === "active";
   // Where the files are visible: the main domain, else the preview address on this host.
-  const primary = t.domains.find((d) => d.isPrimary)?.domain ?? t.domains[0]?.domain;
-  const siteBase = primary ? `https://${primary}` : null;
 
   return (
     <>
@@ -50,8 +48,8 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
         </p>
         <div className="a-actions">
           <a className="btn-sm ghost" href={address.url} target="_blank" rel="noopener">افتح الموقع ↗</a>
-          <a className="btn-sm ghost" href={`/t/${t.slug}/admin`}>لوحة تحكم المدرس</a>
-          <a className="btn-sm ghost" href={`/t/${t.slug}/admin/analytics`}>إحصائياته</a>
+          <a className="btn-sm ghost" href={`${address.url}/admin`}>لوحة تحكم المدرس</a>
+          <a className="btn-sm ghost" href={`${address.url}/admin/analytics`}>إحصائياته</a>
           <form action={setStatusAction.bind(null, t.slug, active ? "disabled" : "active")}>
             <button className={`btn-sm ${active ? "ghost danger" : "primary"}`}>{active ? "إيقاف الموقع" : "تشغيل الموقع"}</button>
           </form>
@@ -167,7 +165,7 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
         </p>
         <ul className="a-list">
           {files.map((f) => {
-            const where = siteBase ? `${siteBase}/${f.name}` : `/t/${t.slug}/${f.name}`;
+            const where = `${address.url}/${f.name}`;
             return (
               <li key={f.name}>
                 <a dir="ltr" href={where} target="_blank" rel="noopener"><code>/{f.name}</code></a>
