@@ -5,8 +5,12 @@ import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
 import { Socials } from "./Socials";
 
+/** A photo whose background was removed (lib/cutout.ts names those files "...cutout..."). */
+export const isCutout = (photo: string | undefined | null) => Boolean(photo && /cutout/i.test(photo));
+
 export function Hero({ c, chat }: { c: Content; chat: ChatConfig }) {
   const h = c.hero;
+  const cut = isCutout(c.profile.photo);
   return (
     <section className="hero" id="top">
       <div className="wrap">
@@ -34,8 +38,10 @@ export function Hero({ c, chat }: { c: Content; chat: ChatConfig }) {
           )}
           <Socials items={c.socials} />
         </div>
-        <div className="hero-photo">
-          <img src={asset(c.profile.photo)} alt={c.profile.fullTitle} width={820} height={661} fetchPriority="high" />
+        <div className={cut ? "hero-photo cut" : "hero-photo"}>
+          {/* The teacher on the site's own colors: a shape behind a background-free photo, a tinted frame around any other. */}
+          <span className="hero-backdrop" aria-hidden="true" />
+          <img src={asset(c.profile.photo)} alt={c.profile.fullTitle} width={cut ? 700 : 820} height={cut ? 820 : 661} fetchPriority="high" />
           {c.profile.photoBadge && <span className="badge">{c.profile.photoBadge}</span>}
         </div>
       </div>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="190" viewBox="0 0 300 190">
+  <g transform="rotate(-24 150 95)" fill="#1D6FE0" font-family="'IBM Plex Sans Arabic','IBM Plex Sans','Segoe UI',Arial,sans-serif">
+    <g transform="translate(62 70) scale(.62)">
+      <rect width="48" height="48" rx="13"/>
+      <circle cx="24" cy="29.5" r="8.6" fill="none" stroke="#fff" stroke-width="5"/>
+      <path d="M24 8.5 39 14.8 24 21.1 9 14.8Z" fill="#fff"/>
+    </g>
+    <text x="98" y="92" font-size="21" font-weight="700">ostaz.com</text>
+    <text x="98" y="114" font-size="13" font-weight="600">نسخة تجريبية · Trial</text>
+  </g>
+</svg>

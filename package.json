@@ -13,12 +13,13 @@
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/db-migrate.mjs",
-    "postinstall": "node --experimental-strip-types scripts/generate-schema.ts"
+    "postinstall": "node --experimental-strip-types scripts/generate-schema.ts && node scripts/copy-segmenter.mjs"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.1.1",
     "@modelcontextprotocol/sdk": "1.32.1",
     "drizzle-orm": "0.45.3",
     "next": "16.3.8",

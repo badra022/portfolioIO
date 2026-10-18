@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { cutout, preloadCutout, type Cutout } from "@/lib/cutout";
 
 /**
  * The public «جرّب موقعك» form on the platform's home page (the page paid ads
  * point to): four short steps, then the site is built (api/signup) and every link
  * to try is listed. The site and its admin login work for 24 hours.
+ * The WhatsApp number is confirmed with a code first when codes are on
+ * (lib/server/otp.ts), and the photo's background is removed in the browser
+ * (lib/cutout.ts).
  */
 type Err = { field: string; message: string };
 type Done = { base: string; endsAt: string; username: string; links: { label: string; href: string }[] };
@@ -15,13 +19,20 @@ const TITLES_EN = ["Mr.", "Ms.", "Dr."];
 const COLORS = ["#1D6FE0", "#0EA5E9", "#16A34A", "#E3171F", "#F59E0B", "#7C3AED", "#DB2777", "#0F766E"];
 const STEPS = ["عنك", "شكل موقعك", "التواصل والفيديوهات", "حساب لوحة التحكم"];
 
-/** The site address around the slug: «mohamedali» + after, e.g. ".ostaz.io", or before "ostaz.io/t/". */
-export function SignupFlow({ before, after }: { before: string; after: string }) {
+/** How long each building step shows at least (ms), ~18 s in all, so the build feels like real work. */
+const BUILD_MS = [4500, 5000, 4500, 4000];
+const sleepUntil = (t: number) => new Promise((ok) => setTimeout(ok, Math.max(0, t - Date.now())));
+
+/**
+ * The site address around the slug: «mohamedali» + after, e.g. ".ostaz.io", or before "ostaz.io/t/".
+ * otp: how the confirmation code is sent, or false when codes are off.
+ */
+export function SignupFlow({ before, after, otp }: { before: string; after: string; otp: false | "sms" | "whatsapp" }) {
   const [step, setStep] = useState(0);
   const [f, setF] = useState({
     title: "أ.", name: "", subject: "", locale: "ar-EG" as "ar-EG" | "en",
     slogan: "", color: COLORS[0], scheme: "light" as "light" | "dark",
-    phone: "", videos: ["", "", ""], slug: "", username: "", password: "", website: "",
+    phone: "", videos: ["", "", ""], slug: "", username: "", password: "", website: "", terms: false,
   });
   const [photo, setPhoto] = useState<File | null>(null);
   const [logo, setLogo] = useState<File | null>(null);
@@ -29,8 +40,21 @@ export function SignupFlow({ before, after }: { before: string; after: string })
   const [state, setState] = useState<"form" | "building" | "done">("form");
   const [done, setDone] = useState<Done | null>(null);
   const [slugFree, setSlugFree] = useState<boolean | null>(null);
+  // The photo without its background: being made, made (null = no person found / failed), and whether to use it.
+  const [cut, setCut] = useState<{ busy: boolean; result: Cutout | null }>({ busy: false, result: null });
+  const [useCut, setUseCut] = useState(true);
+  const cutJob = useRef<Promise<Cutout | null> | null>(null);
+  // Phone confirmation: the number a code was sent to, the code typed, and the proof once it's right.
+  const [codeFor, setCodeFor] = useState("");
+  const [code, setCode] = useState("");
+  const [token, setToken] = useState<{ phone: string; token: string } | null>(null);
+  const [resendAt, setResendAt] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [buildStage, setBuildStage] = useState(0);
+  const [buildStart, setBuildStart] = useState(0);
   const top = useRef<HTMLDivElement>(null);
-  const photoUrl = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
+  const originalUrl = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
+  const photoUrl = useCut && cut.result ? cut.result.url : originalUrl;
   const logoUrl = useMemo(() => (logo ? URL.createObjectURL(logo) : null), [logo]);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => { setF((x) => ({ ...x, [k]: v })); setErrors((e) => e.filter((x) => x.field !== k)); };
   const en = f.locale === "en";
@@ -44,6 +68,17 @@ export function SignupFlow({ before, after }: { before: string; after: string })
     }, 400);
     return () => clearTimeout(t);
   }, [f.slug]);
+
+  function pickPhoto(file: File | null) {
+    setPhoto(file);
+    setErrors((e) => e.filter((x) => x.field !== "photo"));
+    setCut({ busy: Boolean(file), result: null });
+    setUseCut(true);
+    if (!file) { cutJob.current = null; return; }
+    const job = cutout(file).catch(() => null);
+    cutJob.current = job;
+    void job.then((result) => { if (cutJob.current === job) setCut({ busy: false, result }); });
+  }
 
   const err = (field: string) => errors.find((e) => e.field === field)?.message;
   const need = (cond: boolean, field: string, message: string, out: Err[]) => { if (!cond) out.push({ field, message }); };
@@ -63,42 +98,100 @@ export function SignupFlow({ before, after }: { before: string; after: string })
       need(slugFree !== false, "slug", "العنوان ده محجوز، جرّب عنوان تاني.", out);
       need(/^[a-z0-9._-]{3,32}$/.test(f.username), "username", "حروف إنجليزية صغيرة وأرقام، 3 حروف على الأقل", out);
       need(f.password.length >= 8, "password", "كلمة السر 8 حروف على الأقل", out);
+      need(f.terms, "terms", "لازم توافق على شروط التجربة", out);
     }
     return out;
   }
 
   const go = (to: number) => { setStep(to); top.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
-  function next() {
+  async function otpCall(body: Record<string, string>): Promise<{ ok: boolean; skip?: boolean; token?: string; message?: string }> {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/signup/otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      return await res.json().catch(() => ({ ok: false, message: "حصلت مشكلة، حاول تاني." }));
+    } catch {
+      return { ok: false, message: "مفيش اتصال بالإنترنت؟ حاول تاني." };
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Step 3: the number is checked (one trial per number), then confirmed with a code when codes are on. */
+  async function confirmPhone(): Promise<boolean> {
+    const phone = f.phone.trim();
+    if (token?.phone === phone) return true;
+    if (codeFor !== phone) {
+      const r = await otpCall({ action: "send", phone });
+      if (!r.ok) { setErrors([{ field: "phone", message: r.message ?? "حصلت مشكلة، حاول تاني." }]); return false; }
+      if (r.skip) { setToken({ phone, token: "" }); return true; }
+      setCodeFor(phone); setCode(""); setResendAt(Date.now() + 60_000);
+      return false;
+    }
+    if (!/^\d{4,8}$/.test(code.trim())) { setErrors([{ field: "code", message: "اكتب الكود اللي وصلك" }]); return false; }
+    const r = await otpCall({ action: "check", phone, code: code.trim() });
+    if (!r.ok || !r.token) { setErrors([{ field: "code", message: r.message ?? "الكود مش صح" }]); return false; }
+    setToken({ phone, token: r.token });
+    return true;
+  }
+
+  async function resend() {
+    const r = await otpCall({ action: "send", phone: f.phone.trim() });
+    if (!r.ok) setErrors([{ field: "code", message: r.message ?? "حصلت مشكلة، حاول تاني." }]);
+    else { setCode(""); setResendAt(Date.now() + 60_000); setErrors([]); }
+  }
+
+  async function next() {
+    if (busy) return;
     const out = check(step);
     setErrors(out);
     if (out.length) return;
+    if (step === 2 && !(await confirmPhone())) return;
     if (step < STEPS.length - 1) go(step + 1);
     else void submit();
   }
 
+  /**
+   * Building takes ~18 s on screen in four steps (BUILD_MS): the photo is finished
+   * first (its background removal may still be running), then the site is made
+   * while the remaining steps play.
+   */
   async function submit() {
-    setState("building");
+    const t0 = Date.now();
+    setState("building"); setBuildStage(0); setBuildStart(t0);
     top.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const at = (n: number) => t0 + BUILD_MS.slice(0, n).reduce((a, b) => a + b, 0);
+    const fail = (list: Err[]) => {
+      setErrors(list);
+      const stepOf: Record<string, number> = { name: 0, subject: 0, title: 0, locale: 0, photo: 1, logo: 1, slogan: 1, color: 1, phone: 2, videos: 2, slug: 3, username: 3, password: 3, terms: 3 };
+      setStep(Math.min(...list.map((e) => stepOf[e.field] ?? 3)));
+      setState("form");
+    };
+    let photoFile: File | null = photo, photoCut = false;
+    if (photo && useCut) {
+      const made = cut.result ?? (cutJob.current ? await Promise.race([cutJob.current, new Promise<null>((ok) => setTimeout(() => ok(null), 25_000))]) : null);
+      if (made) { photoFile = made.file; photoCut = true; }
+    }
+    await sleepUntil(at(1)); setBuildStage(1);
+
     const fd = new FormData();
-    for (const [k, v] of Object.entries(f)) if (k !== "videos") fd.set(k, String(v));
+    for (const [k, v] of Object.entries(f)) if (k !== "videos" && k !== "terms") fd.set(k, String(v));
     f.videos.filter(Boolean).forEach((v) => fd.append("videos", v));
-    if (photo) fd.set("photo", photo);
+    fd.set("terms", f.terms ? "1" : "");
+    fd.set("phoneToken", token?.phone === f.phone.trim() ? token.token : "");
+    if (photoFile) fd.set("photo", photoFile);
+    if (photoCut) fd.set("photoCut", "1");
     if (logo) fd.set("logo", logo);
-    const started = Date.now();
     try {
       const res = await fetch("/api/signup", { method: "POST", body: fd });
       const r = await res.json().catch(() => ({ ok: false, errors: [{ field: "form", message: "حصلت مشكلة، حاول تاني." }] }));
-      // Let the building animation play through.
-      await new Promise((ok) => setTimeout(ok, Math.max(0, 3200 - (Date.now() - started))));
-      if (r.ok) { setDone(r); setState("done"); return; }
-      const list: Err[] = r.errors ?? [{ field: "form", message: "حصلت مشكلة، حاول تاني." }];
-      setErrors(list);
-      const stepOf: Record<string, number> = { name: 0, subject: 0, title: 0, locale: 0, photo: 1, logo: 1, slogan: 1, color: 1, phone: 2, videos: 2, slug: 3, username: 3, password: 3 };
-      setStep(Math.min(...list.map((e) => stepOf[e.field] ?? 3)));
-      setState("form");
+      if (!r.ok) { fail(r.errors ?? [{ field: "form", message: "حصلت مشكلة، حاول تاني." }]); return; }
+      await sleepUntil(at(2)); setBuildStage(2);
+      await sleepUntil(at(3)); setBuildStage(3);
+      await sleepUntil(at(4)); setBuildStage(4);
+      await new Promise((ok) => setTimeout(ok, 600));
+      setDone(r); setState("done");
     } catch {
-      setErrors([{ field: "form", message: "مفيش اتصال بالإنترنت؟ حاول تاني." }]);
-      setState("form");
+      fail([{ field: "form", message: "مفيش اتصال بالإنترنت؟ حاول تاني." }]);
     }
   }
 
@@ -109,7 +202,7 @@ export function SignupFlow({ before, after }: { before: string; after: string })
       {state === "done" && done ? (
         <Result done={done} password={f.password} />
       ) : state === "building" ? (
-        <Building />
+        <Building stage={buildStage} start={buildStart} />
       ) : (
         <div className="su-grid">
           <form className="su-card" onSubmit={(e) => { e.preventDefault(); next(); }} noValidate>
@@ -140,7 +233,16 @@ export function SignupFlow({ before, after }: { before: string; after: string })
               <fieldset className="su-fields">
                 <legend>شكل موقعك</legend>
                 <div className="su-row">
-                  <FilePick label="صورتك" hint="صورة واضحة ليك، يفضل بخلفية بسيطة" file={photo} url={photoUrl} onPick={setPhoto} error={err("photo")} />
+                  <div className="su-photo-col">
+                    <FilePick label="صورتك" hint="صورة واضحة ليك من الوسط لفوق" file={photo} url={photoUrl} onPick={pickPhoto} error={err("photo")} cut={useCut && Boolean(cut.result)} />
+                    {photo && (cut.busy ? <small className="su-cut-note"><i className="su-dot" aria-hidden="true" />بنشيل خلفية الصورة…</small>
+                      : cut.result ? (
+                        <label className="su-check sm">
+                          <input type="checkbox" checked={useCut} onChange={(e) => setUseCut(e.target.checked)} />
+                          <span>شيل الخلفية وحط ألوان موقعك وراك</span>
+                        </label>
+                      ) : <small className="su-cut-note">هنستخدم الصورة زي ما هي.</small>)}
+                  </div>
                   <FilePick label="اللوجو (اختياري)" hint="لو عندك لوجو أو توقيع" file={logo} url={logoUrl} onPick={setLogo} error={err("logo")} />
                 </div>
                 <Text label="جملة تعريفية (اختياري)" value={f.slogan} onChange={(v) => set("slogan", v)} placeholder={en ? "Physics made simple" : "الفيزياء بقت أسهل"} max={90} />
@@ -157,7 +259,18 @@ export function SignupFlow({ before, after }: { before: string; after: string })
             {step === 2 && (
               <fieldset className="su-fields">
                 <legend>التواصل والفيديوهات</legend>
-                <Text label="رقم الواتساب" value={f.phone} onChange={(v) => set("phone", v)} error={err("phone")} placeholder="01012345678" inputMode="tel" dir="ltr" autoComplete="tel" hint="الطلاب هيكلموك عليه من كل زرار في الموقع" />
+                <Text label="رقم الواتساب" value={f.phone} onChange={(v) => { set("phone", v); if (v.trim() !== codeFor) setCodeFor(""); }} error={err("phone")} placeholder="01012345678" inputMode="tel" dir="ltr" autoComplete="tel"
+                  hint={token?.phone === f.phone.trim() && token.token ? "✓ الرقم متأكد" : otp ? `الطلاب هيكلموك عليه من كل زرار في الموقع. هنبعتلك كود ${otp === "whatsapp" ? "على واتساب" : "في رسالة"} نتأكد بيه.` : "الطلاب هيكلموك عليه من كل زرار في الموقع"} />
+                {codeFor && codeFor === f.phone.trim() && token?.phone !== codeFor && (
+                  <div className="su-code">
+                    <Text label={`الكود اللي وصلك ${otp === "whatsapp" ? "على واتساب" : "في رسالة"}`} value={code} onChange={(v) => { setCode(v.replace(/\D/g, "").slice(0, 8)); setErrors((e) => e.filter((x) => x.field !== "code")); }}
+                      error={err("code")} placeholder="123456" inputMode="tel" dir="ltr" autoComplete="one-time-code" />
+                    <p className="su-code-actions">
+                      <ResendButton at={resendAt} onClick={() => void resend()} disabled={busy} />
+                      <button type="button" className="su-link" onClick={() => { setCodeFor(""); setCode(""); }}>غيّر الرقم</button>
+                    </p>
+                  </div>
+                )}
                 <div className="su-field"><span>فيديوهات يوتيوب ليك (اختياري، لحد 3)</span>
                   {f.videos.map((v, i) => (
                     <input key={i} value={v} dir="ltr" placeholder="https://youtu.be/..." inputMode="url"
@@ -187,6 +300,11 @@ export function SignupFlow({ before, after }: { before: string; after: string })
                   <Text label="كلمة السر" type="password" value={f.password} onChange={(v) => set("password", v)} error={err("password")} placeholder="8 حروف على الأقل" dir="ltr" autoComplete="new-password" />
                 </div>
                 <p className="su-note">هتدخل بيهم لوحة التحكم وتعدّل موقعك. الموقع شغال 24 ساعة ببلاش، ومن غير أي دفع.</p>
+                <label className="su-check">
+                  <input type="checkbox" checked={f.terms} onChange={(e) => set("terms", e.target.checked)} aria-invalid={Boolean(err("terms"))} />
+                  <span>موافق على <a href="/terms" target="_blank" rel="noopener">شروط التجربة</a>: التصميم والمحتوى الجاهز ملك المنصة، ومش هنسخه أو نديه لحد يعمل زيه.</span>
+                </label>
+                {err("terms") && <small className="su-err">{err("terms")}</small>}
                 <input className="su-hp" tabIndex={-1} autoComplete="off" aria-hidden="true" value={f.website} onChange={(e) => set("website", e.target.value)} />
               </fieldset>
             )}
@@ -194,7 +312,9 @@ export function SignupFlow({ before, after }: { before: string; after: string })
             {err("form") && <p className="su-err su-form-err" role="alert">{err("form")}</p>}
             <div className="su-nav">
               {step > 0 && <button type="button" className="su-btn ghost" onClick={() => go(step - 1)}>رجوع</button>}
-              <button type="submit" className="su-btn primary">{step < STEPS.length - 1 ? "التالي" : "ابني موقعي"}</button>
+              <button type="submit" className="su-btn primary" disabled={busy}>
+                {busy ? "لحظة…" : step === 2 && codeFor && codeFor === f.phone.trim() && token?.phone !== codeFor ? "أكّد الكود" : step < STEPS.length - 1 ? "التالي" : "ابني موقعي"}
+              </button>
             </div>
           </form>
 
@@ -207,7 +327,7 @@ export function SignupFlow({ before, after }: { before: string; after: string })
               <div className="su-ph-hero">
                 <small>{f.subject || (en ? "Your subject" : "مادتك")}</small>
                 <h3>{f.slogan || (en ? `Learn ${f.subject || "it"} the right way` : `ذاكر ${f.subject || "مادتك"} صح`)}</h3>
-                <img src={photoUrl ?? "/demo/teacher.svg"} alt="" />
+                <span className={useCut && cut.result ? "su-ph-photo cut" : "su-ph-photo"}><img src={photoUrl ?? "/demo/teacher.svg"} alt="" /></span>
                 <span className="su-ph-cta">{en ? "Book your seat" : "احجز مكانك"}</span>
               </div>
               <div className="su-ph-rows"><i /><i /><i /></div>
@@ -240,11 +360,11 @@ function Choice({ label, value, onChange, options }: { label: string; value: str
   );
 }
 
-function FilePick({ label, hint, file, url, onPick, error }: { label: string; hint: string; file: File | null; url: string | null; onPick: (f: File | null) => void; error?: string }) {
+function FilePick({ label, hint, file, url, onPick, error, cut }: { label: string; hint: string; file: File | null; url: string | null; onPick: (f: File | null) => void; error?: string; cut?: boolean }) {
   return (
     <div className="su-field su-file">
       <span>{label}</span>
-      <label className={`su-drop${url ? " has" : ""}`}>
+      <label className={`su-drop${url ? " has" : ""}${cut ? " cut" : ""}`} onPointerEnter={label === "صورتك" ? preloadCutout : undefined}>
         {url ? <img src={url} alt="" /> : <b aria-hidden="true">+</b>}
         <small>{file ? file.name : hint}</small>
         <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
@@ -255,21 +375,50 @@ function FilePick({ label, hint, file, url, onPick, error }: { label: string; hi
   );
 }
 
-const BUILD_STEPS = ["بنجهز صفحتك الرئيسية بصورتك وألوانك", "بنضيف المواعيد والامتحانات ولوحة الشرف", "بنعمل اختبار وتصويت ورابط شريك تجريبي", "بنفتحلك لوحة التحكم"];
+const BUILD_STEPS = [
+  "بنجهّز صورتك ونظبطها على ألوان موقعك",
+  "بنكتب محتوى موقعك بمادتك وأسلوبك",
+  "بنضيف المواعيد والامتحانات والاختبار والتصويت",
+  "بنجهّز لوحة التحكم وروابط التجربة",
+];
 
-function Building() {
-  const [i, setI] = useState(0);
+/** Four steps, each with its own spinner, and a bar that fills over the whole build (BUILD_MS). */
+function Building({ stage, start }: { stage: number; start: number }) {
+  const total = BUILD_MS.reduce((a, b) => a + b, 0);
+  const [now, setNow] = useState(start);
   useEffect(() => {
-    const t = setInterval(() => setI((x) => Math.min(x + 1, BUILD_STEPS.length - 1)), 800);
+    const t = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(t);
   }, []);
+  const pct = stage >= BUILD_STEPS.length ? 100 : Math.min(96, Math.round(((now - start) / total) * 100));
   return (
     <div className="su-card su-building" role="status" aria-live="polite">
       <div className="su-spinner" aria-hidden="true" />
       <h2>بنبني موقعك…</h2>
-      <ul>{BUILD_STEPS.map((s, j) => <li key={s} className={j < i ? "done" : j === i ? "on" : undefined}><span>{j < i ? "✓" : ""}</span>{s}</li>)}</ul>
+      <div className="su-progress" aria-label={`${pct}%`}><i style={{ inlineSize: `${pct}%` }} /><b>{pct}%</b></div>
+      <ul>
+        {BUILD_STEPS.map((s, j) => (
+          <li key={s} className={j < stage ? "done" : j === stage ? "on" : undefined}>
+            <span>{j < stage ? "✓" : j === stage ? <i className="su-mini-spin" aria-hidden="true" /> : ""}</span>{s}
+          </li>
+        ))}
+      </ul>
+      <p className="su-note">ده بياخد أقل من دقيقة. متقفلش الصفحة.</p>
     </div>
   );
+}
+
+function ResendButton({ at, onClick, disabled }: { at: number; onClick: () => void; disabled: boolean }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (now >= at) return;
+    const t = setTimeout(() => setNow(Date.now()), 1000);
+    return () => clearTimeout(t);
+  }, [now, at]);
+  const left = Math.ceil((at - now) / 1000);
+  return left > 0
+    ? <span className="su-muted">تقدر تطلب كود جديد بعد {left} ثانية</span>
+    : <button type="button" className="su-link" onClick={() => { onClick(); setNow(Date.now()); }} disabled={disabled}>ابعت الكود تاني</button>;
 }
 
 function Result({ done, password }: { done: Done; password: string }) {

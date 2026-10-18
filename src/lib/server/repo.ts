@@ -315,7 +315,7 @@ export async function restoreRevision(slug: string, revisionId: number, author: 
 export async function createTenant(input: {
   slug: string; name: string; content: Content; theme: Theme; author: string;
   /** Free trial: the site stops at this moment, every feature is on until then. */
-  trialEndsAt?: Date; signupKey?: string;
+  trialEndsAt?: Date; signupKey?: string; signupPhone?: string; termsAcceptedAt?: Date;
   /** Teacher login created in the same transaction. */
   login?: { username: string; passwordHash: string };
 }): Promise<void> {
@@ -326,7 +326,7 @@ export async function createTenant(input: {
   await d.transaction(async (tx) => {
     const [row] = await tx.insert(tenants).values({
       slug: input.slug, name: input.name, content, theme: input.theme, updatedBy: input.author,
-      ...(input.trialEndsAt ? { trialEndsAt: input.trialEndsAt, signupKey: input.signupKey ?? null, permissions: ALL_PERMISSIONS } : {}),
+      ...(input.trialEndsAt ? { trialEndsAt: input.trialEndsAt, signupKey: input.signupKey ?? null, signupPhone: input.signupPhone ?? null, termsAcceptedAt: input.termsAcceptedAt ?? null, permissions: ALL_PERMISSIONS } : {}),
     }).returning({ id: tenants.id });
     if (input.login) await tx.insert(adminUsers).values({ username: input.login.username, passwordHash: input.login.passwordHash, tenantId: row.id });
     await tx.insert(tenantRevisions).values({ tenantId: row.id, version: 1, content, theme: input.theme, author: input.author, note: "إنشاء" });

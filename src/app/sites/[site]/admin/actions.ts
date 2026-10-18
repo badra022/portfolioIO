@@ -147,7 +147,7 @@ export async function uploadImageAction(site: string, form: FormData): Promise<{
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false, error: "لم يتم اختيار ملف." };
   try {
-    return { ok: true, ...(await storeImage(ctx.slug, new Uint8Array(await file.arrayBuffer()), file.type)) };
+    return { ok: true, ...(await storeImage(ctx.slug, new Uint8Array(await file.arrayBuffer()), file.type, file.name)) };
   } catch (e) {
     if (e instanceof ImageError) return { ok: false, error: e.message };
     console.error(e);

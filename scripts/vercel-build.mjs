@@ -25,4 +25,6 @@ if (migrate && (process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL)) 
   console.log(`Skipping migrations (${target ?? "local"}, ${branch ?? "no branch"}).`);
 }
 
+// The photo background remover's runtime (normally copied on install).
+run("node", ["scripts/copy-segmenter.mjs"]);
 run("npx", ["next", "build"]);

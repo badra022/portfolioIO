@@ -6,6 +6,7 @@ import { isDev } from "@/lib/env";
 import { dirOf, langOf } from "@/lib/i18n";
 import { UITextProvider } from "@/components/UIText";
 import { ReferralLanding } from "@/components/ReferralLanding";
+import { TrialMark } from "@/components/TrialMark";
 import { themeAttrs, themeCss } from "@/lib/theme";
 import "../../globals.css";
 import "../../sections.css";
@@ -46,8 +47,9 @@ async function SiteFrame({ params, children }: { params: Promise<{ site: string 
       {fonts && <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />}
       {fonts && <link rel="stylesheet" href={fonts} precedence="default" />}
       <style href={`theme-${data.slug}-${data.env}`} precedence="high">{themeCss(theme)}</style>
-      <div className="site" lang={langOf(content.locale)} dir={dirOf(content.locale)} {...themeAttrs(theme)}>
+      <div className="site" lang={langOf(content.locale)} dir={dirOf(content.locale)} data-trial={data.trialEndsAt ? "true" : undefined} {...themeAttrs(theme)}>
         {data.env === "preview" && <PreviewBar base={data.base} />}
+        {data.trialEndsAt && <TrialMark endsAt={data.trialEndsAt} en={content.locale === "en"} siteName={content.profile.fullTitle} />}
         <UITextProvider locale={content.locale}>{children}</UITextProvider>
         {content.referrals.length > 0 && <ReferralLanding slug={data.slug} base={data.base} codes={content.referrals.map((r) => r.code)} preview={data.env === "preview"} />}
       </div>

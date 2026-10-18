@@ -14,6 +14,8 @@ export async function GET(_req: Request, ctx: RouteContext<"/sites/[site]/robots
   // The developer environment is never crawled (it also asks for a login on every page).
   if (isDev()) return new Response("User-agent: *\nDisallow: /\n", { headers: { "Content-Type": "text/plain; charset=utf-8" } });
   const data = await getSiteData(decodeURIComponent((await ctx.params).site));
+  // Free trial sites are never crawled (proxy.ts also turns known bots away from them).
+  if (data.kind === "tenant" && data.trialEndsAt) return new Response("User-agent: *\nDisallow: /\n", { headers: { "Content-Type": "text/plain; charset=utf-8" } });
   const sitemap = data.kind === "tenant" && data.indexable ? `\nSitemap: ${data.canonical}/sitemap.xml\n` : "";
   const body = "User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /upload\nDisallow: /preview\nDisallow: /t/*/admin\nDisallow: /t/*/api/\nDisallow: /t/*/upload\nDisallow: /t/*/preview\n" + sitemap;
   return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
