@@ -8,6 +8,8 @@ import { ui } from "@/lib/i18n";
 import { ActionButton } from "@/components/ActionButton";
 import { LeadForms } from "@/components/LeadForms";
 import { chatConfig } from "@/lib/chat";
+import { LandingPageView } from "@/components/LandingPageView";
+import { PageVisit } from "@/components/PageVisit";
 
 type Props = PageProps<"/sites/[site]/[quiz]">;
 
@@ -17,16 +19,29 @@ async function load(params: Props["params"]) {
   if (data.kind !== "tenant") return null;
   const path = decodeURIComponent(raw);
   const quiz = data.content.quizzes.find((q) => q.path === path);
-  if (quiz) return { data, quiz, poll: null };
-  // Votes share the same page addresses (teacher.com/<path>).
+  if (quiz) return { data, quiz, poll: null, page: null };
+  // Votes and pages (offers, requests) share the same page addresses (teacher.com/<path>).
   const poll = data.content.polls.find((p) => p.path === path);
-  return poll ? { data, quiz: null, poll } : null;
+  if (poll) return { data, quiz: null, poll, page: null };
+  const page = data.content.pages.find((p) => p.path === path && p.enabled);
+  return page ? { data, quiz: null, poll: null, page } : null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const r = await load(params);
   if (!r) return { robots: { index: false, follow: false } };
-  const { data, quiz, poll } = r;
+  const { data, quiz, poll, page } = r;
+  if (page) {
+    const index = page.indexable && data.indexable;
+    const url = data.canonical ? `${data.canonical}/${page.path}` : undefined;
+    return {
+      title: `${page.title} | ${data.content.profile.fullTitle}`,
+      description: page.description,
+      robots: index ? { index: true, follow: true } : { index: false, follow: data.env === "production" },
+      alternates: url ? { canonical: url } : undefined,
+      openGraph: { title: page.title, description: page.description, url, type: "website", images: page.image ? [page.image] : undefined },
+    };
+  }
   if (poll) {
     // Shared in stories and groups: a good preview card, never listed by search engines.
     const url = data.canonical ? `${data.canonical}/${poll.path}` : undefined;
@@ -50,7 +65,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-/** A teacher's quiz or vote on its own page: teacher.com/<path> (lib/schema.ts Quiz, Poll). */
+/** A teacher's quiz, vote or page (offer, request) on its own address: teacher.com/<path> (lib/schema.ts Quiz, Poll, LandingPage). */
 export default function QuizPage({ params }: Props) {
   return (
     <Suspense fallback={null}>
@@ -62,7 +77,7 @@ export default function QuizPage({ params }: Props) {
 async function Body({ params }: { params: Props["params"] }) {
   const r = await load(params);
   if (!r) notFound();
-  const { data, quiz, poll } = r;
+  const { data, quiz, poll, page } = r;
   const c = data.content;
   const header = (
     <header className="nav">
@@ -74,6 +89,16 @@ async function Body({ params }: { params: Props["params"] }) {
       </div>
     </header>
   );
+  if (page) {
+    return (
+      <>
+        {header}
+        <main className="wrap quiz-wrap lp-wrap"><LandingPageView page={page} c={c} chat={chatConfig(c)} base={data.base} /></main>
+        {page.cta.form && <LeadForms forms={c.forms} slug={data.slug} base={data.base} />}
+        {data.env === "production" && <PageVisit base={data.base} path={page.path} />}
+      </>
+    );
+  }
   if (poll) {
     const summary: PollSummary = {
       path: poll.path, title: poll.title, description: poll.description, images: poll.images.map((i) => i.image),

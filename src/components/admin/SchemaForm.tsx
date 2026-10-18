@@ -219,6 +219,13 @@ function ArrayField({ s, value, onChange, path, name, ctx, depth }: FieldProps) 
   const itemSchema = s.items ?? {};
   const itemInner = unwrap(itemSchema).inner;
   const [openIdx, setOpenIdx] = useState<number | null>(null);
+  // ?open=<list>.<n> (or .new) opens that item's pop-up right away, e.g. from the admin list of pages.
+  useEffect(() => {
+    const m = new URLSearchParams(window.location.search).get("open")?.match(/^([\w.]+)\.(\d+|new)$/);
+    if (!m || m[1] !== path) return;
+    setOpenIdx(m[2] === "new" ? items.length : Math.min(Number(m[2]), items.length));
+    // Only on arrival: later saves and closes leave the address as it was.
+  }, []);
 
   if (itemInner.enum) return <EnumArray s={itemInner} items={items as string[]} onChange={onChange} path={path} name={name} ctx={ctx} ordered={path === "sections"} />;
 

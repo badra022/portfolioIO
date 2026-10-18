@@ -591,6 +591,47 @@ export const Poll = z.object({
   showResults: z.boolean().default(true),
 });
 
+/* ---------- pages (offers, requests, information) ---------- */
+
+/**
+ * A page of its own (teacher.com/<path>) to share instead of a raw link: a
+ * summary sheet, a booklet, a discount, a free session. It shows a video or an
+ * image, a title and a description, an optional price, and one button (WhatsApp,
+ * any channel, a link, or one of the site's forms), plus a way back to the site.
+ * E.g. instead of putting a Drive link under a YouTube video, the teacher links
+ * this page, and students ask for the file (and leave their number) here.
+ */
+export const LandingPage = z.object({
+  /** The page address: teacher.com/<path>. */
+  path: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة، مثل summary-pdf" }),
+  /** Off: the page answers "not found" (kept in the list to turn on again). */
+  enabled: z.boolean().default(true),
+  /** What the page is for; only a label in the admin list. */
+  kind: z.enum(["offer", "request", "info"]).default("offer"),
+  /** Small label above the title, e.g. "مجاناً" or "خصم 30%". */
+  badge: z.string().optional(),
+  title: z.string(),
+  description: z.string().optional(),
+  /** A YouTube link (played on the page) or a link to any video file. Takes the place of the image. */
+  video: z.string().regex(/^https?:\/\/\S+$/, { error: "الصق رابط فيديو كامل يبدأ بـ https://" }).optional(),
+  image: OptionalImageRef.optional(),
+  /** Short lines with a check mark, e.g. what's included. */
+  points: z.array(z.string()).default([]),
+  price: z.string().optional(),
+  /** Shown crossed out next to the price. */
+  oldPrice: z.string().optional(),
+  priceNote: z.string().optional(),
+  /** After this date the page says the offer ended and hides the button. */
+  endsAt: EndDate.optional(),
+  /** A countdown to the end date. */
+  countdown: z.boolean().default(true),
+  cta: Action,
+  /** The link back to the teacher's site. */
+  backLabel: z.string().default("ارجع للموقع"),
+  /** Let Google list the page (it's in the sitemap). Off: only people with the link find it. */
+  indexable: z.boolean().default(false),
+});
+
 /* ---------- referral partners ---------- */
 
 /**
@@ -666,6 +707,7 @@ export const ContentSchema = z.object({
   forms: z.array(LeadForm).default([]),
   quizzes: z.array(Quiz).default([]),
   polls: z.array(Poll).default([]),
+  pages: z.array(LandingPage).default([]),
   referrals: z.array(Referral).default([]),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),
   sticky: z.object({ secondary: LinkCta.optional(), cta: ChatCta }),
@@ -681,10 +723,14 @@ export const ContentSchema = z.object({
   });
   // Every button that points at a form must point at one that exists.
   const paths = new Set<string>();
-  // Quizzes and votes share the site's page addresses.
-  [...c.quizzes.map((q, i) => ["quizzes", i, q.path] as const), ...c.polls.map((q, i) => ["polls", i, q.path] as const)].forEach(([list, i, p]) => {
+  // Quizzes, votes and pages share the site's page addresses.
+  [
+    ...c.quizzes.map((q, i) => ["quizzes", i, q.path] as const),
+    ...c.polls.map((q, i) => ["polls", i, q.path] as const),
+    ...c.pages.map((q, i) => ["pages", i, q.path] as const),
+  ].forEach(([list, i, p]) => {
     if (RESERVED_PATHS.includes(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "الاسم ده محجوز للموقع، اختار اسم تاني." });
-    if (paths.has(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "في اختبار أو تصويت تاني بنفس العنوان." });
+    if (paths.has(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "في اختبار أو تصويت أو صفحة تانية بنفس العنوان." });
     paths.add(p);
   });
   const codes = new Set<string>();
@@ -758,6 +804,7 @@ export type ChatCtaT = z.infer<typeof ChatCta>;
 export type ActionT = z.infer<typeof Action>;
 export type LeadFormT = z.infer<typeof LeadForm>;
 export type QuizT = z.infer<typeof Quiz>;
+export type LandingPageT = z.infer<typeof LandingPage>;
 export type PollT = z.infer<typeof Poll>;
 export type SocialT = z.infer<typeof Social>;
 export type DayKeyT = z.infer<typeof DayKey>;

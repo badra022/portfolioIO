@@ -129,6 +129,16 @@ Admin → **التصويتات**. A vote has its own page (`teacher.com/<path>`,
 - **Anonymous**: students only pick a choice. Only a count per choice is stored (`poll_votes`); a cookie on the device ("voted", no id) keeps the same browser from voting twice. Votes are counted by choice position, so don't reorder choices once voting starts.
 - **Results**: votes per choice with percentages, the share link with a copy button, and a reset. Claude: `poll_results`.
 
+## Pages (offers, file requests, information)
+
+Admin → **الصفحات** (under التسويق). A page has its own address (`teacher.com/<path>`, sharing the address space with quizzes and votes) to share instead of a raw link: rather than putting a Drive link to a PDF under a YouTube video for everyone, the teacher links the page, and students see the details and ask for it there.
+
+- **Set up** (admin → **إعداد الصفحات**, or **تعديل** / **+ صفحة جديدة** on the list, which open that page's pop-up directly with `?open=pages.<n>`): the address, on/off, the kind (offer, file request, information: a label for the list), a badge, the title, a description, a video (YouTube plays on the page, a video file plays in a player, any other link gets a "watch" button) or an image, check-mark points, a price and old price, an optional end date with a countdown, the button (WhatsApp, any channel, a link, or one of the site's forms, whose replies land in **الطلبات**), the "back to the site" text, and whether Google may list it.
+- **After the end date** the button is replaced by an "offer ended" line (decided in the browser, so cached pages stop on time). A page that's off answers "not found".
+- **List**: each page's status, kind, visits (all time), link with a copy button, and on/off, edit, open and delete.
+- **Visits** are counted once per page load (`analytics_daily`, metric `page_view`, key = the page address), leaving out browsers that opened `/admin` and automated browsers, like the rest of the analytics.
+- Pages are part of the **أدوات الإعلان** (promo) bundle in the plans.
+
 ## Exam results (students look up their grade)
 
 Under the upcoming exams, the exams section gets a **نتايج الامتحانات اللي فاتت** button (text editable in the exams section) once at least one exam's results are published. The student picks an exam (title and date), types their name and phone, and sees their score (out of the full mark, with a percentage and the teacher's note). They see only their own row; nothing else leaves the server.

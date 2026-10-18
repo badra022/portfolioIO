@@ -78,6 +78,7 @@ export const NAV: NavGroup[] = [
       },
       {
         id: "leads", label: "جمع الطلاب", items: [
+          { label: "الصفحات (عروض وطلبات)", path: "/pages" },
           { label: "روابط الشركاء", path: "/referrals" },
           edit("forms", "نماذج جمع البيانات"),
         ],
@@ -102,6 +103,7 @@ export const NAV: NavGroup[] = [
       },
       {
         id: "advanced", label: "متقدم", items: [
+          edit("pages", "إعداد الصفحات"),
           edit("seo", "جوجل والمشاركة"),
           { label: "سجل التعديلات", path: "/history" },
         ],
