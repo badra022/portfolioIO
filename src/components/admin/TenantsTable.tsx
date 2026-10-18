@@ -141,7 +141,7 @@ export function TenantsTable({ rows, now }: { rows: TenantRow[]; now: number }) 
                 <td className="num">{r.visitors.toLocaleString("en-US")}</td>
                 <td>{r.createdAt ? <small>{fromNow(r.createdAt, now)}</small> : "—"}</td>
                 <td className="sa-row-actions">
-                  <a className="btn-sm ghost" href={`/t/${r.slug}/admin`} title="لوحة تحكم المدرس">لوحته</a>
+                  <a className="btn-sm ghost" href={`${r.siteUrl}/admin`} title="لوحة تحكم المدرس">لوحته</a>
                   {r.state === "trial" || r.state === "trialOver"
                     ? <button type="button" className="btn-sm ghost" disabled={busy} onClick={() => run("extend", [r.slug])}>+24 ساعة</button>
                     : null}

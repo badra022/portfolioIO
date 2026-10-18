@@ -1,18 +1,10 @@
 import "server-only";
-import { env } from "@/lib/env";
 import { listTenants, listTrialRequests, type TrialRequestRow } from "./repo";
 import { overview } from "./analytics";
+import { siteAddress } from "./address";
 import { tenantState } from "@/lib/admin/tenant-actions";
 import { langOf } from "@/lib/i18n";
 import type { TenantRow } from "@/components/admin/TenantsTable";
-
-/** Where students open a teacher's site: the main domain, else <slug>.<ROOT_DOMAIN>, else /t/<slug>. */
-export function siteAddress(slug: string, domains: { domain: string; isPrimary: boolean }[]): { url: string; label: string } {
-  const primary = domains.find((d) => d.isPrimary)?.domain ?? domains[0]?.domain;
-  if (primary) return { url: `https://${primary}`, label: primary };
-  if (env.rootDomain) return { url: `https://${slug}.${env.rootDomain}`, label: `${slug}.${env.rootDomain}` };
-  return { url: `/t/${slug}`, label: `/t/${slug}` };
-}
 
 /** The super admin's data: every teacher as a table row, and every trial request. */
 export async function consoleData(): Promise<{ rows: TenantRow[]; trials: TrialRequestRow[] }> {

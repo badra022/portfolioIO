@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { formatWhen } from "@/lib/admin/format";
 import { requireSuper } from "@/lib/server/auth";
-import { consoleData, siteAddress } from "@/lib/server/console";
+import { consoleData } from "@/lib/server/console";
+import { siteAddress } from "@/lib/server/address";
 import { langOf } from "@/lib/i18n";
 import { TrialsTable, type TrialLead } from "@/components/admin/TrialsTable";
 
