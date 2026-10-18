@@ -46,7 +46,7 @@ export async function PlatformHome() {
         <span>مواقع المدرسين والسناتر</span>
         <a href="/terms">شروط التجربة</a>
       </footer>
-      <DevCredit siteName="ostaz.com" />
+      <DevCredit siteName="myostaz.com" />
     </main>
   );
 }

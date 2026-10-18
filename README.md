@@ -313,7 +313,7 @@ Visitors build a 24-hour trial site from the form on the platform's home page. T
 
 - **Phone check:** the WhatsApp number is confirmed with a code before the site is built, and each number gets one trial. Codes are sent by [Twilio Verify](https://www.twilio.com/docs/verify): set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_VERIFY_SERVICE_SID` (Production). `OTP_CHANNEL=whatsapp` sends codes on WhatsApp instead of SMS (the Verify service needs a WhatsApp sender). `OTP_COUNTRIES` lists the calling codes allowed (default `20`, Egypt). Without the Twilio settings the code step is skipped; one trial per number still applies. `OTP_TEST_CODE` sets a fixed code on dev or locally, never in production.
 - **Terms:** the form requires accepting `/terms` (the design and ready content belong to the platform; no copying). The acceptance time is stored on the tenant.
-- **Watermark:** trial sites show a trial bar and a light ostaz.com watermark over every page and on the photo, block saving images with a right click, and print blank.
+- **Watermark:** trial sites show a trial bar and a light myostaz.com watermark over every page and on the photo, block saving images with a right click, and print blank.
 - **No bots:** trial sites are never indexed, and AI assistants, AI crawlers and copying tools (by user agent) get a 403 (`src/lib/server/bots.ts`). WhatsApp and Facebook link previews still work.
 - **Photo:** the teacher's photo has its background removed in the browser (`src/lib/cutout.ts`, MediaPipe's selfie segmenter, nothing uploaded elsewhere), so the hero shows them on the site's colors. Admins get the same "شيل الخلفية" button on the profile photo.
 

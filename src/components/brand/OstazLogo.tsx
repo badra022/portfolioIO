@@ -1,6 +1,6 @@
 import { BRAND } from "@/lib/platform";
 
-/** The platform's logo: the mark (a graduate's «o» on baby blue) and «ostaz.com». Files: public/brand/. */
+/** The platform's logo: the mark (a graduate's «o» on baby blue) and «myostaz.com». Files: public/brand/. */
 export function OstazMark({ size = 32, className }: { size?: number; className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" width={size} height={size} aria-hidden="true">

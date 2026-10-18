@@ -6,7 +6,7 @@ import { OstazLogo } from "./brand/OstazLogo";
 
 /**
  * Free trial sites only (app/sites/[site]/layout.tsx): a bar saying it's a trial
- * of ostaz.com with the time left, and a light ostaz.com watermark over the whole
+ * of myostaz.com with the time left, and a light myostaz.com watermark over the whole
  * page, so screenshots carry the platform's name. Images can't be saved with a
  * right click or a long press either (a deterrent, not a lock).
  */
