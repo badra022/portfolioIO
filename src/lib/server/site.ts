@@ -36,6 +36,8 @@ export type SiteData =
       permissions: Permissions;
       /** Last save (ISO), for sitemaps. */
       updatedAt: string | null;
+      /** Free trial sites: when the trial ends (ISO); null for a normal site. Trials are watermarked and never indexed. */
+      trialEndsAt: string | null;
       /** Changes with every save; added to generated URLs (share image) so caches refresh. */
       version: number;
       /** Past exams whose results students can look up (published in /admin/results). */
@@ -98,7 +100,8 @@ export async function getSiteData(siteKey: string): Promise<SiteData> {
     theme: copy.theme,
     canonical: canonicalHost ? `https://${canonicalHost}` : null,
     // The preview is never indexed (it's also behind the admin login).
-    indexable: siteEnv === "production" && Boolean(canonicalHost && servedHost === canonicalHost),
+    indexable: siteEnv === "production" && !t.trialEndsAt && Boolean(canonicalHost && servedHost === canonicalHost),
+    trialEndsAt: t.trialEndsAt,
     base: baseForSite(siteKey),
     updatedAt: t.updatedAt,
     version: siteEnv === "preview" ? t.version * 10_000 + t.preview.version : t.version,

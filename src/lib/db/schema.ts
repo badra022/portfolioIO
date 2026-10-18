@@ -32,7 +32,20 @@ export const tenants = pgTable("tenants", {
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
   /** Trial sites: a salted hash of the sign-up's address, only to limit sign-ups per visitor. */
   signupKey: text("signup_key"),
-});
+  /** Trial sites: the WhatsApp number (international digits, lib/phone.ts); unique, so one trial per number. */
+  signupPhone: text("signup_phone"),
+  /** Trial sites: when the sign-up accepted the trial terms (/terms). */
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+}, (t) => [uniqueIndex("tenants_signup_phone_key").on(t.signupPhone)]);
+
+/** Verification codes sent from the sign-up form (lib/server/otp.ts), only to limit how many are sent. */
+export const signupOtps = pgTable("signup_otps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  phone: text("phone").notNull(),
+  /** Salted hash of the sender's address (lib/server/signup.ts visitorKey). */
+  visitor: text("visitor").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("signup_otps_phone_idx").on(t.phone, t.createdAt), index("signup_otps_visitor_idx").on(t.visitor, t.createdAt)]);
 
 /** Custom domains that serve a teacher. Each must also be added to the Vercel project. */
 export const tenantDomains = pgTable("tenant_domains", {

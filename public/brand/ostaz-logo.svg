@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 248 48" width="248" height="48">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4FA8FF"/><stop offset="1" stop-color="#1D6FE0"/></linearGradient></defs>
+  <rect width="48" height="48" rx="13" fill="url(#g)"/>
+  <circle cx="24" cy="29.5" r="8.6" fill="none" stroke="#fff" stroke-width="5"/>
+  <path d="M24 8.5 39 14.8 24 21.1 9 14.8Z" fill="#fff"/>
+  <path d="M35.6 16.3v6.2" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="35.6" cy="23.6" r="1.9" fill="#BFE0FF"/>
+  <text x="58" y="34" font-family="'IBM Plex Sans','Segoe UI',Arial,sans-serif" font-size="29" font-weight="700" fill="#0B2A55" letter-spacing="-.5">myostaz<tspan fill="#1D6FE0" font-weight="500">.com</tspan></text>
+</svg>

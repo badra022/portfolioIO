@@ -3,7 +3,8 @@ import { env, isDev } from "@/lib/env";
 import { isAdminPath, route } from "@/lib/routing";
 import { authenticate, teacherSlugFor } from "@/lib/server/auth";
 import { isSiteFileName } from "@/lib/site-files";
-import { PREVIEW_PATH, siteEnv } from "@/lib/environments";
+import { PREVIEW_PATH, siteEnv, splitSite } from "@/lib/environments";
+import { COPY_BOTS, isTrialSite } from "@/lib/server/bots";
 
 /**
  * Every request is mapped by its host name to /sites/<site>/... (see lib/routing.ts).
@@ -25,6 +26,11 @@ export async function proxy(request: NextRequest) {
     const to = request.nextUrl.clone();
     to.pathname = `${r.base.slice(0, -PREVIEW_PATH.length)}${r.rest}`;
     return NextResponse.redirect(to, 307);
+  }
+
+  // Free trial sites turn away AI assistants, crawlers and copying tools (lib/server/bots.ts).
+  if (r.site !== "_platform" && COPY_BOTS.test(request.headers.get("user-agent") ?? "") && !isAdminPath(r.rest) && await isTrialSite(splitSite(r.site).key)) {
+    return new NextResponse("This is a private trial site.", { status: 403, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow, noarchive" } });
   }
 
   const devGate = isDev() && !OPEN_ON_DEV.test(r.rest);
@@ -64,5 +70,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|local-assets/|demo/).*)"],
+  matcher: ["/((?!_next/static|_next/image|local-assets/|demo/|brand/|segment/).*)"],
 };

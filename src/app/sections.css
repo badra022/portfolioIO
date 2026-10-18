@@ -197,6 +197,14 @@ a.thumb { display: block; }
 .dev-wa { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--line); border-radius: var(--r-pill); }
 .dev-wa:hover { border-color: var(--subtle); }
 .dev-wa svg { width: 14px; height: 14px; }
+.dev-made { display: inline-flex; align-items: center; gap: 8px; }
+.devcredit .ostaz-logo { color: var(--text); }
+
+/* ---------- the platform's logo (components/brand/OstazLogo.tsx) ---------- */
+.ostaz-logo { display: inline-flex; align-items: center; gap: .4em; text-decoration: none; color: #0B2A55; line-height: 1; }
+.ostaz-logo svg { flex: none; }
+.ostaz-word { font: 700 1em/1 "IBM Plex Sans Arabic", "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; letter-spacing: -.01em; color: inherit; }
+.ostaz-word i { font-style: normal; font-weight: 500; color: #1D6FE0; }
 
 @media (max-width: 900px) {
   .bookstack { width: min(58%, 300px); }
@@ -643,3 +651,20 @@ button.btn { font: inherit; cursor: pointer; }
 .cp-done { justify-items: center; text-align: center; }
 .cp-done p { margin: 0; font-weight: 600; }
 .cp-ok { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--accent-12); color: var(--accent); font-size: 24px; font-weight: 700; }
+
+/* ---------- free trial sites (components/TrialMark.tsx) ---------- */
+.trial-bar {
+  position: relative; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 12px;
+  padding: 8px 16px; background: #EAF3FF; color: #0D3B7A; font: 600 13px/1.4 "IBM Plex Sans Arabic", system-ui, sans-serif;
+  border-bottom: 1px solid #CFE3FC;
+}
+.trial-bar .ostaz-word { font-size: 14px !important; }
+.trial-tag { padding: 2px 10px; border-radius: 99px; background: #1D6FE0; color: #fff; }
+.trial-left { color: #55657D; }
+.trial-cta { padding: 3px 12px; border-radius: 99px; border: 1px solid #1D6FE0; color: #1D6FE0; text-decoration: none; }
+.trial-cta:hover { background: #1D6FE0; color: #fff; }
+.site[data-trial="true"] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.site[data-trial="true"] input, .site[data-trial="true"] textarea { -webkit-user-select: text; user-select: text; }
+.site[data-trial="true"] img { -webkit-user-drag: none; }
+.trial-bar.foot { border-bottom: 0; border-top: 1px solid #CFE3FC; padding-bottom: 90px; /* clear of the sticky bar */ }
+@media print { .site[data-trial="true"] { display: none; } }

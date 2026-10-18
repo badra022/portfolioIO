@@ -28,6 +28,7 @@ const paths: Record<string, React.ReactNode> = {
   phone: (<path d="M5 3.5h3.5l1.8 4.5-2.3 1.4a11 11 0 0 0 6.6 6.6l1.4-2.3 4.5 1.8V19a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3.5 5.1 1.5 1.5 0 0 1 5 3.5z" />),
   megaphone: (<><path d="M3.5 10v4h3l7 4.5v-13L6.5 10z" /><path d="M17 9a4 4 0 0 1 0 6" /></>),
   menu: (<path d="M4 6.5h16M4 12h16M4 17.5h16" />),
+  mail: (<><rect x="3.5" y="5.5" width="17" height="13" rx="2" /><path d="M4 7l8 6 8-6" /></>),
   home: (<><path d="M4 11l8-6.5 8 6.5" /><path d="M6 9.5V20h12V9.5" /><path d="M10 20v-5h4v5" /></>),
   help: (<><circle cx="12" cy="12" r="8.5" /><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6" /><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none" /></>),
   medal: (<><path d="M8 3h3l1.5 5M16 3h-3l-1 3" /><circle cx="12" cy="15" r="5.5" /><path d="M12 12.4l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" fill="currentColor" stroke="none" /></>),

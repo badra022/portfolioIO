@@ -1,13 +1,16 @@
 import { headers } from "next/headers";
 import { env } from "@/lib/env";
 import { SignupFlow } from "./signup/SignupFlow";
+import { OstazLogo } from "./brand/OstazLogo";
+import { DevCredit } from "./DevCredit";
+import { otpChannel, otpEnabled } from "@/lib/server/otp";
 import "./signup/signup.css";
 
 /**
  * What the platform's own domain shows at "/": the page paid ads point to. It
  * sells the idea in one screen, then the «جرّب موقعك» form builds the visitor's
  * own trial site (components/signup/SignupFlow.tsx). Teachers' sites live on
- * their own addresses; the platform console stays at /admin.
+ * their own addresses.
  */
 export async function PlatformHome() {
   const host = (await headers()).get("host") ?? "";
@@ -18,7 +21,7 @@ export async function PlatformHome() {
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" precedence="default" />
       <header className="su-head">
-        <a className="su-brand" href="/"><span aria-hidden="true">أ</span>أستاذ</a>
+        <OstazLogo size={36} href="/" />
         <a className="su-btn ghost sm" href="#start">جرّب ببلاش</a>
       </header>
 
@@ -36,12 +39,14 @@ export async function PlatformHome() {
         </div>
       </section>
 
-      <SignupFlow before={before} after={after} />
+      <SignupFlow before={before} after={after} otp={otpEnabled() ? otpChannel() : false} />
 
       <footer className="su-foot">
-        <span>أستاذ · مواقع المدرسين والسناتر</span>
-        <a href="/admin">دخول الإدارة</a>
+        <OstazLogo size={26} href="/" />
+        <span>مواقع المدرسين والسناتر</span>
+        <a href="/terms">شروط التجربة</a>
       </footer>
+      <DevCredit siteName="myostaz.com" />
     </main>
   );
 }

@@ -15,7 +15,9 @@ export async function generateMetadata({ params }: PageProps<"/sites/[site]">): 
   return {
     metadataBase: canonical ? new URL(canonical) : undefined,
     alternates: canonical ? { canonical: `${canonical}/` } : undefined,
-    robots: indexable ? { index: true, follow: true } : { index: false, follow: data.env === "production" },
+    // Trial sites: kept out of search, caches, snippets and image search.
+    robots: data.trialEndsAt ? { index: false, follow: false, noarchive: true, nosnippet: true, noimageindex: true }
+      : indexable ? { index: true, follow: true } : { index: false, follow: data.env === "production" },
     title: c.seo.title,
     description: c.seo.description,
     openGraph: {

@@ -11,3 +11,4 @@ schema/
 package-lock.json
 .local-storage/
 !.env.example
+public/segment/vision_*
