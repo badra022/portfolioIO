@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/admin", icon: "home", label: "الرئيسية", match: (p: string) => p === "/admin" },
   { href: "/admin/tenants", icon: "users", label: "المدرسين", match: (p: string) => p.startsWith("/admin/tenants") },
   { href: "/admin/trials", icon: "form", label: "طلبات التجربة", match: (p: string) => p.startsWith("/admin/trials"), badge: true },
+  { href: "/admin/partners", icon: "link", label: "الشركاء", match: (p: string) => p.startsWith("/admin/partners") },
   { href: "/admin/stats", icon: "trophy", label: "الإحصائيات", match: (p: string) => p.startsWith("/admin/stats") },
 ] as const;
 

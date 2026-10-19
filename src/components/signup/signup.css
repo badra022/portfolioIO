@@ -177,3 +177,24 @@
 .su .su-tel input { flex: 1; min-width: 0; }
 .su textarea { width: 100%; padding: 10px 14px; border: 1px solid #D5E2F2; border-radius: 14px; background: #fff; color: var(--s-ink); font: inherit; font-size: 16px; resize: vertical; }
 .su-opt { font-style: normal; font-weight: 400; color: var(--s-muted); font-size: 13px; }
+
+/* A partner's private page (components/PartnerHome.tsx). */
+.pt-who { font-weight: 600; color: var(--s-deep); }
+.pt-kpis { max-width: 1120px; margin: 0 auto; padding: 8px 20px 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.pt-kpis div { display: grid; gap: 2px; padding: 14px 16px; border: 1px solid var(--s-line); border-radius: 16px; background: #fff; }
+.pt-kpis b { font-size: 26px; line-height: 1.2; color: var(--s-deep); }
+.pt-kpis span { color: var(--s-muted); font-size: 14px; }
+.pt-sites { max-width: 1120px; margin: 0 auto; padding: 0 20px 48px; display: grid; gap: 12px; }
+.pt-sites h2 { font-size: 24px; }
+.pt-table-wrap { overflow-x: auto; border: 1px solid var(--s-line); border-radius: 16px; background: #fff; }
+.pt-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.pt-table th, .pt-table td { padding: 10px 14px; text-align: start; border-bottom: 1px solid var(--s-line); vertical-align: middle; white-space: nowrap; }
+.pt-table th { color: var(--s-muted); font-weight: 600; font-size: 13px; background: #F8FBFF; }
+.pt-table tr:last-child td { border-bottom: 0; }
+.pt-table td small { display: block; color: var(--s-muted); font-size: 12px; }
+.pt-table td a[dir="ltr"] { color: var(--s-blue); text-decoration: none; }
+.pt-state { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; background: var(--s-sky); color: var(--s-deep); }
+.pt-state.live { background: #E3F5EC; color: var(--s-ok); }
+.pt-state.trialOver { background: #FDECEA; color: var(--s-bad); }
+.pt-state.off { background: #EEF1F5; color: var(--s-muted); }
+.pt-hint { margin: 0; color: var(--s-muted); font-size: 14px; }

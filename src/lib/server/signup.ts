@@ -10,6 +10,7 @@ import * as repo from "./repo";
 import { saveSubmission } from "./submissions";
 import { saveComplaint } from "./complaints";
 import { checkPhoneToken, otpEnabled, phoneUsed } from "./otp";
+import type { Partner } from "./partners";
 
 /**
  * The public «جرّب موقعك» form (components/signup/SignupFlow.tsx → api/signup):
@@ -103,7 +104,8 @@ export async function slugStatus(slug: string): Promise<SlugStatus> {
 /** The sign-up's number as international digits (lib/phone.ts), or null. */
 export const signupPhone = (f: Pick<SignupFields, "country" | "phone">) => normalizePhone(f.country, f.phone);
 
-export async function checkFields(f: SignupFields): Promise<SignupError[]> {
+/** partner: built from a partner's page, where one number may make many trials and the terms are in the partnership. */
+export async function checkFields(f: SignupFields, partner = false): Promise<SignupError[]> {
   const errors: SignupError[] = [];
   const bad = (field: SignupError["field"], message: string) => errors.push({ field, message });
   const slug = await slugStatus(f.slug);
@@ -112,14 +114,14 @@ export async function checkFields(f: SignupFields): Promise<SignupError[]> {
   if (f.subject.length < 2) bad("subject", "اكتب المادة");
   const digits = signupPhone(f);
   if (!digits) bad("phone", "اكتب رقم موبايل واتساب صحيح للبلد اللي اخترتها");
-  else if (await phoneUsed(digits)) bad("phone", "الرقم ده عمل موقع تجريبي قبل كده. كلمنا على واتساب ونفعّله ليك.");
-  else if (otpEnabled() && !checkPhoneToken(digits, f.phoneToken)) bad("phone", "أكّد رقمك بالكود اللي وصلك الأول.");
+  else if (!partner && await phoneUsed(digits)) bad("phone", "الرقم ده عمل موقع تجريبي قبل كده. كلمنا على واتساب ونفعّله ليك.");
+  else if (!partner && otpEnabled() && !checkPhoneToken(digits, f.phoneToken)) bad("phone", "أكّد رقمك بالكود اللي وصلك الأول.");
   if (!/^#[0-9a-fA-F]{6}$/.test(f.color)) bad("color", "اختار لون");
   f.videos.forEach((v) => { if (!YOUTUBE_RE.test(v)) bad("videos", `الرابط ده مش فيديو يوتيوب: ${v.slice(0, 60)}`); });
   if (!USERNAME_RE.test(f.username)) bad("username", "حروف إنجليزية صغيرة وأرقام و . _ - من 3 لـ 32 حرف");
   else if (await repo.usernameTaken(f.username)) bad("username", "اسم المستخدم ده مستخدم، اختار اسم تاني.");
   if (f.password.length < 8) bad("password", "كلمة السر 8 حروف على الأقل");
-  if (!f.terms) bad("terms", "لازم توافق على شروط التجربة");
+  if (!partner && !f.terms) bad("terms", "لازم توافق على شروط التجربة");
   return errors;
 }
 
@@ -169,7 +171,12 @@ export function siteBase(slug: string, origin: string): string {
   return env.rootDomain ? `https://${slug}.${env.rootDomain}` : `${origin}/t/${slug}`;
 }
 
-export async function createTrial(f: SignupFields, files: { photo: FormDataEntryValue | null; logo: FormDataEntryValue | null }, key: string, origin: string) {
+/**
+ * from: a partner's page (lib/server/partners.ts): the site belongs to the partner, works for its trialHours,
+ * and counts toward none of the public limits (no visitor key, no number lock).
+ */
+export async function createTrial(f: SignupFields, files: { photo: FormDataEntryValue | null; logo: FormDataEntryValue | null }, key: string, origin: string,
+  from?: { partner: Partner; extra: Record<string, string> }) {
   let photo: string | undefined, logo: string | undefined;
   try {
     // "cutout" in the file's key tells the hero it has no background (components/Hero.tsx).
@@ -184,20 +191,23 @@ export async function createTrial(f: SignupFields, files: { photo: FormDataEntry
     whatsapp: signupPhone(f)!, slogan: f.slogan || undefined, videos: f.videos, photo, logo,
     color: f.color, scheme: f.scheme,
   });
-  const endsAt = new Date(Date.now() + TRIAL_HOURS * 3600_000);
+  const hours = from?.partner.trialHours ?? TRIAL_HOURS;
+  const endsAt = new Date(Date.now() + hours * 3600_000);
   await repo.createTenant({
-    slug: f.slug, name: f.name, content, theme, author: "تجربة مجانية",
-    trialEndsAt: endsAt, signupKey: key, signupPhone: signupPhone(f)!, termsAcceptedAt: new Date(),
+    slug: f.slug, name: f.name, content, theme, author: from ? `شريك: ${from.partner.name}` : "تجربة مجانية",
+    trialEndsAt: endsAt,
+    ...(from ? { partnerId: from.partner.id } : { signupKey: key, signupPhone: signupPhone(f)!, termsAcceptedAt: new Date() }),
     login: { username: f.username, passwordHash: await hashPassword(f.password) },
   });
   const made = await repo.getTenant(f.slug);
   await repo.addTrialRequest({
     tenantId: made?.id ?? null, slug: f.slug, name: `${f.title} ${f.name}`.trim(), title: f.title, subject: f.subject,
     phone: signupPhone(f)!, locale: f.locale, username: f.username, notes: f.notes,
+    partnerId: from?.partner.id ?? null, extra: from?.extra ?? null,
   }).catch((e) => console.error("trial request", e));
   await seedSamples(f.slug, f.locale).catch((e) => console.error("trial samples", e));
   const base = siteBase(f.slug, origin);
-  return { ok: true as const, base, endsAt: endsAt.toISOString(), username: f.username, links: demoLinks(base, f.locale) };
+  return { ok: true as const, base, endsAt: endsAt.toISOString(), hours, username: f.username, links: demoLinks(base, f.locale) };
 }
 
 /** A few sample requests and a complaint, so the admin panel isn't empty on day one. */

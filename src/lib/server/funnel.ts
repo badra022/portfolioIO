@@ -1,5 +1,5 @@
 import "server-only";
-import { and, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql, type SQL } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import { cairoDay } from "@/lib/analytics";
@@ -14,20 +14,22 @@ const { platformDaily } = schema;
  *   submit     «ابني موقعي» was pressed with a complete form
  *   built      a trial site was made
  *   rejected:<reason>  the build was refused (limits, used number, device...)
+ * Each page counts on its own (source): "" = the platform's home page, else a partner's slug
+ * (its private page, lib/server/partners.ts).
  */
 export const FUNNEL_STEPS = ["1", "2", "3", "4"] as const;
 const OK_METRIC = /^(view|submit|built|step:[1-4]|rejected:[a-z]{2,20})$/;
 
-export async function count(metrics: string[], at = new Date()): Promise<void> {
+export async function count(metrics: string[], at = new Date(), source = ""): Promise<void> {
   if (!hasDb()) return;
   const day = cairoDay(at);
   const rows = [...new Set(metrics)].filter((m) => OK_METRIC.test(m)).slice(0, 8).map((m) => {
     const [metric, key = ""] = m.split(":");
-    return { day, metric, key, value: 1 };
+    return { day, source, metric, key, value: 1 };
   });
   if (!rows.length) return;
   await db().insert(platformDaily).values(rows).onConflictDoUpdate({
-    target: [platformDaily.day, platformDaily.metric, platformDaily.key],
+    target: [platformDaily.day, platformDaily.source, platformDaily.metric, platformDaily.key],
     set: { value: sql`${platformDaily.value} + excluded.value` },
   });
 }
@@ -42,12 +44,30 @@ export type Funnel = {
   days: { day: string; views: number; built: number }[];
 };
 
-/** The funnel between two Cairo days (from null = since the start). */
-export async function funnel(from: string | null, to: string): Promise<Funnel> {
-  const out: Funnel = { views: 0, steps: { 1: 0, 2: 0, 3: 0, 4: 0 }, submits: 0, built: 0, rejected: {}, days: [] };
-  if (!hasDb()) return out;
-  const where = from ? and(gte(platformDaily.day, from), lte(platformDaily.day, to)) : lte(platformDaily.day, to);
-  const rows = await db().select().from(platformDaily).where(where);
+const empty = (): Funnel => ({ views: 0, steps: { 1: 0, 2: 0, 3: 0, 4: 0 }, submits: 0, built: 0, rejected: {}, days: [] });
+
+/** The funnel between two Cairo days (from null = since the start), of one page (source) or of every page ("*"). */
+export async function funnel(from: string | null, to: string, source = ""): Promise<Funnel> {
+  if (!hasDb()) return empty();
+  return (await funnels(from, to, source))[source] ?? empty();
+}
+
+/** The funnel of every page at once, by source ("" = home page); "*" = all pages together. */
+export async function funnels(from: string | null, to: string, only?: string): Promise<Record<string, Funnel>> {
+  if (!hasDb()) return {};
+  const conds: SQL[] = [lte(platformDaily.day, to)];
+  if (from) conds.push(gte(platformDaily.day, from));
+  if (only !== undefined && only !== "*") conds.push(eq(platformDaily.source, only));
+  const rows = await db().select().from(platformDaily).where(and(...conds));
+  const bySource = new Map<string, typeof rows>();
+  for (const r of rows) {
+    for (const k of [r.source, "*"]) { const l = bySource.get(k) ?? []; l.push(r); bySource.set(k, l); }
+  }
+  return Object.fromEntries([...bySource].map(([k, list]) => [k, fold(list)]));
+}
+
+function fold(rows: (typeof platformDaily.$inferSelect)[]): Funnel {
+  const out = empty();
   const byDay = new Map<string, { views: number; built: number }>();
   for (const r of rows) {
     const d = byDay.get(r.day) ?? { views: 0, built: 0 };
