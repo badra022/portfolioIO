@@ -27,7 +27,10 @@ body {
   line-height: 1.75;
   -webkit-font-smoothing: antialiased;
 }
-.site { min-height: 100vh; padding-bottom: 72px; /* room for the sticky bar */ }
+/* overflow-x clip: nothing inside may widen the page. The document is right-to-left, so
+   anything sticking out on the left (an English section's start side) would become
+   scrollable space, and the page would open scrolled away from the content. */
+.site { min-height: 100vh; padding-bottom: 72px; /* room for the sticky bar */ overflow-x: clip; }
 .site[data-glow="true"] {
   background-image: radial-gradient(900px 600px at 82% 6%, var(--accent-12), transparent 60%);
   background-repeat: no-repeat;
