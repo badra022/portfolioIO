@@ -93,7 +93,7 @@ export async function checkPartner(creds: { user: string; pass: string }): Promi
   const r = username ? (await db().select().from(partners).where(eq(partners.username, username)).limit(1))[0] : undefined;
   const ok = await verifyPassword(creds.pass.trim(), r?.passwordHash ?? DUMMY_HASH);
   if (!ok || !r || r.disabled) return null;
-  void db().update(partners).set({ lastLoginAt: new Date() }).where(eq(partners.id, r.id)).catch(() => {});
+  await db().update(partners).set({ lastLoginAt: new Date() }).where(eq(partners.id, r.id)).catch(() => {});
   return toPartner(r);
 }
 
