@@ -1,6 +1,5 @@
 import { consoleData } from "@/lib/server/console";
 import { funnel } from "@/lib/server/funnel";
-import { overview } from "@/lib/server/analytics";
 import { cairoDay } from "@/lib/analytics";
 import { STATE_LABEL, fromNow } from "@/lib/admin/tenant-actions";
 import { connection } from "next/server";
@@ -18,11 +17,12 @@ export async function PlatformConsole() {
   await connection();
   const now = new Date();
   const week = cairoDay(new Date(now.getTime() - 6 * 86_400_000));
-  const [{ rows, trials }, f, stats] = await Promise.all([consoleData(), funnel(week, cairoDay(now)), overview().catch(() => [])]);
+  // The teachers' rows already carry this month's visitors and contacts (no second query for them).
+  const [{ rows, trials }, f] = await Promise.all([consoleData(), funnel(week, cairoDay(now))]);
   const by = (s: string) => rows.filter((r) => r.state === s).length;
   const since = (h: number) => trials.filter((t) => Date.parse(t.createdAt) >= now.getTime() - h * 3600_000).length;
-  const visitors = stats.reduce((a, s) => a + s.visitors, 0);
-  const contacts = stats.reduce((a, s) => a + s.contacts, 0);
+  const visitors = rows.reduce((a, r) => a + r.visitors, 0);
+  const contacts = rows.reduce((a, r) => a + r.contacts, 0);
   // Trials that need a decision: ending in the next 6 hours, or ended in the last 3 days.
   const decide = rows.filter((r) => r.trialEndsAt && r.state !== "off"
     && Date.parse(r.trialEndsAt) < now.getTime() + 6 * 3600_000 && Date.parse(r.trialEndsAt) > now.getTime() - 3 * 86_400_000);
