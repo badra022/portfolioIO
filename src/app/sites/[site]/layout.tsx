@@ -24,7 +24,8 @@ export function generateStaticParams() {
  */
 export default function RootLayout({ children, params }: LayoutProps<"/sites/[site]">) {
   return (
-    <html lang="ar" dir="rtl">
+    // Arabic by default; an English site switches it in SiteFrame (the site is only known inside <Suspense>).
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body>
         {isDev() && <div className="dev-bar" role="note" dir="ltr">DEV · test environment with its own database, not the live site</div>}
         <Suspense fallback={null}>
@@ -48,6 +49,10 @@ async function SiteFrame({ params, children }: { params: Promise<{ site: string 
       {fonts && <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />}
       {fonts && <link rel="stylesheet" href={fonts} precedence="default" />}
       <style href={`theme-${data.slug}-${data.env}`} precedence="high">{themeCss(theme)}</style>
+      {/* The page's own language and direction, so browsers don't offer to translate an English site "from Arabic". */}
+      {langOf(content.locale) !== "ar" && (
+        <script dangerouslySetInnerHTML={{ __html: `document.documentElement.lang=${JSON.stringify(langOf(content.locale))};document.documentElement.dir=${JSON.stringify(dirOf(content.locale))};` }} />
+      )}
       <div className="site" lang={langOf(content.locale)} dir={dirOf(content.locale)} data-trial={data.trialEndsAt ? "true" : undefined} {...themeAttrs(theme)}>
         {data.env === "preview" && <PreviewBar base={data.base} />}
         {data.trialEndsAt && <TrialMark endsAt={data.trialEndsAt} en={content.locale === "en"} siteName={content.profile.fullTitle} />}

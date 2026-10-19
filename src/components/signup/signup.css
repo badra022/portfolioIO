@@ -79,7 +79,7 @@
 .su-slug input { border: 0 !important; min-width: 0; flex: 1; }
 .su-slug i { flex: none; padding: 0 12px; font-style: normal; color: var(--s-muted); background: var(--s-bg); align-self: stretch; display: grid; place-items: center; font-size: 14px; }
 .su-note { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--s-sky); color: var(--s-deep); font-size: 14px; }
-.su-hp { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; inset-inline-start: -9999px; }
+.su-hp { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; opacity: 0; pointer-events: none; }
 .su-nav { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 .su-nav .primary { min-width: 160px; }
 @media (max-width: 600px) { .su-nav .su-btn { flex: 1; } .su-card { padding: 16px; border-radius: 18px; } }
