@@ -23,8 +23,15 @@ export function db(): Db {
   assertStage();
   if (g.__portfolioDb) return g.__portfolioDb;
   if (!env.databaseUrl) throw new Error("DATABASE_URL is not set.");
+  // max_pipeline 1: one query at a time per connection. By default postgres.js sends more
+  // queries down a connection that is still busy (pipelining) once all of them are in use;
+  // Supabase's transaction pooler (port 6543) can hand a pipelined query to a backend that
+  // never answers it, and the page waits forever (the super admin's home, which runs the
+  // most queries at once, hung on every load). Queries now wait for a free connection.
   // Short-lived connections, so few of them are open when the function is paused.
-  const client = postgres(env.databaseUrl, { prepare: false, max: 3, idle_timeout: 10, max_lifetime: 5 * 60, connect_timeout: 10 });
+  // (max_pipeline is a real postgres.js option, read in its src/index.js, but missing from its types.)
+  const noPipeline = { max_pipeline: 1 } as Record<string, number>;
+  const client = postgres(env.databaseUrl, { prepare: false, max: 5, idle_timeout: 10, max_lifetime: 5 * 60, connect_timeout: 10, ...noPipeline });
   guard(client);
   g.__portfolioSql = client;
   g.__portfolioDb = drizzle(client, { schema });
