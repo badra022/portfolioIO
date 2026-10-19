@@ -16,6 +16,8 @@ import {
 import { listSiteFiles } from "@/lib/server/site-files";
 import { ActionForm } from "@/components/admin/ConsoleForms";
 import { FEATURES, FEATURE_INFO } from "@/lib/permissions";
+import { listPartners, partnerIdOf } from "@/lib/server/partners";
+import { setTenantPartnerAction } from "../../partners/actions";
 
 export default async function ManageTenant({ params }: PageProps<"/sites/[site]/admin/tenants/[slug]">) {
   const { site: raw, slug } = await params;
@@ -23,13 +25,15 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
   if (site !== "_platform") notFound();
   await requireSuper(site);
   await connection();
-  const [t, users, files, stats, leads] = await Promise.all([
+  const [t, users, files, stats, leads, partners, partnerId] = await Promise.all([
     getTenant(slug), listUsers(slug), listSiteFiles(slug), overview().catch(() => []), listTrialRequests().catch(() => []),
+    listPartners().catch(() => []), partnerIdOf(slug).catch(() => null),
   ]);
   if (!t) notFound();
   const counts = await adminCounts(t, "production").catch(() => ({ requests: 0, grading: 0, complaints: 0 }));
   const st = stats.find((s) => s.slug === t.slug);
   const lead = leads.find((l) => l.slug === t.slug);
+  const partner = partners.find((x) => x.id === partnerId) ?? null;
   const state = tenantState(t);
   const address = siteAddress(t.slug, t.domains);
   const num = (v: number) => v.toLocaleString("en-US");
@@ -68,10 +72,26 @@ export default async function ManageTenant({ params }: PageProps<"/sites/[site]/
         <section className="a-panel">
           <h2>طلب التجربة</h2>
           <p className="a-sub">
-            اتطلب {fromNow(lead.createdAt)} · {lead.subject ?? ""}
+            اتطلب {fromNow(lead.createdAt)} {lead.partnerId ? <>من صفحة <b>{partners.find((x) => x.id === lead.partnerId)?.name ?? "شريك محذوف"}</b></> : "من صفحة المنصة"} · {lead.subject ?? ""}
             {lead.phone && <> · <a dir="ltr" href={`https://wa.me/${lead.phone}`} target="_blank" rel="noopener">+{lead.phone}</a></>}
           </p>
           {lead.notes ? <blockquote className="sa-quote">{lead.notes}</blockquote> : <p className="a-sub">من غير ملاحظات.</p>}
+          {lead.extra && <dl className="sa-extra">{Object.entries(lead.extra).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>}
+        </section>
+      )}
+
+      {(partners.length > 0 || partner) && (
+        <section className="a-panel">
+          <h2>الشريك</h2>
+          <p className="a-sub">{partner
+            ? <>الموقع تبع <a href={`/admin/partners/${partner.slug}`}><b>{partner.name}</b></a>: حسابه بيدخل لوحة التحكم، والموقع بيتحسب في أرقامه.</>
+            : "الموقع مش تبع أي شريك. لو اخترت شريك، حسابه هيقدر يدير الموقع والموقع هيتحسب في أرقامه."}</p>
+          <ActionForm action={setTenantPartnerAction.bind(null, t.slug)} submit="احفظ" className="a-form inline">
+            <select name="partner" defaultValue={partner?.id ?? ""} aria-label="الشريك">
+              <option value="">من غير شريك</option>
+              {partners.map((x) => <option key={x.id} value={x.id}>{x.name}{x.disabled ? " (متوقف)" : ""}</option>)}
+            </select>
+          </ActionForm>
         </section>
       )}
 

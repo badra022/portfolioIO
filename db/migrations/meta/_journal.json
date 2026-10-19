@@ -127,6 +127,13 @@
       "when": 1792325487140,
       "tag": "0017_trial_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792419334950,
+      "tag": "0018_partners",
+      "breakpoints": true
     }
   ]
 }

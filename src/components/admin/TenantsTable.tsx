@@ -16,10 +16,13 @@ export type TenantRow = {
   createdAt: string | null;
   updatedAt: string | null;
   english: boolean;
-  /** Visitors this month. */
+  /** Visitors and contacts this month. */
   visitors: number;
+  contacts: number;
   /** Made from the public trial form. */
   fromTrial: boolean;
+  /** The partner (agency) the site belongs to. */
+  partner: { slug: string; name: string } | null;
 };
 
 const FILTERS: { id: "all" | TenantState; label: string }[] = [
@@ -42,6 +45,9 @@ const BULK: TenantActionT[] = ["enable", "disable", "extend", "end", "activate",
 export function TenantsTable({ rows, now }: { rows: TenantRow[]; now: number }) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [q, setQ] = useState("");
+  // "" = every source, "-" = the platform's own (no partner), else a partner's slug.
+  const [source, setSource] = useState("");
+  const partners = useMemo(() => [...new Map(rows.filter((r) => r.partner).map((r) => [r.partner!.slug, r.partner!.name]))], [rows]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState<{ action: TenantActionT; slugs: string[] } | null>(null);
   const [typed, setTyped] = useState("");
@@ -56,8 +62,9 @@ export function TenantsTable({ rows, now }: { rows: TenantRow[]; now: number }) 
   const shown = useMemo(() => {
     const term = q.trim().toLowerCase();
     return rows.filter((r) => (filter === "all" || r.state === filter)
+      && (!source || (source === "-" ? !r.partner : r.partner?.slug === source))
       && (!term || r.name.toLowerCase().includes(term) || r.slug.includes(term) || r.siteLabel.toLowerCase().includes(term)));
-  }, [rows, filter, q]);
+  }, [rows, filter, q, source]);
   const allShown = shown.length > 0 && shown.every((r) => picked.has(r.slug));
   const selected = rows.filter((r) => picked.has(r.slug));
 
@@ -93,6 +100,13 @@ export function TenantsTable({ rows, now }: { rows: TenantRow[]; now: number }) 
             </button>
           ))}
         </div>
+        {partners.length > 0 && (
+          <select className="sa-source" value={source} onChange={(e) => setSource(e.target.value)} aria-label="الشريك">
+            <option value="">كل المصادر</option>
+            <option value="-">المنصة (من غير شريك)</option>
+            {partners.map(([slug, name]) => <option key={slug} value={slug}>{name}</option>)}
+          </select>
+        )}
         <input className="sa-search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="دوّر بالاسم أو العنوان…" aria-label="بحث" />
       </div>
 
@@ -119,6 +133,7 @@ export function TenantsTable({ rows, now }: { rows: TenantRow[]; now: number }) 
               <th>المدرس</th>
               <th>الحالة</th>
               <th>العنوان</th>
+              <th>الشريك</th>
               <th>زوار الشهر</th>
               <th>اتعمل</th>
               <th aria-label="إجراءات" />
@@ -138,6 +153,7 @@ export function TenantsTable({ rows, now }: { rows: TenantRow[]; now: number }) 
                   {r.trialEndsAt && r.state !== "off" && <small className="sa-sub">{fromNow(r.trialEndsAt, now)}</small>}
                 </td>
                 <td><a dir="ltr" href={r.siteUrl} target="_blank" rel="noopener" className="sa-url">{r.siteLabel}</a></td>
+                <td>{r.partner ? <a className="sa-tag partner" href={`/admin/partners/${r.partner.slug}`}>{r.partner.name}</a> : <span className="a-sub">—</span>}</td>
                 <td className="num">{r.visitors.toLocaleString("en-US")}</td>
                 <td>{r.createdAt ? <small>{fromNow(r.createdAt, now)}</small> : "—"}</td>
                 <td className="sa-row-actions">

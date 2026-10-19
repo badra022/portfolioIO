@@ -5,12 +5,15 @@ import { env } from "@/lib/env";
 import { findLogin, touchLogin } from "./repo";
 import { safeEqual, verifyPassword } from "./passwords";
 import { slugForSite } from "./site";
+import { checkPartner, partnerIdOf, type Partner } from "./partners";
 
 export type Principal =
   | { kind: "super"; name: string }
-  | { kind: "teacher"; id: string; username: string; slug: string };
+  | { kind: "teacher"; id: string; username: string; slug: string }
+  /** A partner (agency) managing one of its own teachers' sites (lib/server/partners.ts). */
+  | { kind: "partner"; id: string; username: string; name: string; slug: string };
 
-export const principalName = (p: Principal) => (p.kind === "super" ? `${p.name} (مدير)` : p.username);
+export const principalName = (p: Principal) => (p.kind === "super" ? `${p.name} (مدير)` : p.kind === "partner" ? `${p.name} (شريك)` : p.username);
 
 function parseBasic(header: string | null): { user: string; pass: string } | null {
   if (!header?.startsWith("Basic ")) return null;
@@ -36,6 +39,7 @@ const MEMO_MS = 60_000;
  * Checks basic-auth credentials for a site.
  * - Super admin (ADMIN_USER / ADMIN_PASSWORD): any site, including the platform console.
  * - Teacher (admin_users table): only the site of their own teacher.
+ * - Partner (partners table): the sites of the teachers that belong to it, even after their trial ended.
  */
 export async function authenticate(header: string | null, site: string): Promise<Principal | null> {
   const creds = parseBasic(header);
@@ -52,6 +56,9 @@ export async function authenticate(header: string | null, site: string): Promise
     if (login && slug && login.slug === slug) {
       p = { kind: "teacher", id: login.id, username: login.username, slug };
       await touchLogin(login.id).catch(() => {});
+    } else if (!login && slug) {
+      const partner = await checkPartner(creds);
+      if (partner && (await partnerIdOf(slug)) === partner.id) p = { kind: "partner", id: partner.id, username: partner.username, name: partner.name, slug };
     }
   }
   if (p) {
@@ -79,6 +86,22 @@ export async function teacherSlugFor(header: string | null): Promise<string | nu
   const creds = parseBasic(header);
   return creds ? (await checkTeacher(creds))?.slug ?? null : null;
 }
+
+/** For a partner's page on the platform host (<platform>/<slug>): that partner's own login, or the super admin. */
+export async function authenticatePartner(header: string | null, partnerSlug: string): Promise<{ partner: Partner | null; isSuper: boolean } | null> {
+  const creds = parseBasic(header);
+  if (!creds) return null;
+  if (env.adminUser && env.adminPassword && safeEqual(creds.user.trim(), env.adminUser) && safeEqual(creds.pass, env.adminPassword)) return { partner: null, isSuper: true };
+  const key = createHash("sha256").update(`${header}|partner:${partnerSlug}`).digest("hex");
+  const hit = partnerMemo.get(key);
+  if (hit && hit.exp > Date.now()) return { partner: hit.p, isSuper: false };
+  const partner = await checkPartner(creds);
+  if (!partner || partner.slug !== partnerSlug) return null;
+  if (partnerMemo.size > 200) partnerMemo.clear();
+  partnerMemo.set(key, { p: partner, exp: Date.now() + MEMO_MS });
+  return { partner, isSuper: false };
+}
+const partnerMemo = new Map<string, { p: Partner; exp: number }>();
 
 export class ForbiddenError extends Error {
   constructor() { super("غير مصرح"); }
