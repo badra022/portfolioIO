@@ -39,7 +39,7 @@ async function teacherContext(site: string): Promise<{ p: Principal; slug: strin
   try { p = await requireAdmin(site); } catch { return { ok: false, reason: "forbidden" }; }
   const slug = await slugForSite(site);
   if (!slug) return { ok: false, reason: "missing" };
-  if (p.kind === "teacher" && p.slug !== slug) return { ok: false, reason: "forbidden" };
+  if (p.kind !== "super" && p.slug !== slug) return { ok: false, reason: "forbidden" };
   return { p, slug };
 }
 
@@ -347,6 +347,8 @@ export async function createUserAction(slug: string, _prev: ConsoleState, form: 
   await requireSuper(PLATFORM);
   const username = String(form.get("username") ?? "").trim().toLowerCase();
   if (!USERNAME_RE.test(username)) return { ok: false, message: "اسم المستخدم: 3-32 حرف إنجليزي صغير أو أرقام أو . _ -" };
+  // Partners log in the same way, so a teacher can't take a partner's username either.
+  if (await repo.usernameTaken(username)) return { ok: false, message: "اسم المستخدم مستخدم بالفعل." };
   const password = generatePassword();
   try {
     await repo.createUser(slug, username, await hashPassword(password));

@@ -10,6 +10,7 @@ import { LeadForms } from "@/components/LeadForms";
 import { chatConfig } from "@/lib/chat";
 import { LandingPageView } from "@/components/LandingPageView";
 import { PageVisit } from "@/components/PageVisit";
+import { PartnerHome } from "@/components/PartnerHome";
 
 type Props = PageProps<"/sites/[site]/[quiz]">;
 
@@ -28,6 +29,8 @@ async function load(params: Props["params"]) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // On the platform host, /<slug> is a partner's private page (components/PartnerHome.tsx).
+  if (decodeURIComponent((await params).site) === "_platform") return { title: "صفحة الشريك | myostaz.com", robots: { index: false, follow: false } };
   const r = await load(params);
   if (!r) return { robots: { index: false, follow: false } };
   const { data, quiz, poll, page } = r;
@@ -75,6 +78,8 @@ export default function QuizPage({ params }: Props) {
 }
 
 async function Body({ params }: { params: Props["params"] }) {
+  const { site, quiz: path } = await params;
+  if (decodeURIComponent(site) === "_platform") return <PartnerHome slug={decodeURIComponent(path)} />;
   const r = await load(params);
   if (!r) notFound();
   const { data, quiz, poll, page } = r;

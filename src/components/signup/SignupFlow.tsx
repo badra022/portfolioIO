@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cutout, preloadCutout, type Cutout } from "@/lib/cutout";
 import { COUNTRIES, DEFAULT_COUNTRY, countryOf, normalizePhone } from "@/lib/phone";
+import type { PartnerForm } from "@/lib/partners";
 
 /**
  * The public «جرّب موقعك» form on the platform's home page (the page paid ads
@@ -11,9 +12,14 @@ import { COUNTRIES, DEFAULT_COUNTRY, countryOf, normalizePhone } from "@/lib/pho
  * The WhatsApp number is confirmed with a code first when codes are on
  * (lib/server/otp.ts), and the photo's background is removed in the browser
  * (lib/cutout.ts).
+ *
+ * On a partner's private page (<platform>/<partner>, lib/server/partners.ts) the
+ * same form builds as many sites as the partner wants for its clients: no phone
+ * code or terms, the partner's own extra questions, and «اعمل موقع تاني» after each.
  */
 type Err = { field: string; message: string };
-type Done = { base: string; endsAt: string; username: string; links: { label: string; href: string }[] };
+type Done = { base: string; endsAt: string; hours?: number; username: string; links: { label: string; href: string }[] };
+export type SignupPartner = { slug: string; name: string; hours: number; form: PartnerForm };
 type Built = { base: string; endsAt: string | null };
 
 /** The address shape the server accepts (lib/server/admin-ops.ts SLUG_RE), 3 letters at least. */
@@ -43,14 +49,21 @@ const sleepUntil = (t: number) => new Promise((ok) => setTimeout(ok, Math.max(0,
 /**
  * The site address around the slug: «mohamedali» + after, e.g. ".ostaz.io", or before "ostaz.io/t/".
  * otp: how the confirmation code is sent, or false when codes are off.
+ * partner: the partner whose page this is (its own endpoints, fields and trial length).
  */
-export function SignupFlow({ before, after, otp }: { before: string; after: string; otp: false | "sms" | "whatsapp" }) {
-  const [step, setStep] = useState(0);
-  const [f, setF] = useState({
+export function SignupFlow({ before, after, otp, partner }: { before: string; after: string; otp: false | "sms" | "whatsapp"; partner?: SignupPartner }) {
+  const api = partner ? `/${partner.slug}/build` : "/api/signup";
+  const trackUrl = partner ? `/${partner.slug}/track` : "/api/signup/track";
+  const blank = () => ({
     title: "أ.", name: "", subject: "", locale: "ar-EG" as "ar-EG" | "en",
-    slogan: "", color: COLORS[0], scheme: "light" as "light" | "dark",
+    slogan: "", color: partner?.form.color || COLORS[0], scheme: "light" as "light" | "dark",
     country: DEFAULT_COUNTRY, phone: "", videos: ["", "", ""], slug: "", username: "", password: "", website: "", terms: false, notes: "",
   });
+  const [step, setStep] = useState(0);
+  const [f, setF] = useState(blank);
+  // Answers to the partner's extra fields, by field id.
+  const [extra, setExtra] = useState<Record<string, string>>({});
+  const extraFields = partner?.form.fields ?? [];
   const [photo, setPhoto] = useState<File | null>(null);
   const [logo, setLogo] = useState<File | null>(null);
   const [errors, setErrors] = useState<Err[]>([]);
@@ -87,13 +100,15 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
     if (!fresh.length || navigator.webdriver) return;
     fresh.forEach((e) => tracked.current.add(e));
     const body = JSON.stringify({ e: fresh });
-    if (!navigator.sendBeacon?.("/api/signup/track", body)) void fetch("/api/signup/track", { method: "POST", body, keepalive: true }).catch(() => {});
+    // A partner's page is behind its login: a beacon can't answer the login prompt, a fetch can.
+    if (partner || !navigator.sendBeacon?.(trackUrl, body)) void fetch(trackUrl, { method: "POST", body, keepalive: true }).catch(() => {});
   };
   useEffect(() => { track("view"); }, []);
   useEffect(() => { if (state === "form") track(`step:${step + 1}`); }, [step, state]);
 
-  // A site built from this browser before: show it instead of a new form.
+  // A site built from this browser before: show it instead of a new form (partners build many).
   useEffect(() => {
+    if (partner) return;
     const saved = readSaved();
     if (saved) { setDone(saved); setState("done"); return; }
     fetch("/api/signup?me=1").then((r) => r.json()).then((r) => { if (r.ok && r.built) { setAlready(r.built); setState("already"); } }).catch(() => {});
@@ -101,7 +116,7 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
 
   const slugShapeOk = SLUG_SHAPE.test(f.slug);
   const checkSlug = (slug: string) =>
-    fetch(`/api/signup?slug=${encodeURIComponent(slug)}`).then((r) => r.json())
+    fetch(`${api}?slug=${encodeURIComponent(slug)}`).then((r) => r.json())
       .then((r) => { const c = { slug, free: Boolean(r.ok && r.free), message: String(r.message ?? "") }; setSlugCheck(c); return c; })
       .catch(() => null);
   // Live check that the site address is free; a result only counts for the address it was made for.
@@ -142,7 +157,8 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
       need(slugShapeOk, "slug", "حروف إنجليزية صغيرة وأرقام وشرطة في النص، 3 حروف على الأقل، مثل mohamedali", out);
       need(/^[a-z0-9._-]{3,32}$/.test(f.username), "username", "حروف إنجليزية صغيرة وأرقام، 3 حروف على الأقل", out);
       need(f.password.length >= 8, "password", "كلمة السر 8 حروف على الأقل", out);
-      need(f.terms, "terms", "لازم توافق على شروط التجربة", out);
+      if (!partner) need(f.terms, "terms", "لازم توافق على شروط التجربة", out);
+      for (const x of extraFields) if (x.required) need(Boolean(extra[x.id]?.trim()), `x:${x.id}`, `اكتب «${x.label}»`, out);
     }
     return out;
   }
@@ -162,6 +178,8 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
 
   /** Step 3: the number is checked (one trial per number), then confirmed with a code when codes are on. */
   async function confirmPhone(): Promise<boolean> {
+    // Partners: one number may make many trials, and no code is sent.
+    if (partner) return true;
     const phone = phoneKey;
     if (token?.phone === phone) return true;
     if (codeFor !== phone) {
@@ -233,8 +251,9 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
     if (photoFile) fd.set("photo", photoFile);
     if (photoCut) fd.set("photoCut", "1");
     if (logo) fd.set("logo", logo);
+    for (const x of extraFields) if (extra[x.id]?.trim()) fd.set(`x:${x.id}`, extra[x.id].trim());
     try {
-      const res = await fetch("/api/signup", { method: "POST", body: fd });
+      const res = await fetch(api, { method: "POST", body: fd });
       const r = await res.json().catch(() => ({ ok: false, errors: [{ field: "form", message: "حصلت مشكلة، حاول تاني." }] }));
       if (!r.ok && r.built) { setAlready(r.built); setState("already"); return; }
       if (!r.ok) { fail(r.errors ?? [{ field: "form", message: "حصلت مشكلة، حاول تاني." }]); return; }
@@ -242,7 +261,7 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
       await sleepUntil(at(3)); setBuildStage(3);
       await sleepUntil(at(4)); setBuildStage(4);
       await new Promise((ok) => setTimeout(ok, 600));
-      save(r);
+      if (!partner) save(r);
       setDone(r); setState("done");
     } catch {
       fail([{ field: "form", message: "مفيش اتصال بالإنترنت؟ حاول تاني." }]);
@@ -256,7 +275,10 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
       {state === "already" && already ? (
         <AlreadyBuilt built={already} />
       ) : state === "done" && done ? (
-        <Result done={done} password={f.password} />
+        <Result done={done} password={f.password} partner={partner} onAgain={() => {
+          setF(blank()); setExtra({}); setPhoto(null); setLogo(null); setCut({ busy: false, result: null }); setErrors([]); setStep(0); setDone(null); setState("form");
+          tracked.current.delete("step:1"); top.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }} />
       ) : state === "building" ? (
         <Building stage={buildStage} start={buildStart} />
       ) : (
@@ -323,7 +345,7 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
                     <input value={f.phone} onChange={(e) => { set("phone", e.target.value); setCodeFor(""); }} placeholder={country.example} inputMode="tel" autoComplete="tel-national" aria-invalid={Boolean(err("phone"))} />
                   </span>
                   {err("phone") ? <small className="su-err">{err("phone")}</small>
-                    : <small>{token?.phone === phoneKey && token.token ? "✓ الرقم متأكد" : otp ? `الطلاب هيكلموك عليه من كل زرار في الموقع. هنبعتلك كود ${otp === "whatsapp" ? "على واتساب" : "في رسالة"} نتأكد بيه.` : "الطلاب هيكلموك عليه من كل زرار في الموقع. رقم واحد لكل موقع تجريبي."}</small>}
+                    : <small>{partner ? "رقم واتساب المدرس: الطلاب هيكلموه عليه من كل زرار في الموقع." : token?.phone === phoneKey && token.token ? "✓ الرقم متأكد" : otp ? `الطلاب هيكلموك عليه من كل زرار في الموقع. هنبعتلك كود ${otp === "whatsapp" ? "على واتساب" : "في رسالة"} نتأكد بيه.` : "الطلاب هيكلموك عليه من كل زرار في الموقع. رقم واحد لكل موقع تجريبي."}</small>}
                 </label>
                 {codeFor && codeFor === phoneKey && token?.phone !== codeFor && (
                   <div className="su-code">
@@ -335,13 +357,13 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
                     </p>
                   </div>
                 )}
-                <div className="su-field"><span>فيديوهات يوتيوب ليك (اختياري، لحد 3)</span>
+                {!partner?.form.hideVideos && <div className="su-field"><span>فيديوهات يوتيوب ليك (اختياري، لحد 3)</span>
                   {f.videos.map((v, i) => (
                     <input key={i} value={v} dir="ltr" placeholder="https://youtu.be/..." inputMode="url"
                       onChange={(e) => set("videos", f.videos.map((x, j) => (j === i ? e.target.value : x)))} />
                   ))}
                   {err("videos") ? <small className="su-err">{err("videos")}</small> : <small>لو مفيش، هنحط فيديوهات تجريبية.</small>}
-                </div>
+                </div>}
               </fieldset>
             )}
 
@@ -364,15 +386,19 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
                   <Text label="اسم المستخدم" value={f.username} onChange={(v) => set("username", v.toLowerCase().replace(/\s/g, ""))} error={err("username")} placeholder="mohamed" dir="ltr" autoComplete="username" />
                   <Text label="كلمة السر" type="password" value={f.password} onChange={(v) => set("password", v)} error={err("password")} placeholder="8 حروف على الأقل" dir="ltr" autoComplete="new-password" />
                 </div>
-                <p className="su-note">هتدخل بيهم لوحة التحكم وتعدّل موقعك. الموقع شغال 24 ساعة ببلاش، ومن غير أي دفع.</p>
+                <p className="su-note">{partner
+                  ? `حساب المدرس للوحة التحكم (وانت كمان تقدر تدخلها بحسابك). الموقع التجريبي شغال ${hoursText(partner.hours)}.`
+                  : "هتدخل بيهم لوحة التحكم وتعدّل موقعك. الموقع شغال 24 ساعة ببلاش، ومن غير أي دفع."}</p>
+                {extraFields.map((x) => <ExtraField key={x.id} field={x} value={extra[x.id] ?? ""} error={err(`x:${x.id}`)}
+                  onChange={(v) => { setExtra((e) => ({ ...e, [x.id]: v })); setErrors((e) => e.filter((y) => y.field !== `x:${x.id}`)); }} />)}
                 <label className="su-field"><span>ملاحظات أو طلبات خاصة <em className="su-opt">(اختياري)</em></span>
                   <textarea rows={3} maxLength={1000} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder="مثلاً: عايز قسم للحصص الأونلاين، أو عندي سنتر وعايز موقع ليه" />
-                  <small>بنقراها بنفسنا، وبتساعدنا نجهّزلك الموقع زي ما انت عايز.</small>
+                  <small>{partner ? "بتظهر لإدارة المنصة مع الطلب." : "بنقراها بنفسنا، وبتساعدنا نجهّزلك الموقع زي ما انت عايز."}</small>
                 </label>
-                <label className="su-check">
+                {!partner && <label className="su-check">
                   <input type="checkbox" checked={f.terms} onChange={(e) => set("terms", e.target.checked)} aria-invalid={Boolean(err("terms"))} />
                   <span>موافق على <a href="/terms" target="_blank" rel="noopener">شروط التجربة</a>: التصميم والمحتوى الجاهز ملك المنصة، ومش هنسخه أو نديه لحد يعمل زيه.</span>
-                </label>
+                </label>}
                 {err("terms") && <small className="su-err">{err("terms")}</small>}
                 <input className="su-hp" tabIndex={-1} autoComplete="off" aria-hidden="true" value={f.website} onChange={(e) => set("website", e.target.value)} />
               </fieldset>
@@ -382,7 +408,7 @@ export function SignupFlow({ before, after, otp }: { before: string; after: stri
             <div className="su-nav">
               {step > 0 && <button type="button" className="su-btn ghost" onClick={() => go(step - 1)}>رجوع</button>}
               <button type="submit" className="su-btn primary" disabled={busy}>
-                {busy ? "لحظة…" : step === 2 && codeFor && codeFor === phoneKey && token?.phone !== codeFor ? "أكّد الكود" : step < STEPS.length - 1 ? "التالي" : "ابني موقعي"}
+                {busy ? "لحظة…" : step === 2 && codeFor && codeFor === phoneKey && token?.phone !== codeFor ? "أكّد الكود" : step < STEPS.length - 1 ? "التالي" : partner ? "ابني الموقع" : "ابني موقعي"}
               </button>
             </div>
           </form>
@@ -490,20 +516,47 @@ function ResendButton({ at, onClick, disabled }: { at: number; onClick: () => vo
     : <button type="button" className="su-link" onClick={() => { onClick(); setNow(Date.now()); }} disabled={disabled}>ابعت الكود تاني</button>;
 }
 
-function Result({ done, password }: { done: Done; password: string }) {
+/** 24 → «24 ساعة», 72 → «3 أيام». */
+function hoursText(h: number): string {
+  if (h % 24 || h < 48) return `${h} ساعة`;
+  const d = h / 24;
+  return d <= 10 ? `${d} أيام` : `${d} يوم`;
+}
+
+function ExtraField({ field: x, value, onChange, error }: { field: PartnerForm["fields"][number]; value: string; onChange: (v: string) => void; error?: string }) {
+  const label = <span>{x.label}{!x.required && <em className="su-opt"> (اختياري)</em>}</span>;
+  return (
+    <label className="su-field">
+      {label}
+      {x.type === "textarea" ? <textarea rows={3} maxLength={2000} value={value} onChange={(e) => onChange(e.target.value)} placeholder={x.placeholder} aria-invalid={Boolean(error)} />
+        : x.type === "select" ? (
+          <select value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={Boolean(error)}>
+            <option value="">اختار…</option>
+            {x.options.map((o) => <option key={o}>{o}</option>)}
+          </select>
+        ) : <input type={x.type === "number" ? "number" : x.type === "date" ? "date" : "text"} value={value} onChange={(e) => onChange(e.target.value)} placeholder={x.placeholder} maxLength={200} aria-invalid={Boolean(error)} />}
+      {error && <small className="su-err">{error}</small>}
+    </label>
+  );
+}
+
+function Result({ done, password, partner, onAgain }: { done: Done; password: string; partner?: SignupPartner; onAgain: () => void }) {
   const [copied, setCopied] = useState(false);
-  const ends = new Intl.DateTimeFormat("ar-EG-u-nu-latn", { weekday: "long", hour: "numeric", minute: "2-digit", timeZone: "Africa/Cairo" }).format(new Date(done.endsAt));
+  const ends = new Intl.DateTimeFormat("ar-EG-u-nu-latn", { weekday: "long", ...(partner ? { day: "numeric", month: "long" } : {}), hour: "numeric", minute: "2-digit", timeZone: "Africa/Cairo" }).format(new Date(done.endsAt));
   const [site, ...rest] = done.links;
   return (
     <div className="su-card su-result">
-      <span className="su-badge">✓ موقعك جاهز</span>
-      <h2>اتفضل، ده موقعك</h2>
+      <span className="su-badge">✓ {partner ? "الموقع جاهز" : "موقعك جاهز"}</span>
+      <h2>{partner ? "اتفضل، ده موقع عميلك" : "اتفضل، ده موقعك"}</h2>
       <a className="su-site" href={site.href} target="_blank" rel="noopener" dir="ltr">{site.href.replace(/^https?:\/\//, "")}</a>
       <div className="su-actions">
         <a className="su-btn primary" href={site.href} target="_blank" rel="noopener">افتح موقعك</a>
         <button type="button" className="su-btn ghost" onClick={() => { void navigator.clipboard?.writeText(site.href).then(() => setCopied(true)); }}>{copied ? "اتنسخ ✓" : "انسخ الرابط"}</button>
       </div>
-      <p className="su-note">الموقع ولوحة التحكم شغالين لحد <b>{ends}</b> (24 ساعة). عجبك؟ كلمنا وهنفعّله ليك على طول.</p>
+      {partner
+        ? <p className="su-note">الموقع ولوحة التحكم شغالين لحد <b>{ends}</b> ({hoursText(done.hours ?? partner.hours)}). ابعت الرابط لعميلك وخد رأيه، وكلمنا لما يحب يفعّله.</p>
+        : <p className="su-note">الموقع ولوحة التحكم شغالين لحد <b>{ends}</b> (24 ساعة). عجبك؟ كلمنا وهنفعّله ليك على طول.</p>}
+      {partner && <div className="su-actions"><button type="button" className="su-btn primary" onClick={onAgain}>اعمل موقع تاني</button></div>}
 
       <h3>جرّب كل حاجة</h3>
       <ul className="su-links">

@@ -10,8 +10,8 @@ const REJECT: Record<string, string> = {
   address: "العنوان متاخد", form: "بيانات ناقصة",
 };
 
-/** The platform home page's sign-up funnel: how many got to each step, pressed build, and got a site. */
-export async function FunnelView({ f }: { f: Funnel }) {
+/** A sign-up page's funnel (the platform home page, or a partner's: title): how many got to each step, pressed build, and got a site. */
+export async function FunnelView({ f, title }: { f: Funnel; title?: string }) {
   const tenants = await listTenants().catch(() => []);
   const rows: { label: string; value: number }[] = [
     { label: "زاروا صفحة التجربة", value: f.views },
@@ -23,7 +23,7 @@ export async function FunnelView({ f }: { f: Funnel }) {
   const rejected = Object.entries(f.rejected).sort((a, b) => b[1] - a[1]);
   return (
     <section className="a-panel sa-funnel">
-      <h2>صفحة التجربة (myostaz.com)</h2>
+      <h2>{title ?? "صفحة التجربة (myostaz.com)"}</h2>
       <p className="a-sub">كل خطوة محسوبة مرة واحدة لكل فتحة صفحة. الأجهزة الآلية مش محسوبة. إجمالي المدرسين دلوقتي: <b>{n(tenants.length)}</b>.</p>
       <ol className="sa-steps">
         {rows.map((r, i) => {

@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env, isDev } from "@/lib/env";
 import { isAdminPath, route } from "@/lib/routing";
-import { authenticate, teacherSlugFor } from "@/lib/server/auth";
+import { authenticate, authenticatePartner, teacherSlugFor } from "@/lib/server/auth";
+import { partnerSlugs } from "@/lib/server/partners";
+import { PARTNER_SLUG_RE, RESERVED_PARTNER_SLUGS } from "@/lib/partners";
 import { isSiteFileName } from "@/lib/site-files";
 import { PREVIEW_PATH, siteEnv, splitSite } from "@/lib/environments";
 import { COPY_BOTS, isTrialSite } from "@/lib/server/bots";
@@ -42,7 +44,12 @@ export async function proxy(request: NextRequest) {
 
   const devGate = isDev() && !OPEN_ON_DEV.test(r.rest);
 
-  if (isAdminPath(r.rest) || preview || devGate) {
+  // A partner's private page (<platform>/<partner>/...): only its own login, or the super admin.
+  const first = r.site === "_platform" ? r.rest.split("/")[1] ?? "" : "";
+  const partnerPage = PARTNER_SLUG_RE.test(first) && !RESERVED_PARTNER_SLUGS.has(first) && (await partnerSlugs()).has(first);
+  if (partnerPage && !(await authenticatePartner(request.headers.get("authorization"), first))) return askLogin();
+
+  if (isAdminPath(r.rest) || preview || (devGate && !partnerPage)) {
     const header = request.headers.get("authorization");
     const principal = await authenticate(header, r.site);
     if (!principal) {
@@ -53,14 +60,7 @@ export async function proxy(request: NextRequest) {
         const to = home.startsWith("/") ? new URL(`${home}${r.rest}${search}`, request.nextUrl) : `${home}${r.rest}${search}`;
         return NextResponse.redirect(to, 307);
       }
-      return new NextResponse("Authentication required", {
-        status: 401,
-        headers: {
-          // One realm per host, so a login entered on one admin page is reused on the next.
-          "WWW-Authenticate": `Basic realm="myostaz admin", charset="UTF-8"`,
-          "Cache-Control": "no-store",
-        },
-      });
+      return askLogin();
     }
   }
 
@@ -71,9 +71,20 @@ export async function proxy(request: NextRequest) {
   url.pathname = `/sites/${encodeURIComponent(r.site)}${rest === "/" ? "" : rest}`;
   url.search = search;
   const res = NextResponse.rewrite(url);
-  if (isAdminPath(r.rest) || preview) res.headers.set("Cache-Control", "no-store");
-  if (isAdminPath(r.rest) || preview || isDev()) res.headers.set("X-Robots-Tag", "noindex, nofollow");
+  if (isAdminPath(r.rest) || preview || partnerPage) res.headers.set("Cache-Control", "no-store");
+  if (isAdminPath(r.rest) || preview || partnerPage || isDev()) res.headers.set("X-Robots-Tag", "noindex, nofollow");
   return res;
+}
+
+function askLogin() {
+  return new NextResponse("Authentication required", {
+    status: 401,
+    headers: {
+      // One realm per host, so a login entered on one admin page is reused on the next.
+      "WWW-Authenticate": `Basic realm="myostaz admin", charset="UTF-8"`,
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 export const config = {

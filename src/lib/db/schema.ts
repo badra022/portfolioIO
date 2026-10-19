@@ -1,6 +1,30 @@
 import { bigint, bigserial, boolean, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
+/**
+ * Marketing agencies the platform works with (admin/partners): each has a private
+ * sign-up page at <platform>/<slug>, behind its own login, where it builds as many
+ * trial sites for its clients as it likes (lib/server/partners.ts). The same login
+ * manages every teacher site that belongs to the partner.
+ */
+export const partners = pgTable("partners", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** The page's address on the platform: myostaz.com/<slug>. */
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  disabled: boolean("disabled").notNull().default(false),
+  /** How long the partner's trial sites work. */
+  trialHours: integer("trial_hours").notNull().default(72),
+  /** The sign-up page's own settings (lib/partners.ts PartnerForm): intro text and extra fields. */
+  form: jsonb("form").notNull().default(sql`'{}'::jsonb`),
+  /** The super admin's own notes about the partner. */
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+});
+
 /** One row per teacher. content/theme hold the same JSON that tenants/<slug>/*.json hold, validated by Zod on every write. */
 export const tenants = pgTable("tenants", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -36,7 +60,9 @@ export const tenants = pgTable("tenants", {
   signupPhone: text("signup_phone"),
   /** Trial sites: when the sign-up accepted the trial terms (/terms). */
   termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
-}, (t) => [uniqueIndex("tenants_signup_phone_key").on(t.signupPhone)]);
+  /** The partner (agency) this teacher came from and who manages the site; null = the platform's own. */
+  partnerId: uuid("partner_id").references(() => partners.id, { onDelete: "set null" }),
+}, (t) => [uniqueIndex("tenants_signup_phone_key").on(t.signupPhone), index("tenants_partner_idx").on(t.partnerId)]);
 
 /**
  * Every free trial request from the platform's home page (lib/server/signup.ts):
@@ -58,18 +84,24 @@ export const trialRequests = pgTable("trial_requests", {
   username: text("username"),
   /** «ملاحظات أو طلبات خاصة» from the form. */
   notes: text("notes"),
-}, (t) => [index("trial_requests_created_idx").on(t.createdAt)]);
+  /** Made from a partner's page (null = the platform's home page). */
+  partnerId: uuid("partner_id").references(() => partners.id, { onDelete: "set null" }),
+  /** Answers to the partner's own extra fields: { label: answer }. */
+  extra: jsonb("extra"),
+}, (t) => [index("trial_requests_created_idx").on(t.createdAt), index("trial_requests_partner_idx").on(t.partnerId)]);
 
 /**
- * Daily counters for the platform's own home page (lib/server/funnel.ts): views,
+ * Daily counters for the platform's sign-up pages (lib/server/funnel.ts): views,
  * how far visitors got in the sign-up form, builds. Cairo days.
  */
 export const platformDaily = pgTable("platform_daily", {
   day: date("day").notNull(),
+  /** Which page: "" = the platform's home page, else a partner's slug. */
+  source: text("source").notNull().default(""),
   metric: text("metric").notNull(),
   key: text("key").notNull().default(""),
   value: bigint("value", { mode: "number" }).notNull().default(0),
-}, (t) => [primaryKey({ columns: [t.day, t.metric, t.key] })]);
+}, (t) => [primaryKey({ columns: [t.day, t.source, t.metric, t.key] })]);
 
 /** Verification codes sent from the sign-up form (lib/server/otp.ts), only to limit how many are sent. */
 export const signupOtps = pgTable("signup_otps", {

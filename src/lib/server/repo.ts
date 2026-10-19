@@ -125,11 +125,13 @@ export type TenantSummary = { slug: string; name: string; status: string; domain
   createdAt: string | null;
   /** The live site's language (lib/i18n.ts). */
   locale: string;
-  trialEndsAt: string | null };
+  trialEndsAt: string | null;
+  /** The partner (agency) the site belongs to, if any. */
+  partnerId: string | null };
 
 export async function listTenants(): Promise<TenantSummary[]> {
   if (!hasDb()) {
-    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null, createdAt: null, locale: t.content.locale, trialEndsAt: null }));
+    return listBundled().map((s) => bundledRecord(s)!).map((t) => ({ slug: t.slug, name: t.name, status: t.status, domains: t.domains, users: 0, updatedAt: null, createdAt: null, locale: t.content.locale, trialEndsAt: null, partnerId: null }));
   }
   const d = db();
   const rows = await d.select({
@@ -137,11 +139,11 @@ export async function listTenants(): Promise<TenantSummary[]> {
     // Columns spelled out with their tables: unqualified, "id" would resolve to admin_users.id inside the subquery.
     users: sql<number>`(select count(*)::int from "admin_users" where "admin_users"."tenant_id" = "tenants"."id")`,
     locale: sql<string | null>`"tenants"."content"->>'locale'`,
-    trialEndsAt: tenants.trialEndsAt,
+    trialEndsAt: tenants.trialEndsAt, partnerId: tenants.partnerId,
   }).from(tenants).orderBy(tenants.name);
   const domains = await d.select().from(tenantDomains);
   return rows.map((r) => ({
-    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(), createdAt: r.createdAt.toISOString(), locale: r.locale ?? "ar-EG", trialEndsAt: r.trialEndsAt?.toISOString() ?? null,
+    slug: r.slug, name: r.name, status: r.status, users: r.users, updatedAt: r.updatedAt.toISOString(), createdAt: r.createdAt.toISOString(), locale: r.locale ?? "ar-EG", trialEndsAt: r.trialEndsAt?.toISOString() ?? null, partnerId: r.partnerId,
     domains: domains.filter((x) => x.tenantId === r.id).map((x) => ({ domain: x.domain, isPrimary: x.isPrimary }))
       .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
   }));
@@ -317,6 +319,8 @@ export async function createTenant(input: {
   slug: string; name: string; content: Content; theme: Theme; author: string;
   /** Free trial: the site stops at this moment, every feature is on until then. */
   trialEndsAt?: Date; signupKey?: string; signupPhone?: string; termsAcceptedAt?: Date;
+  /** The partner (agency) the site belongs to. */
+  partnerId?: string | null;
   /** Teacher login created in the same transaction. */
   login?: { username: string; passwordHash: string };
 }): Promise<void> {
@@ -328,6 +332,7 @@ export async function createTenant(input: {
     const [row] = await tx.insert(tenants).values({
       slug: input.slug, name: input.name, content, theme: input.theme, updatedBy: input.author,
       ...(input.trialEndsAt ? { trialEndsAt: input.trialEndsAt, signupKey: input.signupKey ?? null, signupPhone: input.signupPhone ?? null, termsAcceptedAt: input.termsAcceptedAt ?? null, permissions: ALL_PERMISSIONS } : {}),
+      partnerId: input.partnerId ?? null,
     }).returning({ id: tenants.id });
     if (input.login) await tx.insert(adminUsers).values({ username: input.login.username, passwordHash: input.login.passwordHash, tenantId: row.id });
     await tx.insert(tenantRevisions).values({ tenantId: row.id, version: 1, content, theme: input.theme, author: input.author, note: "إنشاء" });
@@ -459,13 +464,16 @@ export async function setTrial(slug: string, endsAt: Date | null): Promise<void>
 }
 
 /** Records a trial request (the lead) next to the trial site it made (trial_requests). */
-export async function addTrialRequest(r: { tenantId: string | null; slug: string; name: string; title: string; subject: string; phone: string; locale: string; username: string; notes: string }): Promise<void> {
-  await requireDb().insert(schema.trialRequests).values({ ...r, notes: r.notes || null });
+export async function addTrialRequest(r: { tenantId: string | null; slug: string; name: string; title: string; subject: string; phone: string; locale: string; username: string; notes: string;
+  partnerId?: string | null; extra?: Record<string, string> | null }): Promise<void> {
+  await requireDb().insert(schema.trialRequests).values({ ...r, notes: r.notes || null, partnerId: r.partnerId ?? null, extra: r.extra && Object.keys(r.extra).length ? r.extra : null });
 }
 
 export type TrialRequestRow = {
   id: string; createdAt: string; slug: string; name: string; title: string | null; subject: string | null; phone: string | null;
   locale: string | null; username: string | null; notes: string | null;
+  /** The partner page it was made from (null = the platform's home page), and the answers to its extra fields. */
+  partnerId: string | null; extra: Record<string, string> | null;
   /** The trial site, if it still exists. */
   tenant: { status: string; trialEndsAt: string | null } | null;
 };
@@ -485,7 +493,7 @@ export async function listTrialRequests(limit = 500): Promise<TrialRequestRow[]>
     .orderBy(desc(schema.trialRequests.createdAt)).limit(limit);
   return rows.map(({ r, status, trialEndsAt }) => ({
     id: r.id, createdAt: r.createdAt.toISOString(), slug: r.slug, name: r.name, title: r.title, subject: r.subject, phone: r.phone,
-    locale: r.locale, username: r.username, notes: r.notes,
+    locale: r.locale, username: r.username, notes: r.notes, partnerId: r.partnerId, extra: (r.extra as Record<string, string> | null) ?? null,
     tenant: status ? { status, trialEndsAt: trialEndsAt?.toISOString() ?? null } : null,
   }));
 }
@@ -509,7 +517,13 @@ export async function slugTaken(slug: string): Promise<boolean> {
   return (await db().select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1)).length > 0;
 }
 
+/** Teacher and partner logins share one name space (both log in with basic auth). */
 export async function usernameTaken(username: string): Promise<boolean> {
   if (!hasDb()) return false;
-  return (await db().select({ id: adminUsers.id }).from(adminUsers).where(eq(adminUsers.username, username)).limit(1)).length > 0;
+  const d = db();
+  const [a, p] = await Promise.all([
+    d.select({ id: adminUsers.id }).from(adminUsers).where(eq(adminUsers.username, username)).limit(1),
+    d.select({ id: schema.partners.id }).from(schema.partners).where(eq(schema.partners.username, username)).limit(1),
+  ]);
+  return a.length + p.length > 0;
 }
