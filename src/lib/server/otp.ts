@@ -71,7 +71,7 @@ export async function sendCode(digits: string, visitor: string): Promise<OtpResu
   if ((counts?.phone ?? 0) >= PER_PHONE_HOUR) return { ok: false, message: "بعتنا كود كذا مرة للرقم ده. استنى شوية وجرّب تاني." };
   if ((counts?.visitor ?? 0) >= PER_VISITOR_DAY) return { ok: false, message: "طلبت أكواد كتير النهاردة. كلمنا وهنساعدك." };
   await db().insert(signupOtps).values({ phone: digits, visitor });
-  if (Math.random() < 0.05) void pruneCodes().catch(() => {});
+  if (Math.random() < 0.05) await pruneCodes().catch(() => {});
   if (testCode) return { ok: true };
   const r = await verifyApi("Verifications", { To: `+${digits}`, Channel: channel, Locale: "ar" });
   if (r.ok) return { ok: true };
