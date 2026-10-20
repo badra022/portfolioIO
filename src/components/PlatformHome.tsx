@@ -4,6 +4,8 @@ import { SignupFlow } from "./signup/SignupFlow";
 import { OstazLogo } from "./brand/OstazLogo";
 import { DevCredit } from "./DevCredit";
 import { otpChannel, otpEnabled } from "@/lib/server/otp";
+import { sessionAccount } from "@/lib/server/auth";
+import { PartnerHome } from "./PartnerHome";
 import "./signup/signup.css";
 
 /**
@@ -13,7 +15,11 @@ import "./signup/signup.css";
  * their own addresses.
  */
 export async function PlatformHome() {
-  const host = (await headers()).get("host") ?? "";
+  const h = await headers();
+  // A signed-in partner sees their own page here (their form, unlimited trials, their sites).
+  const acct = await sessionAccount(h.get("cookie")).catch(() => null);
+  if (acct?.kind === "partner") return <PartnerHome slug={acct.partner.slug} />;
+  const host = h.get("host") ?? "";
   const before = env.rootDomain ? "" : `${host}/t/`;
   const after = env.rootDomain ? `.${env.rootDomain}` : "";
   return (
@@ -22,7 +28,10 @@ export async function PlatformHome() {
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" precedence="default" />
       <header className="su-head">
         <OstazLogo size={36} href="/" />
-        <a className="su-btn ghost sm" href="#start">جرّب ببلاش</a>
+        <nav className="su-head-actions">
+          {acct?.kind === "super" ? <a className="su-btn ghost sm" href="/admin">لوحة الإدارة</a> : <a className="su-btn ghost sm" href="/login">تسجيل الدخول</a>}
+          <a className="su-btn primary sm" href="#start">جرّب ببلاش</a>
+        </nav>
       </header>
 
       <section className="su-hero">

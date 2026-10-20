@@ -128,10 +128,10 @@ export async function partnerTrialsSince(partnerId: string, hours: number): Prom
  * The partner whose page (<platform>/<slug>) a request is for, when the caller may use it:
  * that partner's own login or the super admin. proxy.ts checks the same before the page loads.
  */
-export async function partnerForRequest(site: string, slug: string, authorization: string | null): Promise<Partner | null> {
+export async function partnerForRequest(site: string, slug: string, authorization: string | null, cookie: string | null = null): Promise<Partner | null> {
   if (site !== "_platform") return null;
   const { authenticatePartner } = await import("./auth");
-  const who = await authenticatePartner(authorization, slug);
+  const who = await authenticatePartner(authorization, slug, cookie);
   if (!who) return null;
   const partner = who.partner ?? (await getPartner(slug));
   return partner && !partner.disabled ? partner : null;
