@@ -14,6 +14,8 @@ export const partners = pgTable("partners", {
   name: text("name").notNull(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  /** The password is still the one the super admin set: the partner picks their own at the next login. */
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   disabled: boolean("disabled").notNull().default(false),
   /** How long the partner's trial sites work. */
   trialHours: integer("trial_hours").notNull().default(72),
@@ -120,11 +122,13 @@ export const tenantDomains = pgTable("tenant_domains", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("tenant_domains_tenant_idx").on(t.tenantId)]);
 
-/** Teacher logins (basic auth). The super admin lives in env vars, not here. */
+/** Teacher logins (the login page). The super admin lives in env vars, not here. */
 export const adminUsers = pgTable("admin_users", {
   id: uuid("id").primaryKey().defaultRandom(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  /** The password is still the one the super admin set: the teacher picks their own at the next login. */
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   disabled: boolean("disabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

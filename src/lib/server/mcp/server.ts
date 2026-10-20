@@ -441,7 +441,7 @@ export function buildMcpServer(origin: string, scope: McpScope = { kind: "super"
     if (!user) return fail(`No login "${name}" for ${slug}.`);
     if (action === "reset_password") {
       const password = generatePassword();
-      await repo.updateUser(slug, user.id, { passwordHash: await hashPassword(password) });
+      await repo.updateUser(slug, user.id, { passwordHash: await hashPassword(password), mustChangePassword: true });
       return ok({ username: name, password, login_url: await absoluteLogin(slug), note: "Shown once." });
     }
     if (action === "delete") await repo.deleteUser(slug, user.id);

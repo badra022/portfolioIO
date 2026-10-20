@@ -48,7 +48,7 @@ export const PARTNER_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
 /** Paths the platform host uses for itself, never a partner's page. */
 export const RESERVED_PARTNER_SLUGS = new Set([
   "admin", "api", "terms", "t", "upload", "files", "preview", "brand", "demo", "segment", "local-assets", "sites",
-  "robots.txt", "sitemap.xml", "og.png", "favicon.ico", "icon", "apple-icon", "www", "app", "login", "signup", "help", "support",
+  "robots.txt", "sitemap.xml", "og.png", "favicon.ico", "icon", "apple-icon", "www", "app", "login", "logout", "password", "oauth", "signup", "help", "support",
   "partner", "partners", "ostaz", "myostaz", "portfolioio",
 ]);
 

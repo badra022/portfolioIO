@@ -7,7 +7,6 @@ import { readToken, signToken } from "./tokens";
  * Who is signed in through the login page (/login): the super admin, a partner, or a
  * teacher login. Kept in an HttpOnly cookie; on <ROOT_DOMAIN> it is set for the whole
  * domain, so one login on myostaz.com also opens every <slug>.myostaz.com admin.
- * Basic auth (the browser's own prompt) keeps working next to it (lib/server/auth.ts).
  */
 export type Identity = { k: "s" } | { k: "p"; id: string } | { k: "t"; id: string };
 
@@ -24,6 +23,16 @@ export function readSession(cookieHeader: string | null | undefined): Identity |
   if (t.k === "s") return { k: "s" };
   if ((t.k === "p" || t.k === "t") && typeof t.id === "string") return { k: t.k, id: t.id };
   return null;
+}
+
+/**
+ * Proof that this account typed its password a moment ago (the login page hands it to the
+ * password page), so picking a new password right after signing in doesn't ask for the old one.
+ */
+export const freshToken = (who: Identity) => signToken("pw-fresh", who, 15 * 60);
+export function isFresh(token: string | null | undefined, who: Identity): boolean {
+  const t = readToken<{ k: string; id?: string }>("pw-fresh", token);
+  return Boolean(t && t.k === who.k && (t.id ?? null) === ("id" in who ? who.id : null));
 }
 
 /** The cookie's Domain: the whole <ROOT_DOMAIN> when signing in on it or one of its subdomains, else this host only. */

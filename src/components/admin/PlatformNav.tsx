@@ -37,9 +37,12 @@ export function PlatformNav({ who, newTrials }: { who: string; newTrials: number
         <nav className="an-nav" aria-label="القائمة">{LINKS.map((l) => item(l, false))}</nav>
         <a className="btn-sm primary sa-new" href="/admin/tenants/new">+ مدرس جديد</a>
         <a className="sa-site" href="/" target="_blank" rel="noopener">صفحة المنصة ↗</a>
-        <a className="sa-site" href="/logout">تسجيل الخروج</a>
+        <a className="an-logout" href="/logout">تسجيل الخروج</a>
       </aside>
-      <nav className="an-tabs sa-tabs" aria-label="القائمة السريعة">{LINKS.map((l) => item(l, true))}</nav>
+      <nav className="an-tabs sa-tabs" aria-label="القائمة السريعة">
+        {LINKS.map((l) => item(l, true))}
+        <a href="/logout"><span className="an-tab-ico"><Icon name="close" /></span><span>خروج</span></a>
+      </nav>
     </>
   );
 }
