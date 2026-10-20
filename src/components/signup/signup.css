@@ -198,3 +198,24 @@
 .pt-state.trialOver { background: #FDECEA; color: var(--s-bad); }
 .pt-state.off { background: #EEF1F5; color: var(--s-muted); }
 .pt-hint { margin: 0; color: var(--s-muted); font-size: 14px; }
+
+/* The login page (app/sites/[site]/login). */
+.su-login-page { display: grid; place-items: center; padding: 32px 16px; }
+.su-login { width: min(100%, 420px); display: grid; gap: 14px; }
+.su-login h1 { font-size: 26px; }
+.su-login .su-btn { width: 100%; }
+.su-login-foot { font-size: 13px; margin: 0; }
+.su-login .su-muted { margin: 0; }
+
+/* Header actions (login / partner menu) and the partner's «ربط Claude» guide. */
+.su-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.pt-mcp { max-width: 1120px; margin: 0 auto; padding: 0 20px 48px; display: grid; gap: 12px; scroll-margin-top: 80px; }
+.pt-mcp h2 { font-size: 24px; }
+.pt-steps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pt-steps li { counter-increment: s; display: grid; gap: 6px; padding: 14px 16px 14px 16px; padding-inline-start: 56px; position: relative; border: 1px solid var(--s-line); border-radius: 16px; background: #fff; }
+.pt-steps li::before { content: counter(s); position: absolute; inset-inline-start: 14px; top: 14px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--s-blue); color: #fff; font-weight: 700; }
+.pt-steps li span { color: var(--s-muted); }
+.pt-steps em { font-style: normal; font-weight: 600; color: var(--s-ink); }
+.copy-text { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.copy-text code { padding: 8px 12px; border-radius: 10px; background: var(--s-sky); color: var(--s-deep); font-size: 15px; overflow-wrap: anywhere; }
+.copy-text button { min-height: 38px; padding: 6px 14px; border-radius: 10px; border: 1px solid var(--s-blue); background: var(--s-blue); color: #fff; font: 600 14px/1.2 inherit; cursor: pointer; }

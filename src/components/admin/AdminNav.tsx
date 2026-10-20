@@ -120,6 +120,7 @@ export function AdminNav(props: Props) {
           <b>محتاج مساعدة؟</b>
           <span>أي حاجة مش واضحة أو عايز تعدّلها، كلّم الإدارة وهنساعدك.</span>
         </div>
+        <a className="an-logout" href={`${base}/logout`}>تسجيل الخروج</a>
       </aside>
 
       <nav className="an-tabs" aria-label="القائمة السريعة">

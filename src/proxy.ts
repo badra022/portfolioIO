@@ -11,13 +11,19 @@ import { addressFor } from "@/lib/server/address";
 
 /**
  * Every request is mapped by its host name to /sites/<site>/... (see lib/routing.ts).
- * /admin paths and the private preview (/preview/...) additionally require basic
- * auth; the same check runs again inside every admin page, server action and
- * preview page. On the dev environment (APP_STAGE=dev) every page asks for it.
+ * /admin paths and the private preview (/preview/...) additionally require a login:
+ * the login page's session cookie (lib/server/session.ts), or basic auth for scripts.
+ * The same check runs again inside every admin page, server action and preview page.
+ * On the dev environment (APP_STAGE=dev) every page asks for it.
  */
 
-/** Dev paths that carry their own credentials: the MCP token and signed photo-upload links. */
-const OPEN_ON_DEV = /^\/(api\/mcp|api\/upload|upload)(\/|$)/;
+/**
+ * Dev paths that carry their own credentials or are the way in: the MCP server (its token
+ * or OAuth), signed photo-upload links, the login page and the OAuth endpoints.
+ */
+const OPEN_ON_DEV = /^\/(api\/mcp|api\/upload|upload|login|logout|api\/auth|oauth|\.well-known\/oauth-)(\/|$|-)/;
+/** The platform's OAuth discovery documents (lib/server/oauth.ts), never a teacher's site file. */
+const OAUTH_WELL_KNOWN = /^\/\.well-known\/oauth-(protected-resource|authorization-server)(\/|$)/;
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const host = request.headers.get("host");
@@ -47,27 +53,28 @@ export async function proxy(request: NextRequest) {
   // A partner's private page (<platform>/<partner>/...): only its own login, or the super admin.
   const first = r.site === "_platform" ? r.rest.split("/")[1] ?? "" : "";
   const partnerPage = PARTNER_SLUG_RE.test(first) && !RESERVED_PARTNER_SLUGS.has(first) && (await partnerSlugs()).has(first);
-  if (partnerPage && !(await authenticatePartner(request.headers.get("authorization"), first))) return askLogin();
+  const cookie = request.headers.get("cookie");
+  if (partnerPage && !(await authenticatePartner(request.headers.get("authorization"), first, cookie))) return askLogin(request, r.base);
 
   if (isAdminPath(r.rest) || preview || (devGate && !partnerPage)) {
     const header = request.headers.get("authorization");
-    const principal = await authenticate(header, r.site);
+    const principal = await authenticate(header, r.site, cookie);
     if (!principal) {
       // A teacher who logs in on the platform console is sent to their own site's admin.
-      const teacherSlug = r.site === "_platform" ? await teacherSlugFor(header) : null;
+      const teacherSlug = r.site === "_platform" ? await teacherSlugFor(header, cookie) : null;
       if (teacherSlug) {
         const home = (await addressFor(teacherSlug)).url;
         const to = home.startsWith("/") ? new URL(`${home}${r.rest}${search}`, request.nextUrl) : `${home}${r.rest}${search}`;
         return NextResponse.redirect(to, 307);
       }
-      return askLogin();
+      return askLogin(request, r.base);
     }
   }
 
   const url = request.nextUrl.clone();
   // Site files (verification files, ads.txt, .well-known/…) are served from the database.
   const file = r.rest.slice(1);
-  const rest = isSiteFileName(file) ? `/files/${file}` : r.rest;
+  const rest = isSiteFileName(file) && !(r.site === "_platform" && OAUTH_WELL_KNOWN.test(r.rest)) ? `/files/${file}` : r.rest;
   url.pathname = `/sites/${encodeURIComponent(r.site)}${rest === "/" ? "" : rest}`;
   url.search = search;
   const res = NextResponse.rewrite(url);
@@ -76,7 +83,20 @@ export async function proxy(request: NextRequest) {
   return res;
 }
 
-function askLogin() {
+/**
+ * Not signed in: a browser opening a page goes to the login page (and comes back after);
+ * anything else (scripts, fetches, a wrong basic-auth password) gets the basic-auth prompt.
+ */
+function askLogin(request: NextRequest, base: string) {
+  const html = request.method === "GET" && (request.headers.get("accept") ?? "").includes("text/html");
+  const triedBasic = (request.headers.get("authorization") ?? "").startsWith("Basic ");
+  if (html && !triedBasic) {
+    const root = base.endsWith(PREVIEW_PATH) ? base.slice(0, -PREVIEW_PATH.length) : base;
+    const to = request.nextUrl.clone();
+    to.pathname = `${root}/login`;
+    to.search = `?next=${encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)}`;
+    return NextResponse.redirect(to, 303);
+  }
   return new NextResponse("Authentication required", {
     status: 401,
     headers: {

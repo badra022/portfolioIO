@@ -449,6 +449,18 @@ export async function findLogin(username: string): Promise<{ id: string; hash: s
   return row ?? null;
 }
 
+/** The same as findLogin, by id: for a signed-in session (lib/server/session.ts). */
+export async function findLoginById(id: string): Promise<{ id: string; username: string; slug: string; disabled: boolean } | null> {
+  if (!hasDb() || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const row = (await db()
+    .select({ id: adminUsers.id, username: adminUsers.username, slug: tenants.slug, disabled: sql<boolean>`${adminUsers.disabled} or coalesce(${tenants.trialEndsAt} <= now(), false)` })
+    .from(adminUsers)
+    .innerJoin(tenants, eq(tenants.id, adminUsers.tenantId))
+    .where(eq(adminUsers.id, id))
+    .limit(1))[0];
+  return row ?? null;
+}
+
 export async function touchLogin(userId: string): Promise<void> {
   if (!hasDb()) return;
   await db().update(adminUsers).set({ lastLoginAt: new Date() }).where(eq(adminUsers.id, userId));

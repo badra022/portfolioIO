@@ -10,6 +10,7 @@ import { STATE_LABEL, fromNow, tenantState } from "@/lib/admin/tenant-actions";
 import { SignupFlow } from "./signup/SignupFlow";
 import { OstazLogo } from "./brand/OstazLogo";
 import { DevCredit } from "./DevCredit";
+import { CopyText } from "./CopyText";
 import "./signup/signup.css";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -21,7 +22,8 @@ const n = (v: number) => v.toLocaleString("en-US");
  */
 export async function PartnerHome({ slug }: { slug: string }) {
   await connection();
-  const partner = await partnerForRequest("_platform", slug, (await headers()).get("authorization"));
+  const h = await headers();
+  const partner = await partnerForRequest("_platform", slug, h.get("authorization"), h.get("cookie"));
   if (!partner) notFound();
   const now = Date.now();
   const [tenants, stats] = await Promise.all([listTenants(), overview().catch(() => [])]);
@@ -30,7 +32,8 @@ export async function PartnerHome({ slug }: { slug: string }) {
     .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
     .map((t) => ({ ...t, state: tenantState(t, now), address: siteAddress(t.slug, t.domains), visitors: visits.get(t.slug)?.visitors ?? 0, contacts: visits.get(t.slug)?.contacts ?? 0 }));
   const by = (s: string) => sites.filter((x) => x.state === s).length;
-  const host = (await headers()).get("host") ?? "";
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const before = env.rootDomain ? "" : `${host}/t/`;
   const after = env.rootDomain ? `.${env.rootDomain}` : "";
 
@@ -39,8 +42,12 @@ export async function PartnerHome({ slug }: { slug: string }) {
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" precedence="default" />
       <header className="su-head">
-        <OstazLogo size={36} href={`/${partner.slug}`} />
-        <span className="pt-who">{partner.name}</span>
+        <OstazLogo size={36} href="/" />
+        <nav className="su-head-actions">
+          <span className="pt-who">{partner.name}</span>
+          <a className="su-btn ghost sm" href="#claude">ربط Claude</a>
+          <a className="su-btn ghost sm" href="/logout">خروج</a>
+        </nav>
       </header>
 
       <section className="su-hero">
@@ -85,11 +92,34 @@ export async function PartnerHome({ slug }: { slug: string }) {
         <p className="pt-hint">لوحة تحكم أي موقع من دول بتدخلها بحسابك ده نفسه، أو بحساب المدرس.</p>
       </section>
 
+      <McpGuide url={`${proto}://${host}/api/mcp`} />
+
       <footer className="su-foot">
         <OstazLogo size={26} href={`/${partner.slug}`} />
         <span>صفحة خاصة بـ {partner.name}</span>
       </footer>
       <DevCredit siteName="myostaz.com" />
     </main>
+  );
+}
+
+/**
+ * How to connect Claude (claude.ai, desktop or phone app) to myostaz with the partner's
+ * own login: a custom connector on /api/mcp, which signs in through OAuth
+ * (lib/server/oauth.ts). Claude can then read and edit only this partner's sites.
+ */
+function McpGuide({ url }: { url: string }) {
+  return (
+    <section className="pt-mcp" id="claude" aria-labelledby="claude-title">
+      <h2 id="claude-title">إدارة مواقعك من Claude</h2>
+      <p className="pt-hint">اربط Claude بحسابك مرة واحدة، وبعدها اطلب منه بالكلام: يعدّل المواعيد، يضيف عرض، يعمل اختبار، يرد على الطلبات، أو يقولك الأرقام. بيشوف ويعدّل مواقعك إنت بس.</p>
+      <ol className="pt-steps">
+        <li><b>افتح الإعدادات في Claude</b><span>على claude.ai أو تطبيق الكمبيوتر أو الموبايل: <em>Settings</em> ← <em>Connectors</em> ← <em>Add custom connector</em>. (في حسابات Team أو Enterprise، مسؤول الحساب هو اللي بيضيفه.)</span></li>
+        <li><b>حط الاسم والرابط</b><span>الاسم: <code dir="ltr">myostaz</code> · الرابط:</span><CopyText text={url} /></li>
+        <li><b>اضغط Connect وسجّل دخولك</b><span>هتفتح صفحة myostaz.com: ادخل بنفس اسم المستخدم وكلمة السر بتوعك، ثم اضغط «اسمح». مش محتاج أي كود أو مفتاح.</span></li>
+        <li><b>ابدأ اطلب</b><span>مثلاً: «اعرض مواقعي»، «غيّر ميعاد مجموعة السبت عند مس سارة لـ 5 العصر»، «اعمل اختبار 10 أسئلة على الكيمياء العضوية لموقع حسام»، «مين طلب حجز النهاردة؟».</span></li>
+      </ol>
+      <p className="pt-hint">لو غيّرت كلمة السر أو عايز تفصل Claude: من نفس صفحة Connectors اضغط Disconnect.</p>
+    </section>
   );
 }

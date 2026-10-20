@@ -47,7 +47,7 @@ export async function createPartnerAction(_prev: ConsoleState, form: FormData): 
     return { ok: false, message: "تعذّر إضافة الشريك." };
   }
   refresh();
-  return { ok: true, message: "الشريك اتضاف. ابعتله الرابط والحساب (كلمة السر مش هتظهر تاني).", secret: { username: b.username, password, loginUrl: `/${b.slug}` } };
+  return { ok: true, message: "الشريك اتضاف. ابعتله اسم المستخدم وكلمة السر: يدخل من «تسجيل الدخول» في myostaz.com (كلمة السر مش هتظهر تاني).", secret: { username: b.username, password, loginUrl: "/login" } };
 }
 
 export async function updatePartnerAction(id: string, _prev: ConsoleState, form: FormData): Promise<ConsoleState> {
@@ -70,7 +70,7 @@ export async function partnerPasswordAction(id: string, _prev: ConsoleState, for
   if (typed && typed.length < 8) return { ok: false, message: "كلمة السر 8 حروف على الأقل." };
   const password = typed || generatePassword();
   await updatePartner(id, { password });
-  return { ok: true, message: "كلمة السر اتغيرت. ابعتها للشريك (مش هتظهر تاني).", secret: { username: p.username, password, loginUrl: `/${p.slug}` } };
+  return { ok: true, message: "كلمة السر اتغيرت. ابعتها للشريك (مش هتظهر تاني).", secret: { username: p.username, password, loginUrl: "/login" } };
 }
 
 /** The partner page's own settings: intro, default color, extra questions (components/admin/PartnerFormEditor.tsx). */
