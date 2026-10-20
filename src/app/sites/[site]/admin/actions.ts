@@ -356,14 +356,14 @@ export async function createUserAction(slug: string, _prev: ConsoleState, form: 
     return { ok: false, message: "اسم المستخدم مستخدم بالفعل." };
   }
   refresh();
-  return { ok: true, message: "تم إنشاء الحساب. انسخ كلمة المرور الآن، لن تظهر مرة أخرى.", secret: { username, password, loginUrl: await loginUrlFor(slug) } };
+  return { ok: true, message: "تم إنشاء الحساب. انسخ كلمة المرور الآن، لن تظهر مرة أخرى. أول ما يدخل هيختار كلمة مرور خاصة بيه.", secret: { username, password, loginUrl: await loginUrlFor(slug) } };
 }
 
 export async function resetPasswordAction(slug: string, userId: string, username: string, _prev: ConsoleState): Promise<ConsoleState> {
   await requireSuper(PLATFORM);
   const password = generatePassword();
-  await repo.updateUser(slug, userId, { passwordHash: await hashPassword(password) });
-  return { ok: true, message: "كلمة مرور جديدة. انسخها الآن، لن تظهر مرة أخرى.", secret: { username, password, loginUrl: await loginUrlFor(slug) } };
+  await repo.updateUser(slug, userId, { passwordHash: await hashPassword(password), mustChangePassword: true });
+  return { ok: true, message: "كلمة مرور جديدة. انسخها الآن، لن تظهر مرة أخرى. أول ما يدخل هيختار كلمة مرور خاصة بيه.", secret: { username, password, loginUrl: await loginUrlFor(slug) } };
 }
 
 export async function setUserDisabledAction(slug: string, userId: string, disabled: boolean): Promise<void> {

@@ -29,7 +29,9 @@ export async function PlatformHome() {
       <header className="su-head">
         <OstazLogo size={36} href="/" />
         <nav className="su-head-actions">
-          {acct?.kind === "super" ? <a className="su-btn ghost sm" href="/admin">لوحة الإدارة</a> : <a className="su-btn ghost sm" href="/login">تسجيل الدخول</a>}
+          {acct?.kind === "super"
+            ? <><a className="su-btn ghost sm" href="/admin">لوحة الإدارة</a><a className="su-btn logout sm" href="/logout">تسجيل الخروج</a></>
+            : <a className="su-btn ghost sm" href="/login">دخول الشركاء</a>}
           <a className="su-btn primary sm" href="#start">جرّب ببلاش</a>
         </nav>
       </header>

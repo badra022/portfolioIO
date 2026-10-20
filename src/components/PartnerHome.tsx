@@ -23,7 +23,7 @@ const n = (v: number) => v.toLocaleString("en-US");
 export async function PartnerHome({ slug }: { slug: string }) {
   await connection();
   const h = await headers();
-  const partner = await partnerForRequest("_platform", slug, h.get("authorization"), h.get("cookie"));
+  const partner = await partnerForRequest("_platform", slug, h.get("cookie"));
   if (!partner) notFound();
   const now = Date.now();
   const [tenants, stats] = await Promise.all([listTenants(), overview().catch(() => [])]);
@@ -46,7 +46,8 @@ export async function PartnerHome({ slug }: { slug: string }) {
         <nav className="su-head-actions">
           <span className="pt-who">{partner.name}</span>
           <a className="su-btn ghost sm" href="#claude">ربط Claude</a>
-          <a className="su-btn ghost sm" href="/logout">خروج</a>
+          <a className="su-btn ghost sm" href="/password">كلمة السر</a>
+          <a className="su-btn logout sm" href="/logout">تسجيل الخروج</a>
         </nav>
       </header>
 
@@ -89,7 +90,7 @@ export async function PartnerHome({ slug }: { slug: string }) {
             </table>
           </div>
         )}
-        <p className="pt-hint">لوحة تحكم أي موقع من دول بتدخلها بحسابك ده نفسه، أو بحساب المدرس.</p>
+        <p className="pt-hint">لوحة تحكم أي موقع من دول بتفتح بدخولك ده نفسه، أو بحساب المدرس.</p>
       </section>
 
       <McpGuide url={`${proto}://${host}/api/mcp`} />

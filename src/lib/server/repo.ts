@@ -422,12 +422,13 @@ export async function listUsers(slug: string): Promise<UserRow[]> {
   return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString(), lastLoginAt: r.lastLoginAt?.toISOString() ?? null }));
 }
 
+/** A login the super admin makes: its owner picks their own password at the first login. */
 export async function createUser(slug: string, username: string, passwordHash: string): Promise<void> {
   const id = await tenantId(slug);
-  await requireDb().insert(adminUsers).values({ username, passwordHash, tenantId: id });
+  await requireDb().insert(adminUsers).values({ username, passwordHash, tenantId: id, mustChangePassword: true });
 }
 
-export async function updateUser(slug: string, userId: string, patch: { passwordHash?: string; disabled?: boolean }): Promise<void> {
+export async function updateUser(slug: string, userId: string, patch: { passwordHash?: string; disabled?: boolean; mustChangePassword?: boolean }): Promise<void> {
   const id = await tenantId(slug);
   await requireDb().update(adminUsers).set(patch).where(and(eq(adminUsers.id, userId), eq(adminUsers.tenantId, id)));
 }
@@ -437,11 +438,11 @@ export async function deleteUser(slug: string, userId: string): Promise<void> {
   await requireDb().delete(adminUsers).where(and(eq(adminUsers.id, userId), eq(adminUsers.tenantId, id)));
 }
 
-export async function findLogin(username: string): Promise<{ id: string; hash: string; slug: string; disabled: boolean } | null> {
+export async function findLogin(username: string): Promise<{ id: string; hash: string; slug: string; disabled: boolean; mustChange: boolean } | null> {
   if (!hasDb()) return null;
   const row = (await db()
     // A trial whose time is up logs nobody in until it's activated.
-    .select({ id: adminUsers.id, hash: adminUsers.passwordHash, slug: tenants.slug, disabled: sql<boolean>`${adminUsers.disabled} or coalesce(${tenants.trialEndsAt} <= now(), false)` })
+    .select({ id: adminUsers.id, hash: adminUsers.passwordHash, slug: tenants.slug, mustChange: adminUsers.mustChangePassword, disabled: sql<boolean>`${adminUsers.disabled} or coalesce(${tenants.trialEndsAt} <= now(), false)` })
     .from(adminUsers)
     .innerJoin(tenants, eq(tenants.id, adminUsers.tenantId))
     .where(eq(adminUsers.username, username))
@@ -459,6 +460,17 @@ export async function findLoginById(id: string): Promise<{ id: string; username:
     .where(eq(adminUsers.id, id))
     .limit(1))[0];
   return row ?? null;
+}
+
+/** The login's owner picked a new password (or kept the old one: hash undefined). */
+export async function setOwnPassword(userId: string, passwordHash?: string): Promise<void> {
+  await requireDb().update(adminUsers).set({ ...(passwordHash ? { passwordHash } : {}), mustChangePassword: false }).where(eq(adminUsers.id, userId));
+}
+
+/** The hash of a login, for checking its current password. */
+export async function loginHash(userId: string): Promise<string | null> {
+  if (!hasDb() || !/^[0-9a-f-]{36}$/i.test(userId)) return null;
+  return (await db().select({ h: adminUsers.passwordHash }).from(adminUsers).where(eq(adminUsers.id, userId)).limit(1))[0]?.h ?? null;
 }
 
 export async function touchLogin(userId: string): Promise<void> {
@@ -529,7 +541,7 @@ export async function slugTaken(slug: string): Promise<boolean> {
   return (await db().select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1)).length > 0;
 }
 
-/** Teacher and partner logins share one name space (both log in with basic auth). */
+/** Teacher and partner logins share one name space (one login page for both). */
 export async function usernameTaken(username: string): Promise<boolean> {
   if (!hasDb()) return false;
   const d = db();

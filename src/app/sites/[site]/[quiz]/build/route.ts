@@ -14,7 +14,7 @@ const PER_HOUR = 60;
 type Ctx = RouteContext<"/sites/[site]/[quiz]/build">;
 const partnerOf = async (req: Request, ctx: Ctx) => {
   const { site, quiz } = await ctx.params;
-  return partnerForRequest(decodeURIComponent(site), decodeURIComponent(quiz), req.headers.get("authorization"), req.headers.get("cookie"));
+  return partnerForRequest(decodeURIComponent(site), decodeURIComponent(quiz), req.headers.get("cookie"));
 };
 
 /** Builds a trial site from a partner's page (<platform>/<partner>): no per-device, per-number or per-network limit. */

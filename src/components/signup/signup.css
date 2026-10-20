@@ -18,6 +18,8 @@
 .su-btn.primary { background: var(--s-blue); border-color: var(--s-blue); color: #fff; }
 .su-btn.primary:hover { background: var(--s-hover); }
 .su-btn.ghost:hover { background: #F8FBFF; }
+.su-btn.logout { border-color: #E5484D; color: #C62A2F; }
+.su-btn.logout:hover { background: #E5484D; color: #fff; }
 .su-btn.sm { min-height: 40px; padding: 6px 16px; font-size: 14px; }
 .su-btn.lg { min-height: 56px; padding: 12px 30px; font-size: 18px; }
 .su-btn:active { transform: translateY(1px); }

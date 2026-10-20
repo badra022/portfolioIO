@@ -16,12 +16,15 @@ const { partners, tenants } = schema;
 export type Partner = {
   id: string; slug: string; name: string; username: string; disabled: boolean;
   trialHours: number; form: PartnerForm; notes: string | null; createdAt: string; lastLoginAt: string | null;
+  /** The password is still the one the super admin set. */
+  mustChange: boolean;
 };
 
 type Row = typeof partners.$inferSelect;
 const toPartner = (r: Row): Partner => ({
   id: r.id, slug: r.slug, name: r.name, username: r.username, disabled: r.disabled, trialHours: r.trialHours,
   form: readPartnerForm(r.form), notes: r.notes, createdAt: r.createdAt.toISOString(), lastLoginAt: r.lastLoginAt?.toISOString() ?? null,
+  mustChange: r.mustChangePassword,
 });
 
 export const TRIAL_HOURS_MAX = 24 * 30;
@@ -45,7 +48,7 @@ export async function getPartnerById(id: string): Promise<Partner | null> {
 
 export async function createPartner(input: { slug: string; name: string; username: string; password: string; trialHours: number; notes: string }): Promise<void> {
   await db().insert(partners).values({
-    slug: input.slug, name: input.name, username: input.username, passwordHash: await hashPassword(input.password),
+    slug: input.slug, name: input.name, username: input.username, passwordHash: await hashPassword(input.password), mustChangePassword: true,
     trialHours: input.trialHours, notes: input.notes || null,
   });
   slugs = null;
@@ -56,9 +59,20 @@ export async function updatePartner(id: string, patch: Partial<{ slug: string; n
   await db().update(partners).set({
     ...rest,
     ...(notes !== undefined ? { notes: notes || null } : {}),
-    ...(password ? { passwordHash: await hashPassword(password) } : {}),
+    // A password the super admin sets is replaced by the partner's own at the next login.
+    ...(password ? { passwordHash: await hashPassword(password), mustChangePassword: true } : {}),
   }).where(eq(partners.id, id));
   slugs = null;
+}
+
+/** The partner picked a new password (or kept the old one: hash undefined). */
+export async function setPartnerOwnPassword(id: string, passwordHash?: string): Promise<void> {
+  await db().update(partners).set({ ...(passwordHash ? { passwordHash } : {}), mustChangePassword: false }).where(eq(partners.id, id));
+}
+
+export async function partnerHash(id: string): Promise<string | null> {
+  if (!hasDb()) return null;
+  return (await db().select({ h: partners.passwordHash }).from(partners).where(eq(partners.id, id)).limit(1))[0]?.h ?? null;
 }
 
 /** Removes the partner; its teachers and trial requests stay, with no partner. */
@@ -126,12 +140,12 @@ export async function partnerTrialsSince(partnerId: string, hours: number): Prom
 
 /**
  * The partner whose page (<platform>/<slug>) a request is for, when the caller may use it:
- * that partner's own login or the super admin. proxy.ts checks the same before the page loads.
+ * that partner signed in, or the super admin. proxy.ts checks the same before the page loads.
  */
-export async function partnerForRequest(site: string, slug: string, authorization: string | null, cookie: string | null = null): Promise<Partner | null> {
+export async function partnerForRequest(site: string, slug: string, cookie: string | null): Promise<Partner | null> {
   if (site !== "_platform") return null;
   const { authenticatePartner } = await import("./auth");
-  const who = await authenticatePartner(authorization, slug, cookie);
+  const who = await authenticatePartner(slug, cookie);
   if (!who) return null;
   const partner = who.partner ?? (await getPartner(slug));
   return partner && !partner.disabled ? partner : null;

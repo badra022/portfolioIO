@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env, isDev } from "@/lib/env";
 import { isAdminPath, route } from "@/lib/routing";
-import { authenticate, authenticatePartner, teacherSlugFor } from "@/lib/server/auth";
+import { authenticate, authenticatePartner, isDevGateOpen, teacherSlugFor } from "@/lib/server/auth";
 import { partnerSlugs } from "@/lib/server/partners";
 import { PARTNER_SLUG_RE, RESERVED_PARTNER_SLUGS } from "@/lib/partners";
 import { isSiteFileName } from "@/lib/site-files";
@@ -11,17 +11,19 @@ import { addressFor } from "@/lib/server/address";
 
 /**
  * Every request is mapped by its host name to /sites/<site>/... (see lib/routing.ts).
- * /admin paths and the private preview (/preview/...) additionally require a login:
- * the login page's session cookie (lib/server/session.ts), or basic auth for scripts.
- * The same check runs again inside every admin page, server action and preview page.
- * On the dev environment (APP_STAGE=dev) every page asks for it.
+ * /admin paths and the private preview (/preview/...) additionally require a login on the
+ * login page (its session cookie, lib/server/session.ts); a partner's page needs that
+ * partner signed in. The same check runs again inside every admin page, server action
+ * and preview page. On the dev environment (APP_STAGE=dev) every page is also behind
+ * the browser's basic-auth prompt with the dev super admin's login (its only use).
  */
 
 /**
- * Dev paths that carry their own credentials or are the way in: the MCP server (its token
- * or OAuth), signed photo-upload links, the login page and the OAuth endpoints.
+ * Dev paths that carry their own credentials or are called by Claude's servers, which
+ * can't answer the prompt: the MCP server (its token or OAuth), signed photo-upload links,
+ * and OAuth discovery, registration and tokens. The OAuth sign-in page itself is a page.
  */
-const OPEN_ON_DEV = /^\/(api\/mcp|api\/upload|upload|login|logout|api\/auth|oauth|\.well-known\/oauth-)(\/|$|-)/;
+const OPEN_ON_DEV = /^\/(api\/mcp|api\/upload|upload|oauth\/register|oauth\/token|\.well-known\/oauth-[a-z-]+)(\/|$|-)/;
 /** The platform's OAuth discovery documents (lib/server/oauth.ts), never a teacher's site file. */
 const OAUTH_WELL_KNOWN = /^\/\.well-known\/oauth-(protected-resource|authorization-server)(\/|$)/;
 export async function proxy(request: NextRequest) {
@@ -48,26 +50,30 @@ export async function proxy(request: NextRequest) {
     return new NextResponse("This is a private trial site.", { status: 403, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow, noarchive" } });
   }
 
-  const devGate = isDev() && !OPEN_ON_DEV.test(r.rest);
+  if (isDev() && !OPEN_ON_DEV.test(r.rest) && !isDevGateOpen(request.headers.get("authorization"))) {
+    return new NextResponse("Authentication required", {
+      status: 401,
+      headers: { "WWW-Authenticate": `Basic realm="myostaz dev", charset="UTF-8"`, "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" },
+    });
+  }
 
-  // A partner's private page (<platform>/<partner>/...): only its own login, or the super admin.
+  // A partner's private page (<platform>/<partner>/...): only that partner signed in, or the super admin.
   const first = r.site === "_platform" ? r.rest.split("/")[1] ?? "" : "";
   const partnerPage = PARTNER_SLUG_RE.test(first) && !RESERVED_PARTNER_SLUGS.has(first) && (await partnerSlugs()).has(first);
   const cookie = request.headers.get("cookie");
-  if (partnerPage && !(await authenticatePartner(request.headers.get("authorization"), first, cookie))) return askLogin(request, r.base);
+  if (partnerPage && !(await authenticatePartner(first, cookie))) return askLogin(request, r.base, "partner");
 
-  if (isAdminPath(r.rest) || preview || (devGate && !partnerPage)) {
-    const header = request.headers.get("authorization");
-    const principal = await authenticate(header, r.site, cookie);
+  if (isAdminPath(r.rest) || preview) {
+    const principal = await authenticate(r.site, cookie);
     if (!principal) {
-      // A teacher who logs in on the platform console is sent to their own site's admin.
-      const teacherSlug = r.site === "_platform" ? await teacherSlugFor(header, cookie) : null;
+      // A teacher signed in on the platform console is sent to their own site's admin.
+      const teacherSlug = r.site === "_platform" ? await teacherSlugFor(cookie) : null;
       if (teacherSlug) {
         const home = (await addressFor(teacherSlug)).url;
         const to = home.startsWith("/") ? new URL(`${home}${r.rest}${search}`, request.nextUrl) : `${home}${r.rest}${search}`;
         return NextResponse.redirect(to, 307);
       }
-      return askLogin(request, r.base);
+      return askLogin(request, r.base, "admin");
     }
   }
 
@@ -84,27 +90,20 @@ export async function proxy(request: NextRequest) {
 }
 
 /**
- * Not signed in: a browser opening a page goes to the login page (and comes back after);
- * anything else (scripts, fetches, a wrong basic-auth password) gets the basic-auth prompt.
+ * Not signed in: a browser opening a page goes to the login page (and comes back after):
+ * the admin login for /admin and previews, the partners' login for a partner's page.
+ * Anything else (fetches, scripts) gets a plain 401.
  */
-function askLogin(request: NextRequest, base: string) {
+function askLogin(request: NextRequest, base: string, door: "admin" | "partner") {
   const html = request.method === "GET" && (request.headers.get("accept") ?? "").includes("text/html");
-  const triedBasic = (request.headers.get("authorization") ?? "").startsWith("Basic ");
-  if (html && !triedBasic) {
+  if (html) {
     const root = base.endsWith(PREVIEW_PATH) ? base.slice(0, -PREVIEW_PATH.length) : base;
     const to = request.nextUrl.clone();
     to.pathname = `${root}/login`;
-    to.search = `?next=${encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)}`;
+    to.search = `?${door === "admin" ? "as=admin&" : ""}next=${encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)}`;
     return NextResponse.redirect(to, 303);
   }
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: {
-      // One realm per host, so a login entered on one admin page is reused on the next.
-      "WWW-Authenticate": `Basic realm="myostaz admin", charset="UTF-8"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return new NextResponse("Sign in first", { status: 401, headers: { "Cache-Control": "no-store" } });
 }
 
 export const config = {
