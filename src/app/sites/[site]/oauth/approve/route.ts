@@ -11,7 +11,7 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/oauth/
   await connection();
   if (decodeURIComponent((await ctx.params).site) !== "_platform") return new Response("Not found", { status: 404 });
   const form = new URLSearchParams(await req.text());
-  const checked = checkAuthorize(form);
+  const checked = await checkAuthorize(form);
   if (!checked.ok) return new Response(checked.error, { status: 400 });
   const who = readSession(req.headers.get("cookie"));
   if (!who) return new Response(null, { status: 303, headers: { Location: `${requestOrigin(req)}/oauth/authorize?${form}` } });
