@@ -5,15 +5,18 @@ import { getSiteData } from "@/lib/server/site";
 import { TenantPage } from "@/components/TenantPage";
 import { PlatformHome } from "@/components/PlatformHome";
 import { TrialEnded } from "@/components/signup/TrialEnded";
-import { BRAND_ICONS } from "@/lib/platform";
+import { BRAND, BRAND_ICONS } from "@/lib/platform";
 
 export async function generateMetadata({ params }: PageProps<"/sites/[site]">): Promise<Metadata> {
   const data = await getSiteData(decodeURIComponent((await params).site));
-  // The platform's home page (the trial sign-up), and trial-ended / unknown addresses.
+  // The platform's home page (components/landing), and trial-ended / unknown addresses.
   if (data.kind === "platform") {
+    const title = "myostaz · مواقع احترافية للمدرسين والسناتر";
+    const description = "موقع باسمك بالمواعيد والحجز على واتساب والامتحانات والنتايج ولوحة الشرف، ولوحة تحكم من موبايلك.";
     return {
-      title: "myostaz · موقعك كمدرس جاهز في دقيقتين",
-      description: "موقع كامل للمدرس بالمواعيد والحجز على واتساب والامتحانات ولوحة التحكم. جرّبه ببلاش 24 ساعة.",
+      title, description,
+      metadataBase: new URL(BRAND.home),
+      openGraph: { title, description, type: "website", images: [{ url: "/brand/landing/og.jpg", width: 1200, height: 630 }] },
       icons: BRAND_ICONS,
       robots: { index: true, follow: true },
     };

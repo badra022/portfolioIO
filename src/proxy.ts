@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env, isDev } from "@/lib/env";
 import { isAdminPath, route } from "@/lib/routing";
-import { authenticate, authenticatePartner, isDevGateOpen, sessionAccount, teacherSlugFor } from "@/lib/server/auth";
+import { authenticate, authenticatePartner, isDevGateOpen, teacherSlugFor } from "@/lib/server/auth";
 import { partnerSlugs } from "@/lib/server/partners";
 import { PARTNER_SLUG_RE, RESERVED_PARTNER_SLUGS } from "@/lib/partners";
 import { isSiteFileName } from "@/lib/site-files";
@@ -55,17 +55,6 @@ export async function proxy(request: NextRequest) {
       status: 401,
       headers: { "WWW-Authenticate": `Basic realm="myostaz dev", charset="UTF-8"`, "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" },
     });
-  }
-
-  // myostaz.com itself is for partners: visitors who aren't signed in as a partner (or the super admin) get the partners' login.
-  if (r.site === "_platform" && r.rest === "/" && request.method === "GET") {
-    const acct = await sessionAccount(request.headers.get("cookie")).catch(() => null);
-    if (acct?.kind !== "partner" && acct?.kind !== "super") {
-      const to = request.nextUrl.clone();
-      to.pathname = `${r.base}/login`;
-      to.search = "";
-      return NextResponse.redirect(to, 307);
-    }
   }
 
   // A partner's private page (<platform>/<partner>/...): only that partner signed in, or the super admin.
