@@ -75,7 +75,6 @@ async function LoginBody({ params, searchParams }: PageProps<"/sites/[site]/logi
         <button type="submit" className="su-btn primary">{admin ? "دخول" : "دخول كشريك"}</button>
         {platform && !admin && <p className="su-muted su-login-foot">حسابات الشركاء بتتعمل من إدارة myostaz بس. عايز تبقى شريك؟ كلمنا على واتساب.</p>}
         {platform && !admin && next.startsWith("/oauth/") && <p className="su-muted su-login-foot">بتربط Claude كمدرس أو كمدير؟ <a href={`/login?as=admin&next=${encodeURIComponent(next)}`}>ادخل من هنا</a></p>}
-        {platform && <p className="su-muted su-login-foot"><a href="/">الرجوع للصفحة الرئيسية</a></p>}
       </form>
     </main>
   );
