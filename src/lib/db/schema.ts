@@ -92,6 +92,23 @@ export const trialRequests = pgTable("trial_requests", {
   extra: jsonb("extra"),
 }, (t) => [index("trial_requests_created_idx").on(t.createdAt), index("trial_requests_partner_idx").on(t.partnerId)]);
 
+/** Messages from the platform's home page («كلمنا» form): teachers, centers and agencies asking about the service. */
+export const contactRequests = pgTable("contact_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  name: text("name").notNull(),
+  /** WhatsApp number, international digits (lib/phone.ts). */
+  phone: text("phone").notNull(),
+  /** teacher | center | agency | other */
+  role: text("role").notNull().default("teacher"),
+  subject: text("subject"),
+  message: text("message"),
+  /** new | contacted | done */
+  status: text("status").notNull().default("new"),
+  /** A salted hash of the sender's network (lib/server/signup.ts visitorKey), for the rate limit. */
+  visitor: text("visitor"),
+}, (t) => [index("contact_requests_created_idx").on(t.createdAt)]);
+
 /**
  * Daily counters for the platform's sign-up pages (lib/server/funnel.ts): views,
  * how far visitors got in the sign-up form, builds. Cairo days.

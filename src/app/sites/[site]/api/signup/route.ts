@@ -13,7 +13,7 @@ const MAX_BODY = 25 * 1024 * 1024;
 /**
  * Builds a free trial site from the «جرّب موقعك» form (platform host only). One per browser, number and a few per network.
  * Sites are built through partners now (their own page, [quiz]/build): the public form is
- * only for the super admin, and myostaz.com shows visitors the partners' login.
+ * only for the super admin; myostaz.com's home page (components/landing) offers contact instead.
  */
 export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/signup">) {
   await connection();
