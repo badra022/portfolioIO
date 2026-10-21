@@ -24,7 +24,7 @@ async function AuthorizeBody({ params, searchParams }: PageProps<"/sites/[site]/
   if (decodeURIComponent((await params).site) !== "_platform") notFound();
   const raw = await searchParams;
   const q = new URLSearchParams(Object.entries(raw).flatMap(([k, v]) => (Array.isArray(v) ? v.map((x) => [k, x]) : v === undefined ? [] : [[k, v]])) as [string, string][]);
-  const checked = checkAuthorize(q);
+  const checked = await checkAuthorize(q);
   const acct = await sessionAccount((await headers()).get("cookie")).catch(() => null);
   if (checked.ok && !acct) redirect(`/login?next=${encodeURIComponent(`/oauth/authorize?${q}`)}`);
   const who = acct?.kind === "partner" ? acct.partner.name : acct?.kind === "super" ? "إدارة المنصة (كل المواقع)" : acct?.kind === "teacher" ? `لوحة تحكم موقع ${acct.slug}` : "";

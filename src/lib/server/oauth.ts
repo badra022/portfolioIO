@@ -12,7 +12,9 @@ import type { Identity } from "./session";
  *
  *   /.well-known/oauth-protected-resource   which server signs in for /api/mcp
  *   /.well-known/oauth-authorization-server the endpoints below
- *   /oauth/register   dynamic client registration (Claude registers itself)
+ *   /oauth/register   dynamic client registration (Claude registers itself), or the client's
+ *                     published identity instead: a client_id that is the https URL of its
+ *                     metadata document (CIMD), read from there
  *   /oauth/authorize  the login page, then «اسمح» (app/sites/[site]/oauth/authorize)
  *   /oauth/token      code (+ PKCE) → access and refresh tokens; refresh → new tokens
  *
@@ -46,6 +48,7 @@ export function authorizationServerMetadata(origin: string) {
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
+    client_id_metadata_document_supported: true,
     scopes_supported: ["mcp"],
   };
 }
@@ -62,6 +65,16 @@ const okRedirect = (u: string) => {
   } catch { return false; }
 };
 
+/** A registered callback matches exactly; a loopback one (http://localhost/...) on any port (RFC 8252), as desktop apps pick a free port. */
+function sameRedirect(registered: string, asked: string): boolean {
+  if (registered === asked) return true;
+  try {
+    const r = new URL(registered), a = new URL(asked);
+    const loop = (u: URL) => u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1");
+    return loop(r) && loop(a) && r.hostname === a.hostname && r.pathname === a.pathname && r.search === a.search;
+  } catch { return false; }
+}
+
 export function registerClient(body: { redirect_uris?: unknown; client_name?: unknown }): { ok: true; client: Record<string, unknown> } | { ok: false; error: string } {
   const ru = Array.isArray(body.redirect_uris) ? body.redirect_uris.filter((x): x is string => typeof x === "string") : [];
   if (!ru.length || ru.length > 10 || !ru.every(okRedirect)) return { ok: false, error: "redirect_uris must be https URLs" };
@@ -73,25 +86,68 @@ export function registerClient(body: { redirect_uris?: unknown; client_name?: un
   };
 }
 
-export const readClient = (clientId: string | null) => readToken<Client>("oauth-client", clientId);
+const signedClient = (clientId: string | null) => readToken<Client>("oauth-client", clientId);
+
+/**
+ * A client known by its published metadata (CIMD): client_id is an https URL whose JSON says
+ * the same client_id and lists the redirect_uris. Only public names (no IP addresses, no
+ * localhost), no redirects, small and quick; remembered for 10 minutes.
+ */
+const cimdCache = new Map<string, { c: Client | null; until: number }>();
+const isCimdUrl = (id: string) => {
+  try {
+    const u = new URL(id);
+    return u.protocol === "https:" && u.pathname !== "/" && !u.username && !u.password && !u.hash
+      && /\.[a-z]{2,}$/i.test(u.hostname) && u.hostname !== "localhost" && !/^[\d.]+$/.test(u.hostname) && !u.hostname.includes(":");
+  } catch { return false; }
+};
+
+async function metadataClient(clientId: string): Promise<Client | null> {
+  const hit = cimdCache.get(clientId);
+  if (hit && hit.until > Date.now()) return hit.c;
+  let c: Client | null = null;
+  try {
+    const res = await fetch(clientId, { redirect: "error", signal: AbortSignal.timeout(5000), headers: { Accept: "application/json" } });
+    const text = res.ok ? await res.text() : "";
+    if (text && text.length < 64 * 1024) {
+      const doc = JSON.parse(text) as { client_id?: unknown; redirect_uris?: unknown; client_name?: unknown };
+      const ru = Array.isArray(doc.redirect_uris) ? doc.redirect_uris.filter((x): x is string => typeof x === "string" && okRedirect(x)) : [];
+      if (doc.client_id === clientId && ru.length) c = { ru: ru.slice(0, 20), n: typeof doc.client_name === "string" ? doc.client_name.slice(0, 80) : new URL(clientId).hostname };
+    }
+  } catch (e) {
+    console.error("[oauth] client metadata", clientId, e instanceof Error ? e.message : e);
+  }
+  if (cimdCache.size > 100) cimdCache.clear();
+  cimdCache.set(clientId, { c, until: Date.now() + (c ? 600_000 : 60_000) });
+  return c;
+}
+
+/** The client behind a client_id: one we registered (a signed token), or a published metadata URL. */
+export async function readClient(clientId: string | null): Promise<Client | null> {
+  if (!clientId) return null;
+  return signedClient(clientId) ?? (isCimdUrl(clientId) ? metadataClient(clientId) : null);
+}
 
 /** What /oauth/authorize was asked for, checked: the client, its callback, and PKCE. */
 export type AuthorizeRequest = { clientId: string; clientName: string; redirectUri: string; state: string; challenge: string };
 
-export function checkAuthorize(q: URLSearchParams): { ok: true; req: AuthorizeRequest } | { ok: false; error: string } {
+export async function checkAuthorize(q: URLSearchParams): Promise<{ ok: true; req: AuthorizeRequest } | { ok: false; error: string }> {
   const clientId = q.get("client_id") ?? "";
-  const client = readClient(clientId);
+  const client = await readClient(clientId);
   if (!client) return { ok: false, error: "Unknown client. Remove the connector in Claude and add it again." };
   const redirectUri = q.get("redirect_uri") ?? client.ru[0];
-  if (!client.ru.includes(redirectUri)) return { ok: false, error: "This redirect_uri isn't registered for the client." };
+  if (!client.ru.some((r) => sameRedirect(r, redirectUri))) return { ok: false, error: "This redirect_uri isn't registered for the client." };
   if ((q.get("response_type") ?? "code") !== "code") return { ok: false, error: "Only response_type=code is supported." };
   const challenge = q.get("code_challenge") ?? "";
   if (!challenge || (q.get("code_challenge_method") ?? "S256") !== "S256") return { ok: false, error: "PKCE (S256) is required." };
   return { ok: true, req: { clientId, clientName: client.n, redirectUri, state: q.get("state") ?? "", challenge } };
 }
 
+/** A short fingerprint of a client_id, so a code only works for the client it was issued to. */
+const clientTag = (clientId: string) => pkceChallenge(clientId).slice(0, 24);
+
 export function issueCode(who: Identity, r: AuthorizeRequest): string {
-  return signToken("oauth-code", { who, cid: r.clientId.slice(-24), ru: r.redirectUri, cc: r.challenge }, CODE_SECONDS);
+  return signToken("oauth-code", { who, cid: clientTag(r.clientId), ru: r.redirectUri, cc: r.challenge }, CODE_SECONDS);
 }
 
 /* ---------------- tokens ---------------- */
@@ -116,7 +172,7 @@ export async function exchange(form: URLSearchParams): Promise<TokenResult> {
     const code = readToken<{ who: Identity; cid: string; ru: string; cc: string }>("oauth-code", form.get("code"));
     if (!code) return { ok: false, error: "invalid_grant", description: "The code is wrong or expired." };
     const clientId = form.get("client_id") ?? "";
-    if (clientId && clientId.slice(-24) !== code.cid) return { ok: false, error: "invalid_grant", description: "The code belongs to another client." };
+    if (clientId && clientTag(clientId) !== code.cid) return { ok: false, error: "invalid_grant", description: "The code belongs to another client." };
     if ((form.get("redirect_uri") ?? code.ru) !== code.ru) return { ok: false, error: "invalid_grant", description: "redirect_uri doesn't match." };
     const verifier = form.get("code_verifier") ?? "";
     if (!verifier || pkceChallenge(verifier) !== code.cc) return { ok: false, error: "invalid_grant", description: "PKCE check failed." };
