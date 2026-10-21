@@ -17,7 +17,7 @@ export const env = {
   rootDomain: (process.env.ROOT_DOMAIN ?? "").toLowerCase(),
   /** Extra hosts that show the platform console instead of a teacher site (comma separated). */
   platformHosts: list(process.env.PLATFORM_HOSTS),
-  /** Super admin basic-auth credentials (can edit every teacher and manage the platform). */
+  /** Super admin login (can edit every teacher and manage the platform). */
   adminUser: process.env.ADMIN_USER ?? "",
   adminPassword: process.env.ADMIN_PASSWORD ?? "",
   /** Secret for the MCP server (/api/mcp) and its upload links. 32+ random characters; empty turns the MCP server off. */

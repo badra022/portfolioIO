@@ -3,16 +3,24 @@ import { headers } from "next/headers";
 import { hasDb } from "@/lib/env";
 import * as repo from "@/lib/server/repo";
 import { count } from "@/lib/server/funnel";
+import { sessionAccount } from "@/lib/server/auth";
 import { SLUG_MESSAGES, checkFields, createTrial, deviceCookie, deviceTrial, readFields, siteBase, slugStatus, tooMany, visitorKey } from "@/lib/server/signup";
 
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store", ...extra } });
 const MAX_BODY = 25 * 1024 * 1024;
 
-/** Builds a free trial site from the «جرّب موقعك» form (platform host only). One per browser, number and a few per network. */
+/**
+ * Builds a free trial site from the «جرّب موقعك» form (platform host only). One per browser, number and a few per network.
+ * Sites are built through partners now (their own page, [quiz]/build): the public form is
+ * only for the super admin; myostaz.com's home page (components/landing) offers contact instead.
+ */
 export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/signup">) {
   await connection();
   if (decodeURIComponent((await ctx.params).site) !== "_platform") return json({ ok: false }, 404);
+  if ((await sessionAccount(req.headers.get("cookie")).catch(() => null))?.kind !== "super") {
+    return json({ ok: false, errors: [{ field: "form", message: "إنشاء المواقع متاح عن طريق شركاء myostaz بس." }] }, 403);
+  }
   if (!hasDb()) return json({ ok: false, errors: [{ field: "form", message: "الخدمة مش متاحة دلوقتي." }] }, 503);
   if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY) return json({ ok: false, errors: [{ field: "photo", message: "الصور كبيرة قوي." }] }, 413);
   let form: FormData;

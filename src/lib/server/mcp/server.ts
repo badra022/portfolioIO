@@ -26,6 +26,7 @@ import { SiteFileError, deleteSiteFile, filesTag, listSiteFiles, putSiteFile } f
 import { applyOps, contentOutline, deepMerge, schemaFor, type Op } from "./content-ops";
 import { fetchImage } from "./fetch-image";
 import { ENVS, type SiteEnv } from "@/lib/environments";
+import type { McpScope } from "../oauth";
 
 const AUTHOR = "Claude (MCP)";
 
@@ -117,8 +118,21 @@ function usedImages(content: Content): Set<string> {
 
 /* ------------------------------------------------------------------ */
 
-export function buildMcpServer(origin: string): McpServer {
-  const server = new McpServer({ name: "portfolioio", version: "1.0.0" }, { instructions: INSTRUCTIONS });
+/** Tools only the super admin gets: making teachers, switching sites on/off, domains. */
+const SUPER_ONLY = new Set(["create_teacher", "set_teacher_status", "manage_domain"]);
+
+/**
+ * scope: everything (the super admin's MCP_TOKEN or OAuth login), or one partner's (or one
+ * teacher's) sites, from their OAuth login (lib/server/oauth.ts).
+ */
+export function buildMcpServer(origin: string, scope: McpScope = { kind: "super" }): McpServer {
+  const limited = scope.kind !== "super";
+  const server = new McpServer({ name: "myostaz", version: "1.1.0" }, {
+    instructions: limited
+      ? `${INSTRUCTIONS}\n\nYou are signed in as ${scope.name}, and can reach only these teachers: ${[...scope.slugs].join(", ") || "(none yet)"}. New trial sites are made from the partner's page on myostaz.com, not here; creating teachers, turning sites on/off and domains are done by the platform admin.`
+      : INSTRUCTIONS,
+  });
+  if (limited) limitTo(server, scope.slugs);
   /** The teacher's address (lib/server/address.ts) as a full URL. */
   const siteUrl = (slug: string, domains: { domain: string; isPrimary: boolean }[]) => absolute(siteAddress(slug, domains), origin);
   // Local development serves files from /local-assets; make every link absolute.
@@ -131,7 +145,7 @@ export function buildMcpServer(origin: string): McpServer {
     description: "Every teacher on the platform with status, domains, logins count and links.",
     annotations: { readOnlyHint: true },
   }, safe(async () => {
-    const all = await repo.listTenants();
+    const all = (await repo.listTenants()).filter((t) => scope.kind === "super" || scope.slugs.has(t.slug));
     return ok(all.map((t) => ({ ...t, site_url: siteUrl(t.slug, t.domains), preview_url: `${siteUrl(t.slug, t.domains)}/preview`, admin_url: `${siteUrl(t.slug, t.domains)}/admin` })));
   }));
 
@@ -427,7 +441,7 @@ export function buildMcpServer(origin: string): McpServer {
     if (!user) return fail(`No login "${name}" for ${slug}.`);
     if (action === "reset_password") {
       const password = generatePassword();
-      await repo.updateUser(slug, user.id, { passwordHash: await hashPassword(password) });
+      await repo.updateUser(slug, user.id, { passwordHash: await hashPassword(password), mustChangePassword: true });
       return ok({ username: name, password, login_url: await absoluteLogin(slug), note: "Shown once." });
     }
     if (action === "delete") await repo.deleteUser(slug, user.id);
@@ -650,4 +664,30 @@ export function buildMcpServer(origin: string): McpServer {
   }));
 
   return server;
+}
+
+/**
+ * A partner's (or teacher's) MCP session: tools that only the super admin may use aren't
+ * offered, and every tool refuses a teacher that isn't one of theirs (slug, copy_from,
+ * get_example's from).
+ */
+function limitTo(server: McpServer, slugs: Set<string>) {
+  const register = server.registerTool.bind(server) as (name: string, config: unknown, handler: (args: Record<string, unknown> | undefined, extra: unknown) => Promise<CallToolResult>) => unknown;
+  (server as unknown as { registerTool: unknown }).registerTool = (name: string, config: unknown, handler: (args: Record<string, unknown> | undefined, extra: unknown) => Promise<CallToolResult>) => {
+    if (SUPER_ONLY.has(name)) return undefined;
+    return register(name, config, async (args, extra) => {
+      for (const k of ["slug", "copy_from"]) {
+        const v = args?.[k];
+        if (typeof v === "string" && !slugs.has(v)) return fail(`"${v}" isn't one of your sites. See list_teachers.`);
+      }
+      // Examples come from their own sites only (the bundled example is a real teacher's page).
+      if (name === "get_example") {
+        const from = typeof args?.from === "string" ? args.from : [...slugs][0];
+        if (!from) return fail("You have no sites yet: make one from your page on myostaz.com first.");
+        if (!slugs.has(from)) return fail(`"${from}" isn't one of your sites.`);
+        return handler({ ...args, from }, extra);
+      }
+      return handler(args, extra);
+    });
+  };
 }

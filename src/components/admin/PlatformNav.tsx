@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/admin", icon: "home", label: "الرئيسية", match: (p: string) => p === "/admin" },
   { href: "/admin/tenants", icon: "users", label: "المدرسين", match: (p: string) => p.startsWith("/admin/tenants") },
   { href: "/admin/trials", icon: "form", label: "طلبات التجربة", match: (p: string) => p.startsWith("/admin/trials"), badge: true },
+  { href: "/admin/leads", icon: "chat", label: "طلبات التواصل", match: (p: string) => p.startsWith("/admin/leads") },
   { href: "/admin/partners", icon: "link", label: "الشركاء", match: (p: string) => p.startsWith("/admin/partners") },
   { href: "/admin/stats", icon: "trophy", label: "الإحصائيات", match: (p: string) => p.startsWith("/admin/stats") },
 ] as const;
@@ -37,8 +38,12 @@ export function PlatformNav({ who, newTrials }: { who: string; newTrials: number
         <nav className="an-nav" aria-label="القائمة">{LINKS.map((l) => item(l, false))}</nav>
         <a className="btn-sm primary sa-new" href="/admin/tenants/new">+ مدرس جديد</a>
         <a className="sa-site" href="/" target="_blank" rel="noopener">صفحة المنصة ↗</a>
+        <a className="an-logout" href="/logout">تسجيل الخروج</a>
       </aside>
-      <nav className="an-tabs sa-tabs" aria-label="القائمة السريعة">{LINKS.map((l) => item(l, true))}</nav>
+      <nav className="an-tabs sa-tabs" aria-label="القائمة السريعة">
+        {LINKS.map((l) => item(l, true))}
+        <a href="/logout"><span className="an-tab-ico"><Icon name="close" /></span><span>خروج</span></a>
+      </nav>
     </>
   );
 }

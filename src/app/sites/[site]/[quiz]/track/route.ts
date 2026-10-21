@@ -8,7 +8,7 @@ const done = () => new Response(null, { status: 204, headers: { "Cache-Control":
 export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/[quiz]/track">) {
   await connection();
   const { site, quiz } = await ctx.params;
-  const partner = await partnerForRequest(decodeURIComponent(site), decodeURIComponent(quiz), req.headers.get("authorization"));
+  const partner = await partnerForRequest(decodeURIComponent(site), decodeURIComponent(quiz), req.headers.get("cookie"));
   if (!partner) return done();
   const text = await req.text();
   if (!text || text.length > 1024) return done();

@@ -134,6 +134,20 @@
       "when": 1792419334950,
       "tag": "0018_partners",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792537609466,
+      "tag": "0019_password_change",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792606902299,
+      "tag": "0020_contact_requests",
+      "breakpoints": true
     }
   ]
 }

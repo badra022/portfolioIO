@@ -14,6 +14,8 @@ export const partners = pgTable("partners", {
   name: text("name").notNull(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  /** The password is still the one the super admin set: the partner picks their own at the next login. */
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   disabled: boolean("disabled").notNull().default(false),
   /** How long the partner's trial sites work. */
   trialHours: integer("trial_hours").notNull().default(72),
@@ -90,6 +92,23 @@ export const trialRequests = pgTable("trial_requests", {
   extra: jsonb("extra"),
 }, (t) => [index("trial_requests_created_idx").on(t.createdAt), index("trial_requests_partner_idx").on(t.partnerId)]);
 
+/** Messages from the platform's home page («كلمنا» form): teachers, centers and agencies asking about the service. */
+export const contactRequests = pgTable("contact_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  name: text("name").notNull(),
+  /** WhatsApp number, international digits (lib/phone.ts). */
+  phone: text("phone").notNull(),
+  /** teacher | center | agency | other */
+  role: text("role").notNull().default("teacher"),
+  subject: text("subject"),
+  message: text("message"),
+  /** new | contacted | done */
+  status: text("status").notNull().default("new"),
+  /** A salted hash of the sender's network (lib/server/signup.ts visitorKey), for the rate limit. */
+  visitor: text("visitor"),
+}, (t) => [index("contact_requests_created_idx").on(t.createdAt)]);
+
 /**
  * Daily counters for the platform's sign-up pages (lib/server/funnel.ts): views,
  * how far visitors got in the sign-up form, builds. Cairo days.
@@ -120,11 +139,13 @@ export const tenantDomains = pgTable("tenant_domains", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("tenant_domains_tenant_idx").on(t.tenantId)]);
 
-/** Teacher logins (basic auth). The super admin lives in env vars, not here. */
+/** Teacher logins (the login page). The super admin lives in env vars, not here. */
 export const adminUsers = pgTable("admin_users", {
   id: uuid("id").primaryKey().defaultRandom(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  /** The password is still the one the super admin set: the teacher picks their own at the next login. */
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   disabled: boolean("disabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

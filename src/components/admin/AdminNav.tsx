@@ -120,6 +120,8 @@ export function AdminNav(props: Props) {
           <b>محتاج مساعدة؟</b>
           <span>أي حاجة مش واضحة أو عايز تعدّلها، كلّم الإدارة وهنساعدك.</span>
         </div>
+        {!isSuper && <a className="an-account" href={`${base}/password?next=${encodeURIComponent(`${base}/admin`)}`}>تغيير كلمة السر</a>}
+        <a className="an-logout" href={`${base}/logout`}>تسجيل الخروج</a>
       </aside>
 
       <nav className="an-tabs" aria-label="القائمة السريعة">
@@ -139,6 +141,8 @@ export function AdminNav(props: Props) {
             <button type="button" className="an-x" aria-label="إغلاق القائمة" onClick={() => setDrawer(false)}><Icon name="close" /></button>
           </div>
           <Links base={base} rest={rest} isSuper={isSuper} counts={counts} onPick={() => setDrawer(false)} />
+          {!isSuper && <a className="an-account" href={`${base}/password?next=${encodeURIComponent(`${base}/admin`)}`}>تغيير كلمة السر</a>}
+          <a className="an-logout" href={`${base}/logout`}>تسجيل الخروج</a>
         </div>
       )}
     </>
