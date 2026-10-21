@@ -9,7 +9,7 @@ import { PartnerHome } from "./PartnerHome";
 import "./signup/signup.css";
 
 /**
- * What the platform's own domain shows at "/": the page paid ads point to. It
+ * What the platform's own domain shows at "/" to the super admin (visitors get the partners' login, proxy.ts; partners their own page). It
  * sells the idea in one screen, then the «جرّب موقعك» form builds the visitor's
  * own trial site (components/signup/SignupFlow.tsx). Teachers' sites live on
  * their own addresses.
