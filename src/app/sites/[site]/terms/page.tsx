@@ -4,6 +4,7 @@ import { OstazLogo } from "@/components/brand/OstazLogo";
 import { DevCredit } from "@/components/DevCredit";
 import { BRAND, BRAND_ICONS } from "@/lib/platform";
 import "@/components/signup/signup.css";
+import { DEVELOPER } from "@/lib/platform";
 
 export const metadata: Metadata = { title: "شروط التجربة المجانية · myostaz", icons: BRAND_ICONS, robots: { index: false, follow: true } };
 
@@ -27,7 +28,7 @@ export default async function Terms({ params }: PageProps<"/sites/[site]/terms">
           <li><b>بياناتك.</b> بنستخدم رقمك واسمك علشان نبني موقعك ونكلمك بخصوصه بس، ومش بنبيعهم أو نديهم لحد.</li>
           <li><b>من حقنا نوقف أي تجربة</b> بتخالف الشروط دي أو بتتعمل باسم حد تاني.</li>
         </ol>
-        <p className="su-note">عجبك موقعك؟ كلمنا على واتساب ونفعّله ليك ونربطه بالعنوان بتاعك.</p>
+        <p className="su-note">عجبك موقعك؟ <a href={`https://wa.me/${DEVELOPER.whatsapp}`} target="_blank" rel="noopener">كلمنا على واتساب</a> ونفعّله ليك ونربطه بالعنوان بتاعك.</p>
       </article>
       <DevCredit siteName={BRAND.name} />
     </main>

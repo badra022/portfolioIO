@@ -21,8 +21,8 @@ export const DEVELOPER = {
   facebook: "https://www.facebook.com/badra069",
   /** Shown next to the logo when set. */
   email: "",
-  phoneDisplay: "+20 115 866 7913",
-  whatsapp: "201158667913",
+  phoneDisplay: "+20 122 802 7597",
+  whatsapp: "201228027597",
   /** Pre-written WhatsApp message; {site} is the teacher's name. */
   message: "مرحباً، شفت موقع {site} وعايز أعمل موقع زيه.",
 };
