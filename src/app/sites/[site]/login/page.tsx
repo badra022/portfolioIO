@@ -10,6 +10,7 @@ import { addressFor } from "@/lib/server/address";
 import { safeNext } from "@/lib/server/session";
 import { OstazLogo } from "@/components/brand/OstazLogo";
 import "@/components/signup/signup.css";
+import { DEVELOPER } from "@/lib/platform";
 
 export const metadata: Metadata = { title: "تسجيل الدخول", robots: { index: false, follow: false } };
 
@@ -73,7 +74,7 @@ async function LoginBody({ params, searchParams }: PageProps<"/sites/[site]/logi
         <input type="hidden" name="next" value={next} />
         {admin && platform && <input type="hidden" name="as" value="admin" />}
         <button type="submit" className="su-btn primary">{admin ? "دخول" : "دخول كشريك"}</button>
-        {platform && !admin && <p className="su-muted su-login-foot">حسابات الشركاء بتتعمل من إدارة myostaz بس. عايز تبقى شريك؟ كلمنا على واتساب.</p>}
+        {platform && !admin && <p className="su-muted su-login-foot">حسابات الشركاء بتتعمل من إدارة myostaz بس. عايز تبقى شريك؟ <a href={`https://wa.me/${DEVELOPER.whatsapp}`} target="_blank" rel="noopener">كلمنا على واتساب</a>.</p>}
         {platform && <p className="su-muted su-login-foot"><a href="/">الرجوع للصفحة الرئيسية</a></p>}
         {platform && !admin && next.startsWith("/oauth/") && <p className="su-muted su-login-foot">بتربط Claude كمدرس أو كمدير؟ <a href={`/login?as=admin&next=${encodeURIComponent(next)}`}>ادخل من هنا</a></p>}
       </form>
