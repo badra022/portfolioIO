@@ -120,6 +120,8 @@ function usedImages(content: Content): Set<string> {
 
 /** Tools only the super admin gets: making teachers, switching sites on/off, domains. */
 const SUPER_ONLY = new Set(["create_teacher", "set_teacher_status", "manage_domain"]);
+/** Also not offered to a teacher's own login: what their admin panel doesn't let them do either (theme, logins, site files). */
+const NOT_FOR_TEACHERS = new Set([...SUPER_ONLY, "update_theme", "manage_login", "manage_site_files"]);
 
 /**
  * scope: everything (the super admin's MCP_TOKEN or OAuth login), or one partner's (or one
@@ -128,11 +130,12 @@ const SUPER_ONLY = new Set(["create_teacher", "set_teacher_status", "manage_doma
 export function buildMcpServer(origin: string, scope: McpScope = { kind: "super" }): McpServer {
   const limited = scope.kind !== "super";
   const server = new McpServer({ name: "myostaz", version: "1.1.0" }, {
-    instructions: limited
-      ? `${INSTRUCTIONS}\n\nYou are signed in as ${scope.name}, and can reach only these teachers: ${[...scope.slugs].join(", ") || "(none yet)"}. New trial sites are made from the partner's page on myostaz.com, not here; creating teachers, turning sites on/off and domains are done by the platform admin.`
-      : INSTRUCTIONS,
+    instructions: !limited ? INSTRUCTIONS
+      : scope.kind === "teacher"
+        ? `${INSTRUCTIONS}\n\nYou are signed in as the teacher's own admin login "${scope.name}", and can reach only their site: ${[...scope.slugs].join(", ")}. Help them run it: content, schedule, offers, quizzes and grading, exam results, requests and analytics. The site's colors and fonts, logins, domains, site files and turning the site on or off are done by the platform admin (myostaz).`
+        : `${INSTRUCTIONS}\n\nYou are signed in as ${scope.name}, and can reach only these teachers: ${[...scope.slugs].join(", ") || "(none yet)"}. New trial sites are made from the partner's page on myostaz.com, not here; creating teachers, turning sites on/off and domains are done by the platform admin.`,
   });
-  if (limited) limitTo(server, scope.slugs);
+  if (limited) limitTo(server, scope.slugs, scope.kind === "teacher" ? NOT_FOR_TEACHERS : SUPER_ONLY);
   /** The teacher's address (lib/server/address.ts) as a full URL. */
   const siteUrl = (slug: string, domains: { domain: string; isPrimary: boolean }[]) => absolute(siteAddress(slug, domains), origin);
   // Local development serves files from /local-assets; make every link absolute.
@@ -667,14 +670,13 @@ export function buildMcpServer(origin: string, scope: McpScope = { kind: "super"
 }
 
 /**
- * A partner's (or teacher's) MCP session: tools that only the super admin may use aren't
- * offered, and every tool refuses a teacher that isn't one of theirs (slug, copy_from,
- * get_example's from).
+ * A partner's (or teacher's) MCP session: the tools in `hidden` aren't offered, and every
+ * tool refuses a teacher that isn't one of theirs (slug, copy_from, get_example's from).
  */
-function limitTo(server: McpServer, slugs: Set<string>) {
+function limitTo(server: McpServer, slugs: Set<string>, hidden: Set<string>) {
   const register = server.registerTool.bind(server) as (name: string, config: unknown, handler: (args: Record<string, unknown> | undefined, extra: unknown) => Promise<CallToolResult>) => unknown;
   (server as unknown as { registerTool: unknown }).registerTool = (name: string, config: unknown, handler: (args: Record<string, unknown> | undefined, extra: unknown) => Promise<CallToolResult>) => {
-    if (SUPER_ONLY.has(name)) return undefined;
+    if (hidden.has(name)) return undefined;
     return register(name, config, async (args, extra) => {
       for (const k of ["slug", "copy_from"]) {
         const v = args?.[k];

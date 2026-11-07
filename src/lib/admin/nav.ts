@@ -106,6 +106,7 @@ export const NAV: NavGroup[] = [
           edit("pages", "إعداد الصفحات"),
           edit("seo", "جوجل والمشاركة"),
           { label: "سجل التعديلات", path: "/history" },
+          { label: "ربط Claude (AI)", path: "/claude" },
         ],
       },
     ],

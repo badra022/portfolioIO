@@ -8,8 +8,9 @@ import { freshToken, safeNext, sessionCookie, sessionToken } from "@/lib/server/
 /**
  * The login page's form (app/sites/[site]/login): checks the username and password, sets
  * the session cookie and goes on to `next`, or to the account's own place: the partner's
- * page, the console, the teacher's admin. Two doors: as=admin (super admin and teachers;
- * the only door on a teacher's site) and, on the platform, the partners' login.
+ * page, the console, the teacher's admin. Doors: as=admin (super admin and teachers;
+ * the only door on a teacher's site) and, on the platform, the partners' login and
+ * as=connect (any account, for linking an AI app: only on the way to /oauth/).
  * A password the super admin set goes through the password page first (app/sites/[site]/password).
  */
 export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/auth/login">) {
@@ -20,7 +21,8 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/au
   const user = String(form?.get("username") ?? "").slice(0, 64);
   const pass = String(form?.get("password") ?? "").slice(0, 200);
   const next = String(form?.get("next") ?? "");
-  const door = site !== "_platform" || form?.get("as") === "admin" ? "admin" : "partner";
+  const as = form?.get("as");
+  const door = site !== "_platform" || as === "admin" ? "admin" : as === "connect" && next.startsWith("/oauth/") ? "connect" : "partner";
   const url = new URL(req.url);
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? url.host;
   const proto = req.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "");
@@ -30,7 +32,7 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/au
 
   const r = user && pass ? await signIn(user, pass, door) : null;
   if (!r) {
-    const q = new URLSearchParams({ e: "1", ...(door === "admin" && site === "_platform" ? { as: "admin" } : {}), ...(next ? { next } : {}) });
+    const q = new URLSearchParams({ e: "1", ...(site === "_platform" && door !== "partner" ? { as: door } : {}), ...(next ? { next } : {}) });
     return go(`${base}/login?${q}`);
   }
 
