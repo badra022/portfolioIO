@@ -15,7 +15,8 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/au
   await connection();
   const base = baseForSite(splitSite(decodeURIComponent((await ctx.params).site)).key);
   const form = await req.formData().catch(() => null);
-  const get = (k: string) => String(form?.get(k) ?? "").slice(0, 200);
+  // `next` can be a whole OAuth request (/oauth/authorize?client_id=...), so it gets more room.
+  const get = (k: string) => String(form?.get(k) ?? "").slice(0, k === "next" ? 4000 : 200);
   const url = new URL(req.url);
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? url.host;
   const proto = req.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "");
