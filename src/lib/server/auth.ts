@@ -94,15 +94,18 @@ async function checkTeacher(creds: { user: string; pass: string }): Promise<{ id
 }
 
 /**
- * The login page: who these credentials are, or null. Two doors: the partners' login
- * on myostaz.com, and the admin login (super admin and teachers) in front of every /admin.
+ * The login page: who these credentials are, or null. Three doors: the partners' login
+ * on myostaz.com, the admin login (super admin and teachers) in front of every /admin, and
+ * «connect» for linking an AI app to myostaz (OAuth, lib/server/oauth.ts), which takes any
+ * of them: a partner first, then the admin login.
  * mustChange: the password is still the one the super admin set (app/sites/[site]/password).
  */
-export async function signIn(user: string, pass: string, door: "partner" | "admin"): Promise<{ who: Identity; teacherSlug?: string; mustChange: boolean } | null> {
+export async function signIn(user: string, pass: string, door: "partner" | "admin" | "connect"): Promise<{ who: Identity; teacherSlug?: string; mustChange: boolean } | null> {
   const creds = { user, pass };
-  if (door === "partner") {
+  if (door !== "admin") {
     const partner = await checkPartner(creds);
-    return partner ? { who: { k: "p", id: partner.id }, mustChange: partner.mustChange } : null;
+    if (partner) return { who: { k: "p", id: partner.id }, mustChange: partner.mustChange };
+    if (door === "partner") return null;
   }
   if (isSuperCreds(creds)) return { who: { k: "s" }, mustChange: false };
   const login = await checkTeacher(creds);

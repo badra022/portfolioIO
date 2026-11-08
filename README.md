@@ -242,6 +242,18 @@ The app is also an MCP server, so Claude (claude.ai, the Claude apps, or Claude 
 | Photos | `create_upload_link`, `upload_image` (link or base64), `list_images`, `view_image` |
 | Platform | `manage_domain` (then add the domain in Vercel too), `manage_login` (create/reset shows the password once) |
 
+### Partners and teachers connect with their own login (OAuth)
+
+Partners and teachers don't need the token: they add a custom connector with the plain address `https://myostaz.com/api/mcp` (no token, OAuth left empty), press Connect, and sign in on the myostaz.com page that opens with their own username and password, then «اسمح». That login page («ربط تطبيق الذكاء الاصطناعي») takes either a partner's login or a teacher's admin login (the same one they use on their site's `/admin`); the super admin's works too. A first login with a password the super admin set goes through «choose your own password» first, then back to the connection.
+
+| Signed in as | Reaches | Tools not offered |
+|---|---|---|
+| Partner | Its own teachers' sites | `create_teacher`, `set_teacher_status`, `manage_domain` |
+| Teacher (admin login) | Their own site only | Same, plus what their admin panel doesn't allow: `update_theme`, `manage_login`, `manage_site_files` |
+| Super admin | Every site | None |
+
+Teachers find the steps and the address in their admin under **الإعدادات → متقدم → ربط Claude (AI)**; partners on their own page. Access tokens last an hour and refresh for 30 days; a login that is disabled or deleted stops working at the next refresh. Plans still apply to every save.
+
 **Security:** the token is the key to every teacher, as powerful as `ADMIN_PASSWORD`. In the claude.ai form it is part of the URL, so treat the connector URL like a password and rotate `MCP_TOKEN` if it leaks (the old URL stops working). Without `MCP_TOKEN` the endpoint doesn't exist; it answers only on the platform host, and wrong tokens get a plain 404. Saves are recorded as "Claude (MCP)" in the history. Upload links are signed per teacher and expire (24 h by default). Image downloads from links only reach public internet addresses (no internal/cloud-metadata addresses), up to 4 MB.
 
 ## Environments and releases (dev → production)

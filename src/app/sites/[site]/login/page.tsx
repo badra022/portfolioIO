@@ -10,14 +10,17 @@ import { addressFor } from "@/lib/server/address";
 import { safeNext } from "@/lib/server/session";
 import { OstazLogo } from "@/components/brand/OstazLogo";
 import "@/components/signup/signup.css";
+import { DEVELOPER } from "@/lib/platform";
 
 export const metadata: Metadata = { title: "تسجيل الدخول", robots: { index: false, follow: false } };
 
 /**
- * The login page, instead of the browser's basic-auth prompt. Two doors:
+ * The login page, instead of the browser's basic-auth prompt. Three doors:
  * - on myostaz.com, the partners' login (the «دخول الشركاء» button on the home page);
  * - ?as=admin, and every teacher's site: the admin login (super admin and teachers), where
- *   every /admin sends a visitor who isn't signed in.
+ *   every /admin sends a visitor who isn't signed in;
+ * - on myostaz.com on the way to /oauth/ (linking an AI app such as Claude, ?as=connect):
+ *   any account, a partner or a site's admin login.
  * On myostaz.com one login also opens every <slug>.myostaz.com (lib/server/session.ts).
  * Already signed in: straight on to where the login would have taken them.
  */
@@ -34,11 +37,13 @@ async function LoginBody({ params, searchParams }: PageProps<"/sites/[site]/logi
   const next = safeNext(one(q.next), "");
   const failed = one(q.e) === "1";
   const platform = site === "_platform";
+  const connect = platform && one(q.as) !== "admin" && next.startsWith("/oauth/");
   const admin = !platform || one(q.as) === "admin";
   const cookie = (await headers()).get("cookie");
 
   const acct = await sessionAccount(cookie).catch(() => null);
   if (acct) {
+    if (connect) redirect(next);
     if (!admin && acct.kind === "partner") redirect(next.startsWith("/oauth/") ? next : "/");
     if (!admin && acct.kind === "super") redirect(next || "/");
     if (admin && (await authenticate(site, cookie).catch(() => null))) redirect(next || `${base}/admin`);
@@ -51,7 +56,12 @@ async function LoginBody({ params, searchParams }: PageProps<"/sites/[site]/logi
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" precedence="default" />
       <form className="su-card su-login" method="post" action={`${base}/api/auth/login`}>
         <OstazLogo size={34} href={platform ? "/" : undefined} />
-        {admin ? (
+        {connect ? (
+          <>
+            <h1>ربط تطبيق الذكاء الاصطناعي</h1>
+            <p className="su-muted">ادخل بنفس اسم المستخدم وكلمة السر بتوع لوحة تحكم موقعك، أو بحساب الشريك.</p>
+          </>
+        ) : admin ? (
           <>
             <h1>دخول لوحة التحكم</h1>
             <p className="su-muted">{platform ? "لإدارة المنصة والمدرسين. الشركاء بيدخلوا من «دخول الشركاء»." : "لوحة تحكم الموقع: ادخل بحسابك اللي اتبعتلك."}</p>
@@ -71,11 +81,10 @@ async function LoginBody({ params, searchParams }: PageProps<"/sites/[site]/logi
           <input name="password" type="password" required dir="ltr" autoComplete="current-password" />
         </label>
         <input type="hidden" name="next" value={next} />
-        {admin && platform && <input type="hidden" name="as" value="admin" />}
-        <button type="submit" className="su-btn primary">{admin ? "دخول" : "دخول كشريك"}</button>
-        {platform && !admin && <p className="su-muted su-login-foot">حسابات الشركاء بتتعمل من إدارة myostaz بس. عايز تبقى شريك؟ كلمنا على واتساب.</p>}
+        {platform && (admin || connect) && <input type="hidden" name="as" value={connect ? "connect" : "admin"} />}
+        <button type="submit" className="su-btn primary">{admin || connect ? "دخول" : "دخول كشريك"}</button>
+        {platform && !admin && !connect && <p className="su-muted su-login-foot">حسابات الشركاء بتتعمل من إدارة myostaz بس. عايز تبقى شريك؟ <a href={`https://wa.me/${DEVELOPER.whatsapp}`} target="_blank" rel="noopener">كلمنا على واتساب</a>.</p>}
         {platform && <p className="su-muted su-login-foot"><a href="/">الرجوع للصفحة الرئيسية</a></p>}
-        {platform && !admin && next.startsWith("/oauth/") && <p className="su-muted su-login-foot">بتربط Claude كمدرس أو كمدير؟ <a href={`/login?as=admin&next=${encodeURIComponent(next)}`}>ادخل من هنا</a></p>}
       </form>
     </main>
   );

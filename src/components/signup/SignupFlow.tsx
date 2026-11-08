@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { cutout, preloadCutout, type Cutout } from "@/lib/cutout";
 import { COUNTRIES, DEFAULT_COUNTRY, countryOf, normalizePhone } from "@/lib/phone";
 import type { PartnerForm } from "@/lib/partners";
+import { DEVELOPER } from "@/lib/platform";
 
 /**
  * The public «جرّب موقعك» form on the platform's home page (the page paid ads
@@ -590,7 +591,7 @@ function AlreadyBuilt({ built }: { built: Built }) {
         <a className="su-btn primary" href={built.base} target="_blank" rel="noopener">افتح موقعك</a>
         <a className="su-btn ghost" href={`${built.base.replace(/\/$/, "")}/admin`} target="_blank" rel="noopener">لوحة التحكم</a>
       </div>
-      <p className="su-note">كل جهاز ورقم ليهم موقع تجريبي واحد. عجبك؟ كلمنا على واتساب ونفعّله ليك على طول.</p>
+      <p className="su-note">كل جهاز ورقم ليهم موقع تجريبي واحد. عجبك؟ <a href={`https://wa.me/${DEVELOPER.whatsapp}`} target="_blank" rel="noopener">كلمنا على واتساب</a> ونفعّله ليك على طول.</p>
     </div>
   );
 }
