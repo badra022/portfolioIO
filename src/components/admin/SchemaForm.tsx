@@ -12,6 +12,8 @@ export type FormCtx = {
   /** Base URL of this teacher's files, used to preview image keys. */
   assetBase: string;
   upload: (file: File) => Promise<UploadResult>;
+  /** Uploads a game's HTML file (content.games[].file). */
+  uploadGame?: (file: File) => Promise<{ ok: true; key: string; name: string; bytes: number } | { ok: false; error: string }>;
   /** The teacher's forms, offered wherever a button can open a form instead of WhatsApp. */
   forms?: { id: string; title: string }[];
 };
@@ -475,6 +477,7 @@ function StringInput({ id, s, value, onChange, name, path, required, ctx }: { id
   if (s.widget === "image") return <ImageInput value={value} onChange={onChange} required={required} ctx={ctx} cutoutable={path === "profile.photo"} />;
   if (s.pattern === TIME_PATTERN) return <input id={id} type="time" dir="ltr" value={v} onChange={(e) => set(e.target.value)} />;
   if (s.widget === "date") return <DateTimeInput id={id} value={v} onChange={set} />;
+  if (s.widget === "game") return <GameInput value={value} onChange={onChange} required={required} ctx={ctx} />;
   if (s.widget === "form") {
     const forms = ctx.forms ?? [];
     return (
@@ -515,6 +518,36 @@ function DateTimeInput({ id, value, onChange }: { id: string; value: string; onC
 }
 
 /** cutoutable: the teacher's main photo, which can have its background removed (lib/cutout.ts). */
+/** A game's HTML file: upload (stored as a new file) or remove; the key itself isn't edited by hand. */
+function GameInput({ value, onChange, required, ctx }: { value: string | undefined; onChange: (v: unknown) => void; required: boolean; ctx: FormCtx }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  return (
+    <span className="f-image f-game">
+      <span className="f-image-empty">{value ? (info || "ملف اللعبة محفوظ ✓") : "لسه مفيش ملف"}</span>
+      <span className="f-image-actions">
+        <span className="btn-sm f-upload">
+          {busy ? "جاري الرفع…" : value ? "رفع نسخة جديدة" : "رفع ملف اللعبة (.html)"}
+          <input type="file" accept=".html,.htm,text/html" disabled={busy || !ctx.uploadGame}
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f || !ctx.uploadGame) return;
+              if (f.size > 3 * 1024 * 1024) { setError("الملف أكبر من 3 ميجا."); return; }
+              setBusy(true);
+              const r = await ctx.uploadGame(f).catch(() => ({ ok: false as const, error: "تعذّر رفع ملف اللعبة." }));
+              setBusy(false);
+              if (r.ok) { setError(""); setInfo(`${r.name} · ${Math.max(1, Math.round(r.bytes / 1024))} كيلوبايت ✓`); onChange(r.key); } else setError(r.error);
+            }} />
+        </span>
+        {value && !required && <button type="button" className="f-link danger" onClick={() => { setInfo(""); onChange(undefined); }}>إزالة</button>}
+      </span>
+      {error && <span className="f-err" role="alert">{error}</span>}
+    </span>
+  );
+}
+
 function ImageInput({ value, onChange, required, ctx, cutoutable }: { value: string | undefined; onChange: (v: unknown) => void; required: boolean; ctx: FormCtx; cutoutable?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [cutting, setCutting] = useState(false);

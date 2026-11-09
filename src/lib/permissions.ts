@@ -8,7 +8,7 @@ import type { Content } from "./schema";
  * - and its data pages in the admin show an error (analytics, requests).
  * It applies to everyone editing that teacher's site, the super admin included.
  */
-export const FEATURES = ["analytics", "students", "forms", "exams", "votes", "promo"] as const;
+export const FEATURES = ["analytics", "students", "forms", "exams", "votes", "promo", "library"] as const;
 export type Feature = (typeof FEATURES)[number];
 
 export type Permissions = Record<Feature, boolean> & {
@@ -17,9 +17,9 @@ export type Permissions = Record<Feature, boolean> & {
 };
 
 /** New teachers: nothing paid. */
-export const NO_PERMISSIONS: Permissions = { analytics: false, students: false, forms: false, exams: false, votes: false, promo: false, maxForms: null };
+export const NO_PERMISSIONS: Permissions = { analytics: false, students: false, forms: false, exams: false, votes: false, promo: false, library: false, maxForms: null };
 /** Teachers from before permissions existed, and sites without a database. */
-export const ALL_PERMISSIONS: Permissions = { analytics: true, students: true, forms: true, exams: true, votes: true, promo: true, maxForms: null };
+export const ALL_PERMISSIONS: Permissions = { analytics: true, students: true, forms: true, exams: true, votes: true, promo: true, library: true, maxForms: null };
 
 export const FEATURE_INFO: Record<Feature, { title: string; description: string }> = {
   analytics: { title: "الإحصائيات", description: "صفحة الإحصائيات وأرقام الزيارات والضغطات في لوحة المدرس." },
@@ -28,6 +28,7 @@ export const FEATURE_INFO: Record<Feature, { title: string; description: string 
   exams: { title: "الاختبارات والنتايج", description: "الاختبارات الأونلاين وتصحيحها، ونتايج الامتحانات اللي الطلاب بيدوروا فيها." },
   votes: { title: "التصويتات", description: "صفحات التصويت من غير اسم ولا رقم." },
   promo: { title: "أدوات الإعلان", description: "الإعلان المنبثق، الشريط الأحمر، القسم المميز (العروض)، صفحات العروض والطلبات، وروابط الشركاء (التسويق بالعمولة)." },
+  library: { title: "مكتبة المحتوى", description: "المقالات والألعاب التعليمية بصفحاتها، وصفحات «المقالات» و«كل الاختبارات» و«الألعاب» بالبحث والتصنيفات وعدد المشاهدات، وإحصائيات كل صفحة." },
 };
 
 /** Stored permissions (tenants.permissions) as a full object: anything missing is off. */
@@ -69,6 +70,7 @@ export function countedForms(c: Content): Content["forms"] {
 
 /** Per bundle: whether the content uses it, and a fingerprint of that part (to tell if a save changes it). */
 function usage(c: Content): Record<Exclude<Feature, "analytics" | "students">, { used: boolean; print: string }> {
+  const libraryUsed = c.articles.length > 0 || c.games.length > 0;
   const featuredOn = c.sections.includes("featured") && (c.featured?.items.length ?? 0) > 0;
   const promoUsed = Boolean(c.popup?.enabled) || (c.bar?.items.length ?? 0) > 0 || featuredOn || c.referrals.length > 0 || c.pages.length > 0;
   return {
@@ -76,6 +78,7 @@ function usage(c: Content): Record<Exclude<Feature, "analytics" | "students">, {
     exams: { used: c.quizzes.length > 0, print: JSON.stringify(c.quizzes) },
     votes: { used: c.polls.length > 0, print: JSON.stringify(c.polls) },
     promo: { used: promoUsed, print: JSON.stringify([c.popup ?? null, c.bar ?? null, c.featured ?? null, featuredOn, c.referrals, c.pages]) },
+    library: { used: libraryUsed, print: JSON.stringify([c.articles, c.games]) },
   };
 }
 
@@ -87,9 +90,9 @@ export function violations(next: Content, prev: Content | null, p: Permissions):
   const now = usage(next);
   const before = prev ? usage(prev) : null;
   const out: { path: string; message: string }[] = [];
-  for (const f of ["forms", "exams", "votes", "promo"] as const) {
+  for (const f of ["forms", "exams", "votes", "promo", "library"] as const) {
     if (!now[f].used || (before && before[f].print === now[f].print)) continue;
-    if (!p[f]) out.push({ path: f === "exams" ? "quizzes" : f === "votes" ? "polls" : f === "promo" ? "popup" : "forms", message: blockedMessage(f) });
+    if (!p[f]) out.push({ path: f === "exams" ? "quizzes" : f === "votes" ? "polls" : f === "promo" ? "popup" : f === "library" ? (next.articles.length ? "articles" : "games") : "forms", message: blockedMessage(f) });
     else if (f === "forms" && p.maxForms !== null && countedForms(next).length > p.maxForms) {
       out.push({ path: "forms", message: `باقة الموقع فيها ${p.maxForms} نماذج بس، والمحفوظ فيه ${countedForms(next).length}. احذف نموذج أو كلم الإدارة.` });
     }
@@ -105,6 +108,7 @@ export function applyPermissions(c: Content, p: Permissions): Content {
   let out = c;
   if (!p.exams) out = { ...out, quizzes: [] };
   if (!p.votes) out = { ...out, polls: [] };
+  if (!p.library) out = { ...out, articles: [], games: [] };
   if (!p.promo) out = { ...out, popup: undefined, bar: undefined, referrals: [], pages: [], sections: out.sections.filter((s) => s !== "featured") };
   const counted = countedForms(out);
   const keep = !p.forms ? [] : p.maxForms === null ? counted : counted.slice(0, p.maxForms);

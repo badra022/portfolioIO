@@ -31,7 +31,15 @@ export async function POST(req: Request, ctx: RouteContext<"/sites/[site]/api/v"
     const data = await getSiteData(site);
     const tenantId = data.kind === "tenant" ? await activeTenantId(data.slug) : null;
     if (tenantId && data.kind === "tenant") {
-      await record(tenantId, toCounters(body, refTargets(data.content), new Set(data.content.pages.map((p) => p.path))), data.env);
+      const c = data.content;
+      // Visits per page: offers/requests by path, and the library's articles (a:), games (g:, plays gp:) and quizzes (q:).
+      const pages = new Set([
+        ...c.pages.map((p) => p.path),
+        ...c.articles.map((a) => `a:${a.path}`),
+        ...c.games.flatMap((g) => [`g:${g.path}`, `gp:${g.path}`]),
+        ...c.quizzes.map((q) => `q:${q.path}`),
+      ]);
+      await record(tenantId, toCounters(body, refTargets(c), pages), data.env);
     }
   } catch (e) {
     console.error("analytics", e);

@@ -137,6 +137,7 @@ async function Body({ params }: { params: Props["params"] }) {
       </main>
       {/* The button under a self-graded result can open one of the site's forms. */}
       {quiz.selfGrading && quiz.resultCta?.form && <LeadForms forms={c.forms} slug={data.slug} base={data.base} />}
+      {data.env === "production" && <PageVisit base={data.base} path={`q:${quiz.path}`} />}
     </>
   );
 }

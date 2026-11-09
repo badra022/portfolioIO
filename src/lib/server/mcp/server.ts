@@ -25,6 +25,7 @@ import * as examResults from "../exam-results";
 import { SiteFileError, deleteSiteFile, filesTag, listSiteFiles, putSiteFile } from "../site-files";
 import { applyOps, contentOutline, deepMerge, schemaFor, type Op } from "./content-ops";
 import { fetchImage } from "./fetch-image";
+import { GameFileError, MAX_GAME_BYTES, listGameFiles, saveGameFile } from "../games";
 import { ENVS, type SiteEnv } from "@/lib/environments";
 import type { McpScope } from "../oauth";
 
@@ -45,6 +46,8 @@ Forms: any WhatsApp button can open a form instead (the student leaves name/phon
 Quizzes: content "quizzes" (get_schema part "quizzes"): each has a page at /<path>, an optional form asked before starting, a timer, start/end dates, state (auto/open/closed) and questions (text and/or image, choice or written, optional correct answers that students never see). Results: quiz_results.
 
 Red bar (content "bar"): announcement messages above the menu for anything to promote (exam, results, a new video...), each with text, icon, a section or url to go to, and start/end dates; the first current message shows. {date} = the featured upcoming exam's date.
+
+Content library (needs the plan's "library" bundle): articles (content "articles", page at /articles/<path>, list at /articles: cover image, blocks of paragraph/heading/image/video/file, optional cta, publishAt to schedule), learning games (content "games", page at /games/<path>, list at /games) and the exams page (/exams, every listed quiz in tabs open/soon/finished, center exams to book, published results to look up). Every article, game and quiz has group (the heading it's listed under), tags (searchable), listed (on the list page or not) and showViews; content "library.showViews" turns view counts off everywhere. Making a game: write ONE self-contained HTML file (inline script and styles, images as data: URIs or https links; libraries only from cdnjs.cloudflare.com, cdn.jsdelivr.net or unpkg.com; no network calls, no cookies or localStorage of the site: it runs in a sandboxed frame with an opaque origin), playable by touch on a phone in a 4:3 frame (it can go full screen), in the site's language, max 3 MB. upload_game stores it and returns a key; put it in games[].file, with games[].form to ask the student's details before playing (answers go to list_requests) and games[].cta for a button under it.
 
 Exam results: students look up their grade in past exams on the site (exams section → past exams' results) with their name and phone. Results live outside the content: exam_results to read, manage_exam_results to create one exam's results, add rows ({name, phone, score, note?}; a student already there with the same phone without country code and same first name gets the new score), edit title/date/full mark, publish (shown on the site) or delete. Never invent grades: only add what the user gives you (e.g. a pasted sheet).
 
@@ -455,6 +458,40 @@ export function buildMcpServer(origin: string, scope: McpScope = { kind: "super"
     const u = await loginUrlFor(slug);
     return u.startsWith("/") ? `${origin}${u}` : u;
   };
+
+  server.registerTool("upload_game", {
+    title: "Upload a game file",
+    description: "Stores a learning game's HTML (one self-contained file, max 3 MB) for a teacher and returns its key (\"game:<id>\"). Set it as content games[].file (update_content or edit_content) to show the game on its page. Files never change: upload again and point the game at the new key.",
+    inputSchema: {
+      slug: slugArg,
+      html: z.string().describe("The whole HTML document of the game."),
+      file_name: z.string().optional().describe("Readable name, e.g. \"atoms-quiz-game.html\"."),
+    },
+  }, safe(async ({ slug, html, file_name }) => {
+    if (Buffer.byteLength(html) > MAX_GAME_BYTES) return fail(`The game is over ${MAX_GAME_BYTES / 1024 / 1024} MB. Load libraries from a CDN and shrink inline images.`);
+    try {
+      const saved = await saveGameFile(slug, file_name ?? "game.html", html, AUTHOR);
+      return ok({ ...saved, next: "Set content games[].file to this key (and enable the library bundle on the teacher's plan if it isn't)." });
+    } catch (e) {
+      if (e instanceof GameFileError) return fail(e.message);
+      throw e;
+    }
+  }));
+
+  server.registerTool("list_game_files", {
+    title: "List game files",
+    description: "A teacher's uploaded game files (key, name, size, when, by whom), newest first, and which games use each.",
+    inputSchema: { slug: slugArg },
+    annotations: { readOnlyHint: true },
+  }, safe(async ({ slug }) => {
+    const t = await repo.getTenant(slug);
+    if (!t) return fail(`No teacher "${slug}".`);
+    const used = new Map<string, string[]>();
+    for (const [env, games] of [["production", t.content.games], ["preview", t.preview.content.games]] as const) {
+      for (const g of games) if (g.file) used.set(g.file, [...(used.get(g.file) ?? []), `${env}: ${g.path}`]);
+    }
+    return ok((await listGameFiles(slug)).map((f) => ({ ...f, usedBy: used.get(f.key) ?? [] })));
+  }));
 
   server.registerTool("manage_site_files", {
     title: "Site files (verification)",

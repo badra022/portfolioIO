@@ -39,7 +39,8 @@ export type ResultSetInfo = {
 export type ResultSet = ResultSetInfo & { rows: ResultRow[]; quizRows: ResultRow[] };
 
 /** What the site shows: a published exam students can look their result up in. */
-export type PastExam = { id: number; title: string; date: string };
+/** A published exam's results on the site; quizPath / examId: the online quiz or center exam it belongs to. */
+export type PastExam = { id: number; title: string; date: string; quizPath: string | null; examId: string | null };
 
 export class ResultsError extends Error {}
 
@@ -209,7 +210,7 @@ export async function publishedExams(tenantId: string, env: SiteEnv): Promise<Pa
   if (!hasDb()) return [];
   // Results with nobody in them yet (a quiz not graded yet) aren't listed.
   const hasRows = sql`(jsonb_array_length(${examResults.rows}) > 0 or exists (select 1 from ${quizAttempts} qa where qa.tenant_id = ${examResults.tenantId} and qa.quiz_path = ${examResults.quizPath} and qa.env = ${env} and qa.approved_at is not null))`;
-  return db().select({ id: examResults.id, title: examResults.title, date: examResults.date })
+  return db().select({ id: examResults.id, title: examResults.title, date: examResults.date, quizPath: examResults.quizPath, examId: examResults.examId })
     .from(examResults).where(and(eq(examResults.tenantId, tenantId), eq(publishedIn(env), true), hasRows))
     .orderBy(desc(examResults.date), desc(examResults.id)).limit(30);
 }
