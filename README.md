@@ -110,6 +110,31 @@ Super admin console → a teacher → **الباقة (الصلاحيات)**: fiv
 - The analytics and requests pages show a "not in your plan" message instead of the data. The teacher's dashboard lists what's not included.
 - Plans apply to **everyone** editing that site in its admin panel, the super admin included, and to Claude's content edits.
 
+## Content library: articles, games and the exams page (plan «مكتبة المحتوى»)
+
+A seventh plan bundle, **library**, off by default. It adds three pages next to the teacher's one-page site, linked from the sections menu («صفحات تانية») and from a strip above the footer (so they're reachable when the menu is off or short). On computers the links open in a new tab, on phones in the same tab; every page has a way back.
+
+| Page | What's on it |
+|---|---|
+| `/articles` | Every published article as a card (cover image small at the side, the start of the text, views, date, tags, share), under the teacher's groups, with group filter buttons |
+| `/articles/<path>` | One article: cover, group and tags, views, reading time, its blocks (paragraphs, headings, images, YouTube or video files, file buttons), an optional button at the end, and more from the same group. Described to Google as an `Article` |
+| `/games` | Every published learning game, the same way |
+| `/games/<path>` | One game: its text, an optional form first (answers go to «الطلبات», remembered fields filled in), the game, an optional button under it, full screen |
+| `/exams` | Every listed online quiz in three tabs: **open now**, **coming soon** (start date ahead; center exams still to come, with their booking card) and **finished**, with the teacher's groups inside each tab. A quiz this device handed in, and finished teacher-graded quizzes with published results, show «اعرف درجتك»: self-graded ones reopen the quiz (its result), teacher-graded ones look the grade up by name and phone. Published result sheets no listed quiz shows (center exams that passed, typed sheets) are cards of their own in **finished** |
+
+- **Search** on every list, with suggestions while typing and the match highlighted. Letters people type interchangeably count as one (أ إ آ ا, ى ي ئ, ة ه, ؤ و), diacritics and tatweel are ignored, Arabic digits match Latin ones (`src/lib/search.ts`).
+- **Groups and tags** are the teacher's own: `group` (the heading an item is listed under) and `tags` (searchable, shown on the card) on every article, game and quiz; center exams have a `group` too. Items without a group go last under «أخرى». Newest first (the last added in the admin comes first).
+- **Per item:** `listed` (on its list page or not; the address still works), `showViews`; `library.showViews` hides every count at once. Articles and games have `enabled` and `publishAt` (scheduled: not listed and not found until then; the cached site refreshes at that time; the preview shows them early). The exams section on the home page keeps the upcoming exams; its results button now opens `/exams?tab=closed`.
+- **Views** are page loads (like the offer pages), counted in `analytics_daily` as `page_view` with keys `a:<path>`, `g:<path>`, `q:<path>` (quiz pages) and `gp:<path>` (game plays). List pages stay cached; the numbers come fresh on every load from `GET /api/views`. On exam cards the number is the students who started the quiz.
+- **Share buttons** on every card and page send the item's link with `?via=share` (the phone's share sheet, or copy).
+- **Admin:** «مكتبة المحتوى» in the menu: «المقالات» (with the library settings), «الألعاب التعليمية» and **«أداء الصفحات»** (`/admin/library`): every article, game and quiz with views all time and in the last 30 days, a small chart, on/off the list, views shown/hidden, page on/off, and a day-by-day chart per item (`/admin/library/<list>/<path>`, 30 days / 3 months / a year; plays for games, students who started for quizzes).
+
+### Games are uploaded files, sandboxed
+
+A game is **one self-contained HTML file** (up to 3 MB), uploaded from the game's editor or by Claude (`upload_game`), stored in `game_files` (migration `0021`) and referenced as `game:<id>` in `games[].file`. Files never change after upload (a new upload is a new key), so the preview and the live site can use different versions.
+
+The file is only served at `/games/<path>/play`, with a `Content-Security-Policy: sandbox allow-scripts …` header, and framed with `sandbox="allow-scripts allow-pointer-lock"`: it runs with an **opaque origin**, so it can't read the site's cookies, storage or admin session, can't submit forms or navigate the page, can't call any server (`connect-src` data/blob only), and can load scripts, styles and fonts only from cdnjs, jsDelivr and unpkg (images and media from any https address). It isn't indexed. Claude's instructions describe this, so agents write games that fit (touch, 4:3, the site's language, no storage).
+
 ## Student profiles (admin → الطلاب)
 
 One profile per student, identified by their mobile number (compared like the results lookup: no country code or leading zero), built automatically from what they do on the site: form requests, quiz attempts (with the teacher's approved grade or the automatic score) and the exam results the teacher typed or imported. Votes are anonymous, so they don't count.
@@ -241,6 +266,7 @@ The app is also an MCP server, so Claude (claude.ai, the Claude apps, or Claude 
 | Write | `create_teacher` (full content, or `copy_from` + edits), `update_content` (whole sections), `edit_content` (path edits like `schedule.slots.2.time`, all in one revision), `update_theme`, `set_teacher_status`, `restore_revision` |
 | Photos | `create_upload_link`, `upload_image` (link or base64), `list_images`, `view_image` |
 | Platform | `manage_domain` (then add the domain in Vercel too), `manage_login` (create/reset shows the password once) |
+| Games | `upload_game` (a game's HTML file → key for `games[].file`), `list_game_files` |
 
 ### Partners and teachers connect with their own login (OAuth)
 

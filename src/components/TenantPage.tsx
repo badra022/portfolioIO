@@ -31,6 +31,8 @@ import { SectionMenu } from "./SectionMenu";
 import { ChatButton } from "./ChatButton";
 import { asset } from "@/lib/assets";
 import { menuItems } from "@/lib/sections-meta";
+import type { LibraryLink } from "@/lib/library";
+import { LibraryLinks } from "./LibraryBits";
 import { ui } from "@/lib/i18n";
 import { chatConfig } from "@/lib/chat";
 
@@ -43,7 +45,7 @@ function hash(value: unknown): string {
 }
 
 /** The ids the teacher's forms use for the student's name and phone, so remembered answers are shared. */
-function contactIds(c: Content): { nameId: string; phoneId: string } {
+export function contactIds(c: Content): { nameId: string; phoneId: string } {
   const kept = c.forms.flatMap((f) => f.fields).filter(remembers);
   const phoneId = kept.find((f) => f.type === "tel")?.id ?? "phone";
   const nameId = kept.find((f) => f.id === "name")?.id
@@ -80,10 +82,12 @@ function barMessages(c: Content, base: string): BarMessage[] {
 }
 
 /** The public teacher page. Content arrives with image URLs resolved and expired items (exams, pop-up) removed. */
-export function TenantPage({ c, base, canonical, pastExams, preview = false }: { c: Content; base: string; canonical: string | null; pastExams: PastExamItem[]; preview?: boolean }) {
+export function TenantPage({ c, base, canonical, pastExams, libraryLinks = [], preview = false }: { c: Content; base: string; canonical: string | null; pastExams: PastExamItem[]; libraryLinks?: LibraryLink[]; preview?: boolean }) {
   const chat = chatConfig(c);
   const t = ui(c.locale);
-  const results = { exams: pastExams, slug: c.slug, base, ...contactIds(c) };
+  // With the content library, past results live on the exams page (/exams); the section links there.
+  const examsPage = libraryLinks.find((l) => l.id === "exams")?.href;
+  const results = { exams: pastExams, slug: c.slug, base, ...contactIds(c), examsPage };
   // Sections that have something to show (the others are skipped by their components too).
   const shown = (key: Content["sections"][number]) => {
     switch (key) {
@@ -135,6 +139,7 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
           name={c.profile.fullTitle}
           avatar={c.profile.avatar ? asset(c.profile.avatar) : c.profile.photo ? asset(c.profile.photo) : undefined}
           cta={<ChatButton chat={chat} block label={c.navCta.label} message={c.navCta.message} refCode={c.navCta.ref} form={c.navCta.form} />}
+          extra={libraryLinks.length > 0 ? <LibraryLinks links={libraryLinks} variant="menu" /> : undefined}
         />
       )}
       <main>
@@ -145,6 +150,8 @@ export function TenantPage({ c, base, canonical, pastExams, preview = false }: {
           </div>
         ))}
       </main>
+      {/* Reachable even without the sections menu (turned off, or fewer than 3 sections). */}
+      {libraryLinks.length > 0 && <div className="wrap"><LibraryLinks links={libraryLinks} variant="strip" /></div>}
       <Footer c={c} />
       <StickyBar c={c} chat={chat} />
       {/* Machine-readable description of the teacher, classes, exams, book and videos (lib/structured-data.ts). */}

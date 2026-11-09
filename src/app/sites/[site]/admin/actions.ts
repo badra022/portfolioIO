@@ -25,6 +25,7 @@ import * as siteFiles from "@/lib/server/site-files";
 import * as results from "@/lib/server/exam-results";
 import * as pollsRepo from "@/lib/server/polls";
 import * as studentsRepo from "@/lib/server/students";
+import { GameFileError, saveGameFile } from "@/lib/server/games";
 import { cairoNow } from "@/lib/poll";
 import { FEATURES, blockedMessage, type Feature } from "@/lib/permissions";
 import { MAX_SITE_FILE } from "@/lib/site-files";
@@ -153,6 +154,22 @@ export async function uploadImageAction(site: string, form: FormData): Promise<{
     if (e instanceof ImageError) return { ok: false, error: e.message };
     console.error(e);
     return { ok: false, error: "تعذّر رفع الصورة." };
+  }
+}
+
+/** A game's HTML file (content.games[].file): stored as a new file, returns its key ("game:<id>"). */
+export async function uploadGameAction(site: string, form: FormData): Promise<{ ok: true; key: string; name: string; bytes: number } | { ok: false; error: string }> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) return { ok: false, error: "غير مصرح." };
+  const file = form.get("file");
+  if (!(file instanceof File)) return { ok: false, error: "لم يتم اختيار ملف." };
+  try {
+    const saved = await saveGameFile(ctx.slug, file.name, await file.text(), principalName(ctx.p));
+    return { ok: true, key: saved.key, name: saved.name, bytes: saved.bytes };
+  } catch (e) {
+    if (e instanceof GameFileError) return { ok: false, error: e.message };
+    console.error(e);
+    return { ok: false, error: "تعذّر رفع ملف اللعبة." };
   }
 }
 
@@ -576,6 +593,31 @@ export async function updatePageAction(site: string, path: string, change: "on" 
   const copy = repo.copyFor(t, env).content;
   if (!copy.pages.some((p) => p.path === path)) return;
   const note = `${change === "delete" ? "حذف صفحة" : change === "on" ? "تشغيل صفحة" : "إيقاف صفحة"}: ${path}`;
+  const r = env === "preview"
+    ? await repo.savePreview(ctx.slug, { content: apply(copy) }, null, principalName(ctx.p), note)
+    : await repo.saveTenant(ctx.slug, { content: apply(copy) }, t.version, principalName(ctx.p), note);
+  if (r.ok && env === "production" && t.preview.pending) {
+    await repo.savePreview(ctx.slug, { content: apply(t.preview.content) }, null, principalName(ctx.p), note);
+  }
+  if (r.ok) updateTag(tenantTag(ctx.slug));
+  refresh();
+}
+
+/**
+ * The content library's switches from «أداء الصفحات» (admin/library): an article, game or
+ * quiz on or off its list page, its views shown or hidden, or (articles and games) the page on or off.
+ */
+export async function updateLibraryItemAction(site: string, list: "articles" | "games" | "quizzes", path: string, field: "listed" | "showViews" | "enabled", on: boolean, env: SiteEnv = "production"): Promise<void> {
+  const ctx = await teacherContext(site);
+  if ("ok" in ctx) throw new ForbiddenError();
+  if (!["articles", "games", "quizzes"].includes(list) || !["listed", "showViews", "enabled"].includes(field) || (list === "quizzes" && field === "enabled") || !isEnv(env)) return;
+  const t = await repo.getTenant(ctx.slug);
+  if (!t) return;
+  const apply = (c: Content): Content => ({ ...c, [list]: (c[list] as { path: string }[]).map((x) => (x.path === path ? { ...x, [field]: on } : x)) });
+  const copy = repo.copyFor(t, env).content;
+  if (!(copy[list] as { path: string }[]).some((x) => x.path === path)) return;
+  const what = field === "listed" ? (on ? "إظهار في القائمة" : "إخفاء من القائمة") : field === "showViews" ? (on ? "إظهار المشاهدات" : "إخفاء المشاهدات") : on ? "تشغيل" : "إيقاف";
+  const note = `${what}: ${path}`;
   const r = env === "preview"
     ? await repo.savePreview(ctx.slug, { content: apply(copy) }, null, principalName(ctx.p), note)
     : await repo.saveTenant(ctx.slug, { content: apply(copy) }, t.version, principalName(ctx.p), note);

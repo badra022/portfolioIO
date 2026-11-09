@@ -86,6 +86,17 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
+    id: "library", label: "مكتبة المحتوى", icon: "book", subs: [
+      {
+        id: "lib", label: "المكتبة", items: [
+          edit("articles", "المقالات"),
+          edit("games", "الألعاب التعليمية"),
+          { label: "أداء الصفحات", path: "/library" },
+        ],
+      },
+    ],
+  },
+  {
     id: "settings", label: "الإعدادات", icon: "form", subs: [
       {
         id: "me", label: "بياناتك", items: [

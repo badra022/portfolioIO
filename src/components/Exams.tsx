@@ -5,6 +5,7 @@ import { ExamCard } from "./ExamCard";
 import { Carousel } from "./Carousel";
 import { SectionHead } from "./SectionHead";
 import { ExamResults, type PastExamItem } from "./ExamResults";
+import { Icon } from "./Icon";
 
 type Data = NonNullable<Content["exams"]>;
 
@@ -15,7 +16,7 @@ export function upcomingExams(data: Data) {
 }
 
 /** Where the results button finds the student's remembered name and phone (the ids used by the teacher's forms). */
-export type ResultsSetup = { exams: PastExamItem[]; slug: string; base: string; nameId: string; phoneId: string };
+export type ResultsSetup = { exams: PastExamItem[]; slug: string; base: string; nameId: string; phoneId: string; examsPage?: string };
 
 export function Exams({ data, locale, chat, results }: { data: Data; locale: string; chat: ChatConfig; results: ResultsSetup }) {
   const items = upcomingExams(data);
@@ -29,7 +30,9 @@ export function Exams({ data, locale, chat, results }: { data: Data; locale: str
             {items.map((e) => <ExamCard key={e.id} exam={e} parts={dateParts(e.date, locale)} labels={data.labels} chat={chat} />)}
           </Carousel>
         )}
-        {results.exams.length > 0 && (
+        {results.examsPage ? (
+          <div className="exr"><a className="btn btn-ghost" href={`${results.examsPage}${results.exams.length ? "?tab=closed" : ""}`}><Icon name="trophy" />{data.resultsLabel}</a></div>
+        ) : results.exams.length > 0 && (
           <ExamResults {...results} locale={locale} label={data.resultsLabel} intro={data.resultsIntro} />
         )}
       </div>

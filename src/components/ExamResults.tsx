@@ -21,7 +21,7 @@ type Step = { at: "list" } | { at: "ask"; exam: PastExamItem } | { at: "result";
  * answers as the form buttons (LeadForms, same device storage and field ids), so a
  * student who already filled a form gets their result in one tap.
  */
-export function ExamResults({ exams, slug, base, locale, label, intro, nameId, phoneId }: {
+export function ExamResults({ exams, slug, base, locale, label, intro, nameId, phoneId, direct, buttonClass }: {
   exams: PastExamItem[];
   slug: string;
   base: string;
@@ -30,6 +30,9 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
   intro?: string;
   nameId: string;
   phoneId: string;
+  /** One exam: the button goes straight to it (the exams page's «اعرف درجتك»). */
+  direct?: boolean;
+  buttonClass?: string;
 }) {
   const tx = useUI();
   const [step, setStep] = useState<Step | null>(null);
@@ -109,7 +112,7 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
   return (
     <div className="exr">
       {intro && <p className="exr-intro">{intro}</p>}
-      <button type="button" className="btn btn-ghost" onClick={() => { setErrors({}); setStep({ at: "list" }); }}>
+      <button type="button" className={buttonClass ?? "btn btn-ghost"} onClick={() => { setErrors({}); if (direct && exams.length === 1) pick(exams[0]); else setStep({ at: "list" }); }}>
         <Icon name="trophy" />{label}
       </button>
       {/* At the page root, like the form buttons' dialog: inside the section it would sit under the sticky bar. */}
@@ -152,7 +155,7 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
                 <button type="submit" className="btn btn-wa btn-block" disabled={busy}>
                   <Icon name="trophy" />{busy ? tx.searchingShort : tx.findResult}
                 </button>
-                <button type="button" className="lead-edit" onClick={() => setStep({ at: "list" })}>← {tx.otherExam}</button>
+                {!direct && <button type="button" className="lead-edit" onClick={() => setStep({ at: "list" })}>← {tx.otherExam}</button>}
               </form>
             )}
 
@@ -170,7 +173,8 @@ export function ExamResults({ exams, slug, base, locale, label, intro, nameId, p
                   {values[nameId]} · <span dir="ltr">{values[phoneId]}</span>
                   <button type="button" className="lead-edit" onClick={() => setStep({ at: "ask", exam })}>{step.result ? tx.notYou : tx.editDetails}</button>
                 </p>
-                <button type="button" className="btn btn-ghost btn-block" onClick={() => setStep({ at: "list" })}>{tx.otherExam}</button>
+                {direct ? <button type="button" className="btn btn-ghost btn-block" onClick={close}>{tx.close}</button>
+                  : <button type="button" className="btn btn-ghost btn-block" onClick={() => setStep({ at: "list" })}>{tx.otherExam}</button>}
               </div>
             )}
           </div>
