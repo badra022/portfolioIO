@@ -10,6 +10,8 @@ import { copyFor, findSlugByDomain, getTenant, trialOver } from "./repo";
 import { resolveImages } from "./assets";
 import { localizeDefaults } from "@/lib/i18n";
 import { publishedExams, type PastExam } from "./exam-results";
+import { instantOf } from "@/lib/dates";
+import { articleCards, examEntries, gameCards, isPublished, type LibraryLink } from "@/lib/library";
 
 export const tenantTag = (slug: string) => `tenant:${slug}`;
 export const DOMAINS_TAG = "domains";
@@ -42,6 +44,8 @@ export type SiteData =
       version: number;
       /** Past exams whose results students can look up (published in /admin/results). */
       pastExams: PastExam[];
+      /** The content library's pages to link from the home page (empty without the plan or anything to show). */
+      libraryLinks: LibraryLink[];
     };
 
 /** Resolves a site key (from routing.ts) to the slug it serves, or null. */
@@ -90,22 +94,43 @@ export async function getSiteData(siteKey: string): Promise<SiteData> {
   const canonicalHost = primary ?? (env.rootDomain ? `${slug}.${env.rootDomain}` : null);
   const servedHost = site.startsWith("d.") ? site.slice(2) : site.startsWith("s.") ? `${site.slice(2)}.${env.rootDomain}` : null;
   const copy = copyFor(t, siteEnv);
+  const now = new Date();
+  let content = resolveImages(localizeDefaults(withLiveContent(applyPermissions(copy.content, t.permissions), now)), slug);
+  // Scheduled articles and games stay out until their time (the preview shows them, to check before).
+  if (siteEnv === "production") {
+    content = { ...content, articles: content.articles.filter((a) => isPublished(a, now.getTime())), games: content.games.filter((g) => isPublished(g, now.getTime())) };
+    // ...and the cached page refreshes when the next one comes out.
+    const next = [...copy.content.articles, ...copy.content.games].map((x) => (x.publishAt ? instantOf(x.publishAt).getTime() : 0)).filter((at) => at > now.getTime()).sort((a, b) => a - b)[0];
+    if (next && next - now.getTime() < 3_600_000) cacheLife({ stale: 60, revalidate: Math.max(60, Math.ceil((next - now.getTime()) / 1000)), expire: 3600 });
+  }
+  const pastExams = t.id && t.permissions.exams ? await publishedExams(t.id, siteEnv).catch((e) => { console.error("past exams", e); return []; }) : [];
+  const base = baseForSite(siteKey);
+  const libraryLinks: LibraryLink[] = [];
+  if (t.permissions.library) {
+    const articles = articleCards(content, base, now.getTime()).length;
+    const games = gameCards(content, base, now.getTime()).length;
+    const exams = examEntries(content, base, pastExams, now.getTime());
+    if (articles) libraryLinks.push({ id: "articles", href: `${base}/articles`, count: articles });
+    if (exams.length) libraryLinks.push({ id: "exams", href: `${base}/exams`, count: exams.filter((e) => e.tab === "live").length });
+    if (games) libraryLinks.push({ id: "games", href: `${base}/games`, count: games });
+  }
   return {
     kind: "tenant",
     slug,
     env: siteEnv,
     // Parts of the site outside the teacher's plan are left out right away (lib/permissions.ts).
-    content: resolveImages(localizeDefaults(withLiveContent(applyPermissions(copy.content, t.permissions), new Date())), slug),
+    content,
     permissions: t.permissions,
     theme: copy.theme,
     canonical: canonicalHost ? `https://${canonicalHost}` : null,
     // The preview is never indexed (it's also behind the admin login).
     indexable: siteEnv === "production" && !t.trialEndsAt && Boolean(canonicalHost && servedHost === canonicalHost),
     trialEndsAt: t.trialEndsAt,
-    base: baseForSite(siteKey),
+    base,
     updatedAt: t.updatedAt,
     version: siteEnv === "preview" ? t.version * 10_000 + t.preview.version : t.version,
     // Publishing results refreshes this through the same tag (tenantTag).
-    pastExams: t.id && t.permissions.exams ? await publishedExams(t.id, siteEnv).catch((e) => { console.error("past exams", e); return []; }) : [],
+    pastExams,
+    libraryLinks,
   };
 }

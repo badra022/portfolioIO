@@ -307,6 +307,8 @@ const Exams = z.object({
     cta: z.string(),
     message: z.string(),
     form: FormRef.optional(),
+    /** The teacher's own heading for it on the exams page (/exams), e.g. «تالتة ثانوي». */
+    group: z.string().optional(),
   })),
   /** Button under the exams that opens past exams' results (published in the admin panel → نتايج الامتحانات). */
   resultsLabel: z.string().default("نتايج الامتحانات اللي فاتت"),
@@ -506,7 +508,99 @@ const Menu = z.object({
 /* ---------- quizzes ---------- */
 
 /** Paths a quiz can't use, because the site already answers them. */
-export const RESERVED_PATHS = ["admin", "api", "upload", "t", "preview", "robots.txt", "sitemap.xml", "local-assets", "favicon.ico"];
+export const RESERVED_PATHS = ["admin", "api", "upload", "t", "preview", "robots.txt", "sitemap.xml", "local-assets", "favicon.ico", "articles", "games", "exams"];
+
+/* ---------- the content library (articles, games, the exams page) ---------- */
+
+/**
+ * How an item shows on its list page (/articles, /games, /exams): the teacher's own
+ * heading for it (group), tags (searchable, shown on the card), whether it's listed
+ * at all, and whether its views count is shown to visitors.
+ */
+const LibraryFields = {
+  group: z.string().optional(),
+  tags: z.array(z.string()).default([]),
+  /** Off: not on the list page (its own address still works). */
+  listed: z.boolean().default(true),
+  /** Off: the views count isn't shown to visitors for this item. */
+  showViews: z.boolean().default(true),
+};
+
+/** One block of an article's text: a paragraph, a heading, an image, a video or a file to open. */
+export const ArticleBlock = z.object({
+  type: z.enum(["paragraph", "heading", "image", "video", "file"]).default("paragraph"),
+  /** Paragraph or heading text. */
+  text: z.string().optional(),
+  image: OptionalImageRef.optional(),
+  caption: z.string().optional(),
+  /** Video (YouTube or a video file link) or the file's link. */
+  url: z.string().optional(),
+  /** The file button's text. */
+  label: z.string().optional(),
+}).superRefine((b, ctx) => {
+  const need = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message });
+  if ((b.type === "paragraph" || b.type === "heading") && !b.text?.trim()) need("text", "اكتب النص.");
+  if (b.type === "image" && !b.image) need("image", "ارفع الصورة.");
+  if ((b.type === "video" || b.type === "file") && !/^https?:\/\/\S+$/.test(b.url ?? "")) need("url", "الصق رابط كامل يبدأ بـ https://");
+});
+
+/** Where an article or a game lives: teacher.com/articles/<path>, teacher.com/games/<path>. */
+const LibraryPath = z.string().regex(/^[a-z0-9][a-z0-9-]{1,59}$/, { error: "حروف إنجليزية صغيرة وأرقام وشرطة، مثل gas-laws" });
+
+/**
+ * An article on its own page (teacher.com/articles/<path>), listed on /articles:
+ * a cover image, the text in blocks, an optional button at the end. Shown from
+ * publishAt (empty = right away).
+ */
+export const Article = z.object({
+  path: LibraryPath,
+  /** Off: the article answers "not found". */
+  enabled: z.boolean().default(true),
+  title: z.string().min(1),
+  /** The line on the list card; empty = the start of the first paragraph. */
+  summary: z.string().optional(),
+  image: OptionalImageRef.optional(),
+  publishAt: StartDate.optional(),
+  blocks: z.array(ArticleBlock).default([]),
+  cta: Action.optional(),
+  /** Let Google list the article (it's in the sitemap). */
+  indexable: z.boolean().default(true),
+  ...LibraryFields,
+});
+
+/**
+ * A game id: an HTML file uploaded through the admin panel or Claude (stored outside
+ * the content, lib/server/games.ts), played in a sandboxed frame.
+ */
+const GameFileRef = z.string().regex(/^game:[0-9a-f-]{36}$/, { error: "ارفع ملف اللعبة." }).meta({ widget: "game" });
+
+/**
+ * A learning game on its own page (teacher.com/games/<path>), listed on /games: a
+ * description, an optional form the student fills before playing, the game itself
+ * (one HTML file in a sandboxed frame) and an optional button under it.
+ */
+export const Game = z.object({
+  path: LibraryPath,
+  enabled: z.boolean().default(true),
+  title: z.string().min(1),
+  /** The text around the game; its first line is the list card's summary. */
+  description: z.string().optional(),
+  image: OptionalImageRef.optional(),
+  publishAt: StartDate.optional(),
+  file: GameFileRef.optional(),
+  /** Asked before the game opens (name, phone…); the answers go to «الطلبات». */
+  form: FormRef.optional(),
+  playLabel: z.string().default("ابدأ اللعب"),
+  cta: Action.optional(),
+  indexable: z.boolean().default(true),
+  ...LibraryFields,
+});
+
+/** Settings of the list pages (/articles, /games, /exams). */
+const Library = z.object({
+  /** Off: no views (or "took it") counts on any list, whatever each item says. */
+  showViews: z.boolean().default(true),
+});
 
 const QuizQuestion = z.object({
   text: z.string().optional(),
@@ -562,6 +656,7 @@ export const Quiz = z.object({
   /** Let Google list the quiz page (it's in the sitemap). Off: only people with the link find it. */
   indexable: z.boolean().default(false),
   questions: z.array(QuizQuestion).default([]),
+  ...LibraryFields,
 });
 
 /* ---------- votes (polls) ---------- */
@@ -708,6 +803,9 @@ export const ContentSchema = z.object({
   quizzes: z.array(Quiz).default([]),
   polls: z.array(Poll).default([]),
   pages: z.array(LandingPage).default([]),
+  articles: z.array(Article).default([]),
+  games: z.array(Game).default([]),
+  library: Library.default({ showViews: true }),
   referrals: z.array(Referral).default([]),
   footer: z.object({ hashtags: z.array(z.string()).default([]) }).default({ hashtags: [] }),
   sticky: z.object({ secondary: LinkCta.optional(), cta: ChatCta }),
@@ -733,6 +831,14 @@ export const ContentSchema = z.object({
     if (paths.has(p)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "في اختبار أو تصويت أو صفحة تانية بنفس العنوان." });
     paths.add(p);
   });
+  // Articles and games have their own address spaces (/articles/<path>, /games/<path>).
+  for (const list of ["articles", "games"] as const) {
+    const seen = new Set<string>();
+    c[list].forEach((x, i) => {
+      if (seen.has(x.path)) ctx.addIssue({ code: "custom", path: [list, i, "path"], message: "في عنصر تاني بنفس العنوان." });
+      seen.add(x.path);
+    });
+  }
   const codes = new Set<string>();
   c.referrals.forEach((r, i) => {
     if (codes.has(r.code)) ctx.addIssue({ code: "custom", path: ["referrals", i, "code"], message: "الكود ده مستخدم لشريك تاني." });
@@ -805,6 +911,9 @@ export type ActionT = z.infer<typeof Action>;
 export type LeadFormT = z.infer<typeof LeadForm>;
 export type QuizT = z.infer<typeof Quiz>;
 export type LandingPageT = z.infer<typeof LandingPage>;
+export type ArticleT = z.infer<typeof Article>;
+export type ArticleBlockT = z.infer<typeof ArticleBlock>;
+export type GameT = z.infer<typeof Game>;
 export type PollT = z.infer<typeof Poll>;
 export type SocialT = z.infer<typeof Social>;
 export type DayKeyT = z.infer<typeof DayKey>;

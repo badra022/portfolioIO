@@ -268,6 +268,23 @@ export const tenantFiles = pgTable("tenant_files", {
 }, (t) => [primaryKey({ columns: [t.tenantId, t.name] })]);
 
 /**
+ * A teacher's learning games (content.games[].file = "game:<id>"): one HTML file each,
+ * uploaded from the admin panel or by Claude, served only inside a sandboxed frame
+ * (app/sites/[site]/games/[path]/play). Never changed after upload: a new upload is a
+ * new row, so the preview and the live site can point at different versions.
+ */
+export const gameFiles = pgTable("game_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  /** The uploaded file's name, for the admin panel. */
+  name: text("name").notNull(),
+  html: text("html").notNull(),
+  bytes: integer("bytes").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text("created_by"),
+}, (t) => [index("game_files_tenant_idx").on(t.tenantId)]);
+
+/**
  * Results of one exam, entered or imported by the teacher (/admin/results).
  * Students look theirs up on the site with their name and phone
  * (lib/exam-results.ts); the rows are never sent to the browser as a whole.

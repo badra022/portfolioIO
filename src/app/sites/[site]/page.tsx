@@ -69,5 +69,5 @@ async function SiteBody({ params }: { params: Promise<{ site: string }> }) {
   if (data.kind === "platform") return <PlatformHome />;
   if (data.kind === "missing") notFound();
   if (data.kind === "ended") return <TrialEnded locale={data.locale} name={data.name} />;
-  return <TenantPage c={data.content} base={data.base} canonical={data.canonical} pastExams={data.pastExams} preview={data.env === "preview"} />;
+  return <TenantPage c={data.content} base={data.base} canonical={data.canonical} pastExams={data.pastExams} libraryLinks={data.libraryLinks} preview={data.env === "preview"} />;
 }

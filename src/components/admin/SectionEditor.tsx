@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { saveSectionAction, uploadImageAction } from "@/app/sites/[site]/admin/actions";
+import { saveSectionAction, uploadGameAction, uploadImageAction } from "@/app/sites/[site]/admin/actions";
 import type { JS } from "@/lib/admin/schema-tools";
 import { labelFor } from "@/lib/admin/labels";
 import { SchemaForm, type FormCtx } from "./SchemaForm";
@@ -70,6 +70,11 @@ export function SectionEditor(props: {
       const fd = new FormData();
       fd.set("file", file);
       return uploadImageAction(site, fd);
+    },
+    uploadGame: async (file: File) => {
+      const fd = new FormData();
+      fd.set("file", file);
+      return uploadGameAction(site, fd);
     },
   }), [issues, assetBase, site, props.forms]);
 

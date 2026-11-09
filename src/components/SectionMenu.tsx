@@ -17,8 +17,10 @@ const KEY = "side:closed";
  * menu button opens and closes it everywhere (a closed docked menu is remembered
  * on the device). The section being read is highlighted as the visitor scrolls.
  */
-export function SectionMenu({ items, title, name, avatar, cta }: {
+export function SectionMenu({ items, title, name, avatar, cta, extra }: {
   items: MenuItem[];
+  /** Below the sections: links to the site's other pages (the content library). */
+  extra?: React.ReactNode;
   title: string;
   name: string;
   avatar?: string;
@@ -105,6 +107,7 @@ export function SectionMenu({ items, title, name, avatar, cta }: {
             </a>
           ))}
         </nav>
+        {extra}
         <div className="side-cta" onClick={close}>{cta}</div>
       </aside>
       {open && <div className="side-backdrop" onClick={close} aria-hidden="true" />}
