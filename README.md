@@ -249,7 +249,7 @@ Result lookups are counted by day from this version on (earlier lookups only exi
 
 ## Claude connector (MCP): onboard and edit teachers by chat
 
-The app is also an MCP server, so Claude (claude.ai, the Claude apps, or Claude Code) can do everything the admin panel does, straight on the live database: create a teacher, fill or change any section, upload and place photos, theme, domains, logins, history and analytics. Saves go through the same validation as the admin forms, keep a full revision (and can be restored), and are live within seconds.
+The app is also an MCP server, so Claude (claude.ai, the Claude apps, or Claude Code) can do everything the admin panel does, straight on the live database: create a teacher, fill or change any section, upload and place photos, theme, domains, logins, history and analytics. Saves go through the same validation as the admin forms, keep a version that can be restored for 7 days, and are live within seconds.
 
 **Turn it on (once):**
 1. Generate a secret: `openssl rand -hex 32` (or any 32+ random characters).
@@ -258,15 +258,32 @@ The app is also an MCP server, so Claude (claude.ai, the Claude apps, or Claude 
    - **claude.ai / Claude apps:** Settings → Connectors → Add custom connector → URL `https://<your-project>.vercel.app/api/mcp/<MCP_TOKEN>` (leave OAuth empty). Enable it in a chat from the tools menu.
    - **Claude Code:** `claude mcp add --transport http portfolioio https://<your-project>.vercel.app/api/mcp --header "Authorization: Bearer <MCP_TOKEN>"`
 
-**Then just ask**, e.g. "Create a page for أ. سارة أحمد, math teacher, grades 1-3 secondary, groups in Faisal Sat/Tue 5pm, WhatsApp 2010..., use a blue theme", or "Move Sara's Tuesday group to 6pm and add a popup announcing the new term until the 1st". For photos Claude sends you a private upload link (it can't forward images attached in the chat): open it, drop the photos (naming them teacher.jpg, book-cover.jpg... helps), say done, and Claude looks at each one and puts it in place. Public Google Drive/Dropbox links work too.
+**Then just ask**, e.g. "Create a page for أ. سارة أحمد, math teacher, grades 1-3 secondary, groups in Faisal Sat/Tue 5pm, WhatsApp 2010..., use a blue theme", or "Move Sara's Tuesday group to 6pm and add a popup announcing the new term until the 1st".
 
 | Tools | |
 |---|---|
-| Read | `list_teachers`, `get_teacher`, `get_schema` (page outline, or one section's fields with the admin labels/hints), `get_example` (a full real page), `list_revisions`, `get_analytics` |
-| Write | `create_teacher` (full content, or `copy_from` + edits), `update_content` (whole sections), `edit_content` (path edits like `schedule.slots.2.time`, all in one revision), `update_theme`, `set_teacher_status`, `restore_revision` |
+| Read | `list_teachers`, `get_teacher` (a short summary by default; `keys` or `path` for the part needed), `get_schema` (page outline, one section, or one field with `path`), `get_example`, `get_guide` (how-to per area), `list_revisions`, `get_analytics` |
+| Write | `create_teacher` (full content, or `copy_from` + edits), `update_content` (whole sections), `edit_content` (path edits, all in one version), `update_theme`, `publish_preview`, `set_teacher_status`, `restore_revision` |
 | Photos | `create_upload_link`, `upload_image` (link or base64), `list_images`, `view_image` |
-| Platform | `manage_domain` (then add the domain in Vercel too), `manage_login` (create/reset shows the password once) |
+| Quizzes and results | `quiz_results` (summary, paged attempts, or what still needs grading), `grade_quiz` (many grades in one call), `exam_results`, `manage_exam_results`, `poll_results` |
+| Requests | `list_requests`, `update_requests` |
+| Platform | `manage_plan` (the teacher's bundles), `manage_domain` (then add the domain in Vercel too), `manage_login` (create/reset shows the password once), `manage_site_files` |
 | Games | `upload_game` (a game's HTML file → key for `games[].file`), `list_game_files` |
+
+**Made for agents** (`src/lib/server/mcp`; `scripts/mcp-scenarios.mjs` runs an agent's work end to end in CI):
+
+- **Small reads.** `get_teacher` answers with a summary (each section's fields, lists with their item ids), then `keys: ["schedule"]` or `path: "schedule.slots[id=S3A]"` fetch only what's needed. `quiz_results` is numbers by default; attempts come paged.
+- **Items by id, not position.** Paths pick a list item by one of its own fields: `schedule.slots[id=S3A].time`, `quizzes[path=chem-exam].title` (positions still work: `hero.headline.0`). `edit_content` ops: `set`, `merge` (some fields of an object), `upsert` (add a list item, or replace the one with the same id/path), `append`, `insert`, `remove`.
+- **Check first.** `dry_run: true` on a save validates it and lists what would change, without saving.
+- **Preview vs live is spelled out.** Saves go to the preview unless `target: "production"`; every reply says `live: true/false`, where to look, and (for the preview) `publish_with: "publish_preview"`, plus the paths that changed.
+- **Errors that say what to do.** `{ error: { code, message, fix, message_ar?, issues? } }` with codes `VALIDATION` (field path, English and Arabic message, what the field expects), `PLAN_FEATURE_OFF`, `VERSION_CONFLICT`, `BAD_PATH` (lists the ids that exist), `NOT_YOUR_SITE`, `SLUG_REQUIRED`, `NOT_FOUND`, `REVISION_GONE`, `BAD_INPUT`.
+- **One site, no slug.** A login that reaches a single site (every teacher) can leave `slug` out.
+- **Guides, workflows, resources.** Long how-to text isn't loaded into every conversation: `get_guide` (also MCP resources `myostaz://guide/<topic>` and `myostaz://schema/<part>`) serves it on demand, and four MCP prompts show as ready-made workflows in the app (new teacher onboarding, weekly exam, monthly promo, requests inbox).
+- **Usage log.** Every call is recorded (who, tool, time, reply size, error code) for 30 days; the console's **استخدام Claude** page (`/admin/mcp`) shows the most used tools, the most common errors and who hit them.
+
+**Images without the user in the middle.** `create_upload_link` returns a signed `upload_url` an agent can post files to by itself (`curl -F "file=@photo.jpg" "<upload_url>"`, one file per request, under 4 MB): this works wherever the agent has the files and can run commands (Claude Code, Cowork, or a claude.ai chat with code execution, where attached files are on the sandbox's disk and `myostaz.com` is allowed in its network settings). Images already on the internet go through `upload_image`. An agent that only *sees* a picture in the chat (no file, no commands) can't pass its bytes to any tool; for that case the same call returns `page_url`, a page where the user drops the photos.
+
+**Who did it.** What an AI app saves is recorded under the account that connected it, named exactly as in the admin panel (`admin (مدير)`, `<partner> (شريك)`, or the teacher's username): history, grades, exam results and game files. The `MCP_TOKEN` link counts as the super admin.
 
 ### Partners and teachers connect with their own login (OAuth)
 
@@ -274,13 +291,13 @@ Partners and teachers don't need the token: they add a custom connector with the
 
 | Signed in as | Reaches | Tools not offered |
 |---|---|---|
-| Partner | Its own teachers' sites | `create_teacher`, `set_teacher_status`, `manage_domain` |
+| Partner | Its own teachers' sites | `create_teacher`, `set_teacher_status`, `manage_domain`, `manage_plan` |
 | Teacher (admin login) | Their own site only | Same, plus what their admin panel doesn't allow: `update_theme`, `manage_login`, `manage_site_files` |
 | Super admin | Every site | None |
 
 Teachers find the steps and the address in their admin under **الإعدادات → متقدم → ربط Claude (AI)**; partners on their own page. Access tokens last an hour and refresh for 30 days; a login that is disabled or deleted stops working at the next refresh. Plans still apply to every save.
 
-**Security:** the token is the key to every teacher, as powerful as `ADMIN_PASSWORD`. In the claude.ai form it is part of the URL, so treat the connector URL like a password and rotate `MCP_TOKEN` if it leaks (the old URL stops working). Without `MCP_TOKEN` the endpoint doesn't exist; it answers only on the platform host, and wrong tokens get a plain 404. Saves are recorded as "Claude (MCP)" in the history. Upload links are signed per teacher and expire (24 h by default). Image downloads from links only reach public internet addresses (no internal/cloud-metadata addresses), up to 4 MB.
+**Security:** the token is the key to every teacher, as powerful as `ADMIN_PASSWORD`. In the claude.ai form it is part of the URL, so treat the connector URL like a password and rotate `MCP_TOKEN` if it leaks (the old URL stops working). Without `MCP_TOKEN` the endpoint doesn't exist; it answers only on the platform host, and wrong tokens get a plain 404. Upload links are signed per teacher and expire (24 h by default); anyone holding one can add images to that teacher's folder until then, nothing else. Image downloads from links only reach public internet addresses (no internal/cloud-metadata addresses), up to 4 MB.
 
 ## Environments and releases (dev → production)
 
@@ -406,7 +423,7 @@ npm run typecheck
 - **Authorization:** basic auth is checked in the proxy and again inside every admin page and server action. A teacher can only reach their own teacher's data, and the platform console accepts only the super admin.
 - **Database:** RLS is on with no policies, so Supabase's public Data API can't touch these tables. The app's database URL and secret key are only used on the server.
 - **Saving:**
-  - Every save is validated against the schemas and keeps a full revision, so any change can be restored.
+  - Every save is validated against the schemas and keeps a full version (who, when, what) that can be restored from «سجل التعديلات» for **7 days** (`REVISION_DAYS` in `src/lib/server/repo.ts`). Older versions are deleted for good: on the teacher's next save, and for everyone by a daily clean-up (`/api/cron/sweep`, scheduled in `vercel.json`; set `CRON_SECRET` in Vercel so only Vercel can call it). One version from before the week is kept for each copy (site and preview): how it looked when the week began, so a mistake made today on a site nobody edited for months can still be undone.
   - If two people edit the same site at once, the second save is refused instead of silently overwriting the first.
 - **Uploads:**
   - Images only (JPG, PNG, WebP, GIF, AVIF; no SVG).

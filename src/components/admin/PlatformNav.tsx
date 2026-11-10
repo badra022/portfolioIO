@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/admin/leads", icon: "chat", label: "طلبات التواصل", match: (p: string) => p.startsWith("/admin/leads") },
   { href: "/admin/partners", icon: "link", label: "الشركاء", match: (p: string) => p.startsWith("/admin/partners") },
   { href: "/admin/stats", icon: "trophy", label: "الإحصائيات", match: (p: string) => p.startsWith("/admin/stats") },
+  { href: "/admin/mcp", icon: "bolt", label: "Claude", match: (p: string) => p.startsWith("/admin/mcp") },
 ] as const;
 
 /** The super admin's menu on the platform host: a side menu on computers, a tab bar on phones. */

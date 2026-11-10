@@ -86,15 +86,15 @@ function usage(c: Content): Record<Exclude<Feature, "analytics" | "students">, {
  * Why a save to the public site isn't allowed (empty = fine). Only parts the save
  * changes are checked, so a teacher whose plan shrank can still edit the rest.
  */
-export function violations(next: Content, prev: Content | null, p: Permissions): { path: string; message: string }[] {
+export function violations(next: Content, prev: Content | null, p: Permissions): { path: string; message: string; feature: Feature }[] {
   const now = usage(next);
   const before = prev ? usage(prev) : null;
-  const out: { path: string; message: string }[] = [];
+  const out: { path: string; message: string; feature: Feature }[] = [];
   for (const f of ["forms", "exams", "votes", "promo", "library"] as const) {
     if (!now[f].used || (before && before[f].print === now[f].print)) continue;
-    if (!p[f]) out.push({ path: f === "exams" ? "quizzes" : f === "votes" ? "polls" : f === "promo" ? "popup" : f === "library" ? (next.articles.length ? "articles" : "games") : "forms", message: blockedMessage(f) });
+    if (!p[f]) out.push({ path: f === "exams" ? "quizzes" : f === "votes" ? "polls" : f === "promo" ? "popup" : f === "library" ? (next.articles.length ? "articles" : "games") : "forms", message: blockedMessage(f), feature: f });
     else if (f === "forms" && p.maxForms !== null && countedForms(next).length > p.maxForms) {
-      out.push({ path: "forms", message: `باقة الموقع فيها ${p.maxForms} نماذج بس، والمحفوظ فيه ${countedForms(next).length}. احذف نموذج أو كلم الإدارة.` });
+      out.push({ path: "forms", message: `باقة الموقع فيها ${p.maxForms} نماذج بس، والمحفوظ فيه ${countedForms(next).length}. احذف نموذج أو كلم الإدارة.`, feature: f });
     }
   }
   return out;

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hasDb } from "@/lib/env";
 import { ContentSchema, DeploySchema, ThemeSchema, type Content, type Theme } from "@/lib/schema";
@@ -194,6 +194,7 @@ export async function saveTenant(
       name: next.content.profile.name, updatedAt: new Date(), updatedBy: author,
     }).where(eq(tenants.id, row.id));
     await tx.insert(tenantRevisions).values({ tenantId: row.id, version: next.version, content: next.content, theme: next.theme, author, note });
+    await pruneRevisions(tx, row.id);
     return { ok: true, version: next.version } as const;
   });
 }
@@ -244,6 +245,7 @@ export async function savePreview(
       previewUpdatedAt: new Date(), previewUpdatedBy: author,
     }).where(eq(tenants.id, row.id));
     await tx.insert(tenantRevisions).values({ tenantId: row.id, version, content, theme, author, note, env: "preview" });
+    await pruneRevisions(tx, row.id);
     return { ok: true, version } as const;
   });
 }
@@ -269,6 +271,7 @@ export async function publishPreview(slug: string, author: string): Promise<Save
       previewContent: null, previewTheme: null, previewVersion: row.previewVersion + 1, previewUpdatedAt: new Date(), previewUpdatedBy: author,
     }).where(eq(tenants.id, row.id));
     await tx.insert(tenantRevisions).values({ tenantId: row.id, version, content: checked.content!, theme: checked.theme!, author, note: "نشر تعديلات المعاينة" });
+    await pruneRevisions(tx, row.id);
     return { ok: true, version } as const;
   });
 }
@@ -281,22 +284,70 @@ export async function discardPreview(slug: string, author: string): Promise<void
   }).where(eq(tenants.slug, slug));
 }
 
-export type RevisionSummary = { id: number; version: number; author: string; note: string | null; createdAt: string; env: SiteEnv };
+/* ------------------------------------------------------------------ */
+/* History: saved versions are kept for a week                         */
+/* ------------------------------------------------------------------ */
 
-export async function listRevisions(slug: string, limit = 50): Promise<RevisionSummary[]> {
+/**
+ * How long a saved version can be restored. Older ones are deleted (on the teacher's
+ * next save, and daily for everyone: app/sites/[site]/api/cron/sweep), except the newest
+ * of them for each copy: that is what the site looked like when the week started, so
+ * a mistake made today on a site nobody touched for months can still be undone.
+ */
+export const REVISION_DAYS = 7;
+
+const expired = sql`${tenantRevisions.createdAt} < now() - make_interval(days => ${REVISION_DAYS})`;
+/** A newer version of the same copy is itself past the week: this one isn't the week's starting point. */
+const superseded = sql`exists (
+  select 1 from "tenant_revisions" n
+  where n."tenant_id" = "tenant_revisions"."tenant_id" and n."env" = "tenant_revisions"."env"
+    and n."created_at" < now() - make_interval(days => ${REVISION_DAYS})
+    and (n."created_at", n."id") > ("tenant_revisions"."created_at", "tenant_revisions"."id")
+)`;
+
+type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
+
+async function pruneRevisions(tx: Tx, tenantId: string): Promise<void> {
+  await tx.delete(tenantRevisions).where(and(eq(tenantRevisions.tenantId, tenantId), expired, superseded));
+}
+
+/** Deletes every teacher's versions that are past the week. Returns how many. */
+export async function sweepRevisions(): Promise<number> {
+  const rows = await requireDb().delete(tenantRevisions).where(and(expired, superseded)).returning({ id: tenantRevisions.id });
+  return rows.length;
+}
+
+/** startingPoint: the one version kept from before the week (how the copy looked when the week started). */
+export type RevisionSummary = { id: number; version: number; author: string; note: string | null; createdAt: string; env: SiteEnv; startingPoint: boolean };
+
+const revisionColumns = { id: tenantRevisions.id, version: tenantRevisions.version, author: tenantRevisions.author, note: tenantRevisions.note, createdAt: tenantRevisions.createdAt, env: tenantRevisions.env };
+
+/** The versions that can be restored: the last week's, plus each copy's starting point. Newest first. */
+export async function listRevisions(slug: string, limit = 200): Promise<RevisionSummary[]> {
   if (!hasDb()) return [];
-  const rows = await db()
-    .select({ id: tenantRevisions.id, version: tenantRevisions.version, author: tenantRevisions.author, note: tenantRevisions.note, createdAt: tenantRevisions.createdAt, env: tenantRevisions.env })
-    .from(tenantRevisions)
-    .innerJoin(tenants, eq(tenants.id, tenantRevisions.tenantId))
-    .where(eq(tenants.slug, slug))
-    .orderBy(desc(tenantRevisions.createdAt), desc(tenantRevisions.id))
-    .limit(limit);
-  return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
+  const d = db();
+  const tenant = (await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1))[0];
+  if (!tenant) return [];
+  const cutoff = new Date(Date.now() - REVISION_DAYS * 86400_000);
+  const [recent, older] = await Promise.all([
+    d.select(revisionColumns).from(tenantRevisions)
+      .where(and(eq(tenantRevisions.tenantId, tenant.id), gte(tenantRevisions.createdAt, cutoff)))
+      .orderBy(desc(tenantRevisions.createdAt), desc(tenantRevisions.id)).limit(limit),
+    d.selectDistinctOn([tenantRevisions.env], revisionColumns).from(tenantRevisions)
+      .where(and(eq(tenantRevisions.tenantId, tenant.id), lt(tenantRevisions.createdAt, cutoff)))
+      .orderBy(tenantRevisions.env, desc(tenantRevisions.createdAt), desc(tenantRevisions.id)),
+  ]);
+  const starts = older.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return [
+    ...recent.map((r) => ({ ...r, createdAt: r.createdAt.toISOString(), startingPoint: false })),
+    ...(recent.length < limit ? starts.map((r) => ({ ...r, createdAt: r.createdAt.toISOString(), startingPoint: true })) : []),
+  ];
 }
 
 export async function restoreRevision(slug: string, revisionId: number, author: string): Promise<SaveResult> {
   const d = requireDb();
+  // Only what the history lists can come back: a version past the week is gone, even if not deleted yet.
+  if (!(await listRevisions(slug, 5000)).some((r) => r.id === revisionId)) return { ok: false, reason: "missing" };
   const rev = (await d
     .select({ content: tenantRevisions.content, theme: tenantRevisions.theme, version: tenantRevisions.version, env: tenantRevisions.env })
     .from(tenantRevisions)
@@ -309,6 +360,18 @@ export async function restoreRevision(slug: string, revisionId: number, author: 
   const current = await getTenant(slug);
   if (!current) return { ok: false, reason: "missing" };
   return saveTenant(slug, { content: rev.content, theme: rev.theme }, current.version, author, `استرجاع النسخة ${rev.version}`);
+}
+
+/**
+ * Checks a save without saving: the same validation and plan rules as saveTenant /
+ * savePreview. Returns the content and theme as they would be stored.
+ */
+export async function checkSave(slug: string, target: SiteEnv, patch: { content?: unknown; theme?: unknown }): Promise<{ ok: true; content?: Content; theme?: Theme } | { ok: false; issues: Issue[] }> {
+  const checked = checkPatch(slug, patch);
+  if (!checked.ok || target === "preview" || !checked.content) return checked;
+  const current = await getTenant(slug);
+  const blocked = current ? violations(checked.content, current.content, current.permissions) : [];
+  return blocked.length ? { ok: false, issues: blocked } : checked;
 }
 
 /* ------------------------------------------------------------------ */
