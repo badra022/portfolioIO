@@ -234,6 +234,23 @@ try {
   const codes = new Set(usage.map((u) => u.error).filter(Boolean));
   check(usage.length > 30 && ["BAD_PATH", "VALIDATION", "PLAN_FEATURE_OFF", "VERSION_CONFLICT"].every((c) => codes.has(c)), `usage log: ${usage.length} calls recorded with their error codes (${[...codes].join(", ")})`);
   check(usage.some((u) => u.scope === "teacher" && u.actor === login.data.username) && usage.some((u) => u.scope === "super"), "usage log: names who called");
+
+  /* ---------- fixing a live quiz while the preview holds a draft ---------- */
+  // The preview gets an unfinished quiz in front of the live one, so the same position means two different quizzes.
+  const draft = await call("edit_content", { slug, operations: [{ op: "insert", path: "quizzes.0", value: { path: "draft-quiz", title: "مسودة", state: "closed", questions: [] } }] });
+  check(!draft.error, "the preview gets an unfinished quiz in front of the live one");
+  const held = await call("get_teacher", { slug });
+  check(held.data?.unpublished_in_preview?.some((x) => x.includes("draft-quiz")) && held.data.note.includes("production"), "get_teacher shows what the preview holds and how to fix the live site without publishing it");
+  const fix = await call("edit_content", { slug, target: "production", operations: [{ op: "set", path: "quizzes.0.title", value: "اختبار الباب الأول (تصحيح)" }, { op: "set", path: "quizzes.0.questions.1.text", value: "اشرح قانون بويل بالتفصيل." }] });
+  check(!fix.error && fix.data.saved === "production" && fix.data.changed.includes("quizzes[path=chem-1].title") && fix.data.changed.includes("quizzes[path=chem-1].questions[text=اشرح قانون بويل بالتفصيل.]") === false, `a live edit by position is reported by the quiz's path (${fix.data?.changed?.join(", ")})`);
+  check(fix.data?.warnings?.[0]?.includes("chem-1"), "…with a warning that students already started it");
+  const liveQuizzes = (await call("get_teacher", { slug, path: "quizzes" })).data.value;
+  const previewQuizzes = (await call("get_teacher", { slug, env: "preview", path: "quizzes" })).data.value;
+  const title = (list, path) => list.find((q) => q.path === path)?.title;
+  check(title(liveQuizzes, "chem-1")?.includes("تصحيح") && title(previewQuizzes, "chem-1")?.includes("تصحيح"), "the fix is in the live quiz and in the same quiz in the preview");
+  check(title(previewQuizzes, "draft-quiz") === "مسودة" && !liveQuizzes.some((q) => q.path === "draft-quiz"), "the preview's draft quiz was not touched and is not live");
+  const byPath = await call("edit_content", { slug, target: "production", operations: [{ op: "merge", path: "quizzes[path=chem-1]", value: { passPercent: 70 } }] });
+  check(!byPath.error && (await call("get_teacher", { slug, env: "preview", path: "quizzes[path=chem-1].passPercent" })).data.value === 70, "editing the live quiz by its path reaches the preview too");
 } finally {
   await call("set_teacher_status", { slug, status: "disabled" }).catch(() => {});
   await sql`delete from tenants where slug = ${slug}`.catch(() => {});

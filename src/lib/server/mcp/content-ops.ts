@@ -159,6 +159,71 @@ export function applyOps<T extends object>(doc: T, ops: Op[]): T {
   return out as T;
 }
 
+/* ---------------- the same edit on a second copy ---------------- */
+
+const idKeyOfList = (list: unknown[]) =>
+  list.length === 0 ? undefined : ID_KEYS.find((k) => list.every((x) => x && typeof x === "object" && typeof (x as Record<string, unknown>)[k] === "string")
+    && new Set(list.map((x) => (x as Record<string, unknown>)[k])).size === list.length);
+
+const render = (segs: Seg[]) => segs.map((x, i) => (typeof x === "string" ? (i ? `.${x}` : x) : `[${x.key}=${x.value}]`)).join("");
+
+/** One op with every list position that points at an item with an id rewritten to that id (quizzes.12.title → quizzes[path=exam-6].title). */
+function canonicalOp(doc: unknown, op: Op): Op {
+  const parts = parsePath(op.path);
+  let node: unknown = doc;
+  const out: Seg[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    let seg = parts[i];
+    if (Array.isArray(node) && typeof seg === "string" && isIndex(seg)) {
+      const key = idKeyOfList(node);
+      const item = node[Number(seg)] as Record<string, unknown> | undefined;
+      if (key && item && !String(item[key]).includes("]")) seg = { key, value: String(item[key]) };
+    }
+    out.push(seg);
+    if (node === null || typeof node !== "object") break;
+    try {
+      const k = resolve(node, seg, parts.slice(0, i));
+      node = Array.isArray(node) ? node[Number(k)] : (node as Record<string, unknown>)[k];
+    } catch { node = undefined; }
+  }
+  return { ...op, path: render(out) } as Op;
+}
+
+/** The ops with positions turned into ids, each read against the document as the ops before it left it. */
+export function canonicalOps(doc: object, ops: Op[]): Op[] {
+  const out: Op[] = [];
+  let cur = doc;
+  for (const op of ops) {
+    const c = canonicalOp(cur, op);
+    out.push(c);
+    cur = applyOps(cur, [c]);
+  }
+  return out;
+}
+
+/**
+ * Applies ops made on `source` to `copy`, a second version of the same document (the
+ * preview next to the live site). Ops reach their item by id, so a list that differs
+ * between the two copies (a draft quiz only the preview has) can't make an edit land on the
+ * wrong item. An op that can't be placed safely is skipped and named instead of guessed.
+ */
+export function mirrorOps<T extends object>(source: T, copy: T, ops: Op[]): { doc: T; skipped: string[] } {
+  let src: object = source;
+  let doc: object = copy;
+  const skipped: string[] = [];
+  for (const op of canonicalOps(source, ops)) {
+    // A position that still points into a list without ids is only the same item while the two lists agree.
+    const positional = parsePath(op.path).some((x, i, all) => typeof x === "string" && isIndex(x) && i < all.length);
+    const same = !positional || op.op === "append" || op.op === "upsert" || JSON.stringify(getAt(src, op.path)) === JSON.stringify(getAt(doc, op.path));
+    try {
+      if (!same) throw new PathError("copies differ here");
+      doc = applyOps(doc, [op]);
+    } catch { skipped.push(op.path); }
+    src = applyOps(src, [op]);
+  }
+  return { doc: doc as T, skipped };
+}
+
 /* ---------------- what changed ---------------- */
 
 export type Change = { path: string; before?: unknown; after?: unknown };

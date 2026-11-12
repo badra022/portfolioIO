@@ -38,7 +38,8 @@ Results and grading:
 1. quiz_results (view summary) for the numbers.
 2. quiz_results view "needs_grading" lists finished attempts not yet approved, with only the written answers that have no answer key.
 3. grade_quiz with grades: [{attempt, score, note}] grades many at once; approve true (default) publishes each grade so the student can look it up by name and phone. approve_all approves every finished attempt with its automatic score.
-Never invent a grade: grade from the answers, and tell the user what rule you used.`,
+Never invent a grade: grade from the answers, and tell the user what rule you used.
+Changing a quiz that is already live: the preview may hold other unfinished work, and publish_preview publishes all of it. get_teacher shows what the preview holds (unpublished_in_preview). To fix a live quiz right away, edit_content with target "production" and the quiz's path (quizzes[path=…]); the same change is copied to the preview by item id. Students who already started keep the questions they got and grades use the answer key by question number, so after changing questions re-check quiz_results before grading; to change a quiz that has results, prefer fixing wording or answer keys and keep the question order.`,
 
   exam_results: `Exam results typed by hand (paper exams): students look up their grade on the site (exams section → past exams' results, or /exams) with their name and phone. exam_results to read; manage_exam_results to create one exam's results, add rows ({name, phone, score, note?}; a student already there with the same phone and first name gets the new score), edit title/date/full mark, publish or delete. Never invent grades: only add what the user gives you (e.g. a pasted sheet).`,
 

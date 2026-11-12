@@ -21,12 +21,12 @@ import { makeUploadLink } from "../upload-link";
 import { absolute, addressFor, siteAddress } from "../address";
 import { RANGES, report } from "../analytics";
 import { STATUSES, listSubmissions, setStatus } from "../submissions";
-import { GradeError, approveAll, listAttempts, quizMetrics, reviewAttempt, type AttemptRow } from "../quiz-attempts";
+import { GradeError, approveAll, attemptCounts, listAttempts, quizMetrics, reviewAttempt, type AttemptRow } from "../quiz-attempts";
 import { resultsFor as pollResultsFor } from "../polls";
 import { pollStatus, pollTimes } from "@/lib/poll";
 import * as examResults from "../exam-results";
 import { SiteFileError, deleteSiteFile, filesTag, listSiteFiles, putSiteFile } from "../site-files";
-import { PathError, applyOps, contentOutline, deepMerge, diff, expectedAt, getAt, schemaAt, schemaFor, summarize, type Change, type Op } from "./content-ops";
+import { PathError, applyOps, canonicalOps, contentOutline, deepMerge, diff, expectedAt, getAt, mirrorOps, schemaAt, schemaFor, summarize, type Change, type Op } from "./content-ops";
 import { fetchImage } from "./fetch-image";
 import { GameFileError, MAX_GAME_BYTES, listGameFiles, saveGameFile } from "../games";
 import { ENVS, type SiteEnv } from "@/lib/environments";
@@ -235,7 +235,7 @@ export function buildMcpServer(origin: string, scope: McpScope): McpServer {
    * save also goes into the preview copy when the preview has unpublished edits, like in
    * the admin panel (previewNext = the same change applied to the preview copy).
    */
-  async function commit(t: repo.TenantRecord, env: SiteEnv, next: { content?: Content; theme?: Theme }, previewNext: { content?: Content; theme?: Theme } | undefined, o: { expected?: number; note: string; dry_run?: boolean }): Promise<CallToolResult> {
+  async function commit(t: repo.TenantRecord, env: SiteEnv, next: { content?: Content; theme?: Theme }, previewNext: { content?: Content; theme?: Theme } | undefined, o: { expected?: number; note: string; dry_run?: boolean; notSynced?: string[] }): Promise<CallToolResult> {
     const current = repo.copyFor(t, env);
     const version = env === "preview" ? t.preview.version : t.version;
     if (o.expected !== undefined && o.expected !== version) return conflict(version, env);
@@ -257,9 +257,20 @@ export function buildMcpServer(origin: string, scope: McpScope): McpServer {
     if (env === "production" && t.preview.pending && previewNext) await repo.savePreview(t.slug, previewNext, null, actor, `${o.note} (منشور على الموقع)`);
     refreshTeacher(t.slug);
     const changed = changes.slice(0, 40).map((c) => c.path);
+    const warnings: string[] = [];
+    if (o.notSynced?.length) warnings.push(`Saved live, but the preview copy has different content at ${o.notSynced.join(", ")}, so this change was not copied there: publish_preview would bring the old version back. Redo the change with target "preview" or discard the preview (publish_preview action discard).`);
+    if (env === "production") {
+      const quizzes = [...new Set(changes.map((c) => c.path.match(/^quizzes\[path=([^\]]+)\]\.questions/)?.[1]).filter((x): x is string => Boolean(x)))];
+      if (quizzes.length) {
+        const counts = await attemptCounts(t.slug, "production");
+        const started = quizzes.filter((q) => (counts[q]?.total ?? 0) > 0);
+        if (started.length) warnings.push(`Students already started ${started.map((q) => `${q} (${counts[q].total})`).join(", ")}: they keep the questions they got, and grades use the new answer key by question number. Re-check the results with quiz_results before grading.`);
+      }
+    }
+    const extra = warnings.length ? { warnings } : {};
     return ok(env === "preview"
-      ? { saved: "preview", live: false, preview_version: r.version, visible_at: `${site}/preview`, publish_with: "publish_preview", changed, next: "Not on the public site yet. Ask the user to check the preview, then publish_preview." }
-      : { saved: "production", live: true, version: r.version, visible_at: site, changed });
+      ? { saved: "preview", live: false, preview_version: r.version, visible_at: `${site}/preview`, publish_with: "publish_preview", changed, ...extra, next: "Not on the public site yet. Ask the user to check the preview, then publish_preview." }
+      : { saved: "production", live: true, version: r.version, visible_at: site, changed, ...extra });
   }
 
   const noteFor = (keys: string[]) => [...new Set(keys)].map((k) => labelFor(k, k)).join("، ");
@@ -306,6 +317,7 @@ export function buildMcpServer(origin: string, scope: McpScope): McpServer {
       site_url: site, preview_url: `${site}/preview`, image_base: abs(assetBase(slug)),
       domains: t.domains.map((d) => d.domain), logins: (await repo.listUsers(slug)).map((u) => u.username),
       plan: { off, max_forms: t.permissions.maxForms, ...(off.length ? { note: "Parts in \"off\" can be saved to the preview but not to the live site." } : {}) },
+      ...(t.preview.pending ? { unpublished_in_preview: diff(t.content, t.preview.content).slice(0, 15).map((c) => c.path), note: "publish_preview publishes ALL of these. To fix something that is live without publishing them, save with target \"production\"." } : {}),
     };
     if (view === "full") return ok({ ...meta, content, theme: copy.theme });
     return ok({ ...meta, content_summary: summarize(content), next: "Fetch what you need with keys or path; address list items by the ids shown, e.g. schedule.slots[id=…]." });
@@ -429,10 +441,11 @@ export function buildMcpServer(origin: string, scope: McpScope): McpServer {
     const roots = operations.map((o) => o.path.split(/[.[]/)[0].trim());
     if (roots.includes("slug")) return fail("BAD_INPUT", "slug can't be changed.");
     const env = target ?? "preview";
-    const content = applyOps(repo.copyFor(t, env).content, operations as Op[]);
-    let previewContent: Content | undefined;
-    try { previewContent = applyOps(t.preview.content, operations as Op[]); } catch { previewContent = undefined; }
-    return commit(t, env, { content }, previewContent && { content: previewContent }, { expected: expected_version, note: note ?? noteFor(roots), dry_run });
+    const ops = canonicalOps(repo.copyFor(t, env).content, operations as Op[]);
+    const content = applyOps(repo.copyFor(t, env).content, ops);
+    // A live edit is also made in the preview when it holds unpublished edits: by item id, never by position.
+    const mirrored = env === "production" && t.preview.pending ? mirrorOps(t.content, t.preview.content, ops) : null;
+    return commit(t, env, { content }, mirrored ? { content: mirrored.doc } : undefined, { expected: expected_version, note: note ?? noteFor(roots), dry_run, notSynced: mirrored?.skipped });
   });
 
   tool("update_theme", {
