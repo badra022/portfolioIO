@@ -16,9 +16,9 @@ export type Permissions = Record<Feature, boolean> & {
   maxForms: number | null;
 };
 
-/** New teachers: nothing paid. */
+/** Everything off: what a teacher gets when every bundle is switched off by hand in the console. */
 export const NO_PERMISSIONS: Permissions = { analytics: false, students: false, forms: false, exams: false, votes: false, promo: false, library: false, maxForms: null };
-/** Teachers from before permissions existed, and sites without a database. */
+/** Everything on: new teachers, teachers from before plans existed, and sites without a database. */
 export const ALL_PERMISSIONS: Permissions = { analytics: true, students: true, forms: true, exams: true, votes: true, promo: true, library: true, maxForms: null };
 
 export const FEATURE_INFO: Record<Feature, { title: string; description: string }> = {
@@ -31,11 +31,15 @@ export const FEATURE_INFO: Record<Feature, { title: string; description: string 
   library: { title: "مكتبة المحتوى", description: "المقالات والألعاب التعليمية بصفحاتها، وصفحات «المقالات» و«كل الاختبارات» و«الألعاب» بالبحث والتصنيفات وعدد المشاهدات، وإحصائيات كل صفحة." },
 };
 
-/** Stored permissions (tenants.permissions) as a full object: anything missing is off. */
+/**
+ * Stored permissions (tenants.permissions) as a full object. Everything is ON unless it is
+ * explicitly false: a new teacher (stored as {}) has every bundle, and a bundle added to the
+ * platform later is on for everyone until the console switches it off for a teacher.
+ */
 export function readPermissions(raw: unknown): Permissions {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const max = typeof o.maxForms === "number" && Number.isInteger(o.maxForms) && o.maxForms >= 0 ? o.maxForms : null;
-  return { ...Object.fromEntries(FEATURES.map((f) => [f, o[f] === true])) as Record<Feature, boolean>, maxForms: max };
+  return { ...Object.fromEntries(FEATURES.map((f) => [f, o[f] !== false])) as Record<Feature, boolean>, maxForms: max };
 }
 
 export const blockedMessage = (f: Feature) => `«${FEATURE_INFO[f].title}» مش متاحة في باقة الموقع ده. كلم الإدارة لتفعيلها.`;

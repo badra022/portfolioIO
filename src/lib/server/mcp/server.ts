@@ -213,7 +213,7 @@ export function buildMcpServer(origin: string, scope: McpScope): McpServer {
       return fail("PLAN_FEATURE_OFF", `This site's plan doesn't include: ${features.map((f) => `${f} («${FEATURE_INFO[f].title}»)`).join(", ")}. It can't go on the live site.`, {
         features,
         fix: scope.kind === "super"
-          ? `Turn it on with manage_plan { enable: ${JSON.stringify(features)} } if the teacher bought it, then save again.`
+          ? `Turn it on with manage_plan { enable: ${JSON.stringify(features)} } if the platform admin wants it on, then save again.`
           : "Ask the platform admin (myostaz) to add it to the plan. Until then it can be saved to the preview (target \"preview\") but not published.",
         message_ar: plan[0].message,
       });
@@ -366,7 +366,7 @@ export function buildMcpServer(origin: string, scope: McpScope): McpServer {
 
   tool("create_teacher", {
     title: "Create a teacher", kind: "write",
-    description: "A new teacher page from full content, or copy_from an existing teacher (then replace everything). Online right away unless active is false. Its plan starts with no paid bundles (manage_plan).",
+    description: "A new teacher page from full content, or copy_from an existing teacher (then replace everything). Online right away unless active is false. Every plan bundle starts on (manage_plan switches them).",
     input: {
       slug: z.string().describe("New id, e.g. \"ahmed-hassan\": lowercase letters, digits, dashes. Permanent."),
       name: z.string().describe("Display name."),
@@ -394,7 +394,7 @@ export function buildMcpServer(origin: string, scope: McpScope): McpServer {
     if (active === false) await repo.setTenantStatus(slug, "disabled");
     refreshTeacher(slug, true);
     const site = siteUrl(slug, []);
-    return ok({ created: true, slug, version: 1, status: active === false ? "disabled" : "active", live: active !== false, site_url: site, preview_url: `${site}/preview`, admin_url: `${site}/admin`, plan: { off: [...FEATURES], note: "No paid bundles yet: manage_plan turns on what the teacher bought." } });
+    return ok({ created: true, slug, version: 1, status: active === false ? "disabled" : "active", live: active !== false, site_url: site, preview_url: `${site}/preview`, admin_url: `${site}/admin`, plan: { off: [] } });
   });
 
   tool("update_content", {
@@ -492,7 +492,7 @@ export function buildMcpServer(origin: string, scope: McpScope): McpServer {
 
   tool("manage_plan", {
     title: "The teacher's plan", kind: "write",
-    description: "The plan's bundles: read them (no changes), or enable / disable. A bundle that's off can be edited in the preview but not published. Turn on only what the teacher bought.",
+    description: "The plan's bundles (all on by default): read them (no changes), or disable / enable one. A bundle that's off can be edited in the preview but not published.",
     input: {
       slug: slugArg,
       enable: z.array(z.enum(FEATURES)).optional(),
