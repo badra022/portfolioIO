@@ -48,7 +48,7 @@ export const tenants = pgTable("tenants", {
   previewVersion: integer("preview_version").notNull().default(0),
   previewUpdatedAt: timestamp("preview_updated_at", { withTimezone: true }),
   previewUpdatedBy: text("preview_updated_by"),
-  /** What the teacher's plan includes (lib/permissions.ts). Empty = nothing paid (new teachers). */
+  /** What the teacher's plan includes (lib/permissions.ts). Only what is switched off is stored as false: empty = every bundle on (new teachers). */
   permissions: jsonb("permissions").notNull().default(sql`'{}'::jsonb`),
   /**
    * Free trial sites (made from the public «جرّب موقعك» form): the site and its

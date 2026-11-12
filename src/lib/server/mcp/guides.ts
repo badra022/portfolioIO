@@ -10,7 +10,7 @@ export const GUIDES = {
 2. Gather the facts from the user: name, subjects and grades, schedule (days, times, areas/centers), WhatsApp number, book, exams, socials, YouTube. Never invent facts (prices, phone numbers, results, follower counts, dates): ask, or leave the optional field out.
 3. Photos: see get_guide "images". Then list_images and view_image to decide which photo goes where. Image fields take the returned key (e.g. "uploads/…-teacher.webp").
 4. create_teacher with the full content (and optionally a theme), or with copy_from and then edit_content to replace everything that belongs to the other teacher (all text, numbers, images, links).
-5. A new teacher's plan has no paid bundles: turn on what the user bought with manage_plan before saving forms, quizzes, votes, offers or articles to the live site.
+5. Every bundle is on for a new teacher. If the platform admin switched one off, saving it to the live site fails with PLAN_FEATURE_OFF (the preview still takes it); the super admin can turn it back on with manage_plan.
 6. Send the user preview_url; adjust with edit_content (small changes) or update_content (whole sections).
 7. When ready: manage_domain (the domain must also be added in Vercel → Settings → Domains), then manage_login to create the teacher's account (the password is shown once; pass it to the user).`,
 
