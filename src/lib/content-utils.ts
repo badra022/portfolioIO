@@ -101,7 +101,8 @@ function startState(starts: string | undefined, now: Date): "started" | "soon" |
   return at - now.getTime() <= CACHE_WINDOW ? "soon" : "later";
 }
 
-export type Issue = { path: string; message: string };
+/** feature: the plan bundle that refuses the save (lib/permissions.ts), when that is the reason. */
+export type Issue = { path: string; message: string; feature?: string };
 
 /** Validates with Arabic error messages; returns flat issues keyed by dotted path. */
 export function validate<T>(schema: z.ZodType<T>, value: unknown): { ok: true; data: T } | { ok: false; issues: Issue[] } {

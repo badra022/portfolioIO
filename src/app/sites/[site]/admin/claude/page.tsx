@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { REVISION_DAYS } from "@/lib/server/repo";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { env } from "@/lib/env";
@@ -40,6 +41,7 @@ export default async function ConnectClaude({ params }: PageProps<"/sites/[site]
           <li><b>ابدأ اطلب</b><span>مثلاً: «غيّر ميعاد مجموعة السبت لـ 5 العصر»، «حط إعلان عن امتحان الشهر»، «اعمل اختبار 10 أسئلة على الباب الأول»، «صحّح الاختبار وابعت لكل طالب ملاحظة»، «مين طلب يحجز النهاردة؟».</span></li>
         </ol>
       )}
+      <p className="a-sub">كل تعديل بيعمله Claude بيتسجل باسمك إنت في <a className="f-link" href="history">سجل التعديلات</a>، وتقدر ترجّعه خلال {REVISION_DAYS} أيام. التعديلات بتتحفظ في المعاينة الأول، ومش بتظهر للطلاب غير لما توافق على النشر.</p>
       <p className="a-sub">ألوان الموقع وخطوطه، الحسابات، والدومين بتتعمل من إدارة myostaz. لو غيّرت كلمة السر أو عايز تفصل Claude: من نفس صفحة Connectors اضغط Disconnect.</p>
     </>
   );

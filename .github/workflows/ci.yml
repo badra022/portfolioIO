@@ -59,3 +59,16 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # The MCP server as an AI agent uses it, on a throwaway teacher: small reads, edits by id,
+      # dry runs, error codes, grading in bulk, image upload, a teacher's own login, the 7-day history.
+      - name: MCP scenarios
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+          ADMIN_USER: admin
+          ADMIN_PASSWORD: ci-only-not-a-real-password
+          MCP_TOKEN: ci-only-not-a-real-token-0123456789abcdef
+        run: |
+          npx next start -p 3000 > next.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:3000/api/cron/sweep && break; sleep 1; done
+          npm run test:mcp || { cat next.log; exit 1; }

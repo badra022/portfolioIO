@@ -285,6 +285,26 @@ export const gameFiles = pgTable("game_files", {
 }, (t) => [index("game_files_tenant_idx").on(t.tenantId)]);
 
 /**
+ * One row per call an AI app made to the MCP server (lib/server/mcp/usage.ts): who, which
+ * tool, how long, how big the answer was and the error code if it failed. Shows the
+ * super admin where agents struggle (/admin/mcp). Kept for 30 days.
+ */
+export const mcpCalls = pgTable("mcp_calls", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  /** The signed-in account, named as in the history (lib/server/auth.ts principalName). */
+  actor: text("actor").notNull(),
+  scope: text("scope", { enum: ["super", "partner", "teacher"] }).notNull(),
+  /** The teacher the call was about, when it had one. */
+  slug: text("slug"),
+  tool: text("tool").notNull(),
+  ms: integer("ms").notNull(),
+  bytes: integer("bytes").notNull(),
+  /** Error code (lib/server/mcp/errors.ts), or null when the call worked. */
+  error: text("error"),
+}, (t) => [index("mcp_calls_at_idx").on(t.at)]);
+
+/**
  * Results of one exam, entered or imported by the teacher (/admin/results).
  * Students look theirs up on the site with their name and phone
  * (lib/exam-results.ts); the rows are never sent to the browser as a whole.
