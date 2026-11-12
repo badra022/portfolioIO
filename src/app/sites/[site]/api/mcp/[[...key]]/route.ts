@@ -3,7 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { env } from "@/lib/env";
 import { safeEqual } from "@/lib/server/passwords";
 import { buildMcpServer } from "@/lib/server/mcp/server";
-import { accessIdentity, requestOrigin, scopeOf, type McpScope } from "@/lib/server/oauth";
+import { accessIdentity, requestOrigin, scopeOf, superScope, type McpScope } from "@/lib/server/oauth";
 import { preflight } from "@/lib/server/oauth-http";
 
 /**
@@ -28,7 +28,7 @@ async function handle(req: Request, ctx: RouteContext<"/sites/[site]/api/mcp/[[.
   const isMaster = (t: string) => env.mcpToken.length >= 32 && Boolean(t) && safeEqual(t, env.mcpToken);
 
   let scope: McpScope | null = null;
-  if (isMaster(pathToken) || isMaster(bearer)) scope = { kind: "super" };
+  if (isMaster(pathToken) || isMaster(bearer)) scope = superScope();
   else if (pathToken) return notFound();
   else if (bearer) {
     const who = await accessIdentity(bearer);

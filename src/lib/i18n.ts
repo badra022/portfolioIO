@@ -38,6 +38,7 @@ const ar = {
   menuClose: "إغلاق القائمة",
   pageSections: "أقسام الصفحة",
   notFound: "الصفحة غير موجودة.",
+  backToMain: "الرجوع للصفحة الرئيسية",
   and: "و",
   // countdowns
   endsIn: "ينتهي خلال",
@@ -219,6 +220,7 @@ const en: UIText = {
   menuClose: "Close menu",
   pageSections: "Page sections",
   notFound: "Page not found.",
+  backToMain: "Back to the main page",
   and: "and",
   endsIn: "Ends in",
   day: "d",

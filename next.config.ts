@@ -10,6 +10,8 @@ const config: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   images: { unoptimized: true },
+  // proxy.ts decides about trailing slashes itself: a teacher's main page gets one, every other page loses it.
+  skipTrailingSlashRedirect: true,
   // The platform console's "Import" reads tenants/* at runtime.
   outputFileTracingIncludes: { "/sites/[site]/admin": ["./tenants/**/*"] },
   experimental: {

@@ -4,6 +4,7 @@ import { findLoginById, listTenants } from "./repo";
 import { getPartnerById } from "./partners";
 import { pkceChallenge, readToken, signToken } from "./tokens";
 import type { Identity } from "./session";
+import { principalName } from "./auth";
 
 /**
  * OAuth 2.1 for the MCP server (app/sites/[site]/api/mcp), so a partner adds myostaz as a
@@ -202,17 +203,24 @@ async function stillAllowed(who: Identity): Promise<boolean> {
 
 /* ---------------- what an MCP session may reach ---------------- */
 
-/** The MCP server's reach: everything (super admin), or a set of teacher sites. */
-export type McpScope = { kind: "super" } | { kind: "partner" | "teacher"; name: string; slugs: Set<string> };
+/**
+ * The MCP server's reach: everything (super admin), or a set of teacher sites. actor is
+ * the signed-in account as the history names it (lib/server/auth.ts principalName): what
+ * an AI app saves is recorded under the person who connected it, like their own edits.
+ */
+export type McpScope = { kind: "super"; actor: string } | { kind: "partner" | "teacher"; name: string; actor: string; slugs: Set<string> };
+
+/** The super admin, for the MCP_TOKEN link (which carries no login of its own). */
+export const superScope = (): McpScope => ({ kind: "super", actor: principalName({ kind: "super", name: env.adminUser || "admin" }) });
 
 export async function scopeOf(who: Identity): Promise<McpScope | null> {
-  if (who.k === "s") return { kind: "super" };
+  if (who.k === "s") return superScope();
   if (who.k === "p") {
     const p = await getPartnerById(who.id);
     if (!p || p.disabled) return null;
     const slugs = new Set((await listTenants()).filter((t) => t.partnerId === p.id).map((t) => t.slug));
-    return { kind: "partner", name: p.name, slugs };
+    return { kind: "partner", name: p.name, actor: principalName({ kind: "partner", id: p.id, username: p.username, name: p.name, slug: "" }), slugs };
   }
   const l = await findLoginById(who.id);
-  return l && !l.disabled ? { kind: "teacher", name: l.username, slugs: new Set([l.slug]) } : null;
+  return l && !l.disabled ? { kind: "teacher", name: l.username, actor: principalName({ kind: "teacher", id: l.id, username: l.username, slug: l.slug }), slugs: new Set([l.slug]) } : null;
 }

@@ -56,7 +56,7 @@ async function SiteFrame({ params, children }: { params: Promise<{ site: string 
       <div className="site" lang={langOf(content.locale)} dir={dirOf(content.locale)} data-trial={data.trialEndsAt ? "true" : undefined} {...themeAttrs(theme)}>
         {data.env === "preview" && <PreviewBar base={data.base} />}
         {data.trialEndsAt && <TrialMark endsAt={data.trialEndsAt} en={content.locale === "en"} siteName={content.profile.fullTitle} />}
-        <UITextProvider locale={content.locale}>{children}</UITextProvider>
+        <UITextProvider locale={content.locale} base={data.base}>{children}</UITextProvider>
         {/* The platform's signature under every page of the site: home, quizzes, votes, pages (hidden in /admin). */}
         <DevCredit siteName={content.profile.fullTitle} />
         {data.trialEndsAt && <TrialMark foot endsAt={data.trialEndsAt} en={content.locale === "en"} siteName={content.profile.fullTitle} />}

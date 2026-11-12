@@ -13,6 +13,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/db-migrate.mjs",
+    "test:mcp": "node scripts/mcp-scenarios.mjs",
     "postinstall": "node --experimental-strip-types scripts/generate-schema.ts && node scripts/copy-segmenter.mjs"
   },
   "engines": {

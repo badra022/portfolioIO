@@ -22,6 +22,8 @@ export const env = {
   adminPassword: process.env.ADMIN_PASSWORD ?? "",
   /** Secret for the MCP server (/api/mcp) and its upload links. 32+ random characters; empty turns the MCP server off. */
   mcpToken: process.env.MCP_TOKEN ?? "",
+  /** Optional: when set, Vercel sends it with the daily clean-up call (api/cron/sweep) and anything else is refused. */
+  cronSecret: process.env.CRON_SECRET ?? "",
   /**
    * "dev" on the developer environment (Vercel Preview deployments: the develop
    * branch and feature branches), which has its own database and storage. The

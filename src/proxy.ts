@@ -38,6 +38,16 @@ export async function proxy(request: NextRequest) {
     if (!home.startsWith("/")) return NextResponse.redirect(`${home}${preview ? PREVIEW_PATH : ""}${r.rest}${search}`, 308);
   }
 
+  // Trailing slashes: a teacher's main page ("/", "/t/<slug>/", "/preview/") always has one and is
+  // reached with or without it; every other page is the same address without it.
+  const hasSlash = pathname.length > 1 && pathname.endsWith("/");
+  const mainPage = r.rest === "/" && pathname !== "/";
+  if (mainPage !== hasSlash) {
+    // A plain URL: NextURL would put the slash back (or drop it) by itself.
+    const fixed = mainPage ? `${pathname}/` : pathname.replace(/\/+$/, "") || "/";
+    return NextResponse.redirect(new URL(`${fixed}${search}`, request.nextUrl.origin), 308);
+  }
+
   // One admin panel for both environments: /preview/admin is /admin.
   if (preview && isAdminPath(r.rest)) {
     const to = request.nextUrl.clone();
