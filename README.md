@@ -104,7 +104,7 @@ Super admin console → a teacher → **الباقة (الصلاحيات)**: fiv
 | التصويتات | Vote pages |
 | أدوات الإعلان | Pop-up, red bar, featured section |
 
-- **New teachers start with none; teachers created before plans existed keep everything** (migration `0010` sets them all on).
+- **Everything is on by default.** A new teacher has every bundle, and so does every teacher until the super admin switches one off: a bundle that isn't explicitly `false` counts as on, so a bundle added to the platform later is on for everyone without touching any plan.
 - A bundle that's off can be prepared and **saved to the preview**, but **not saved or published to the site**. Only parts a save changes are checked, so editing the rest still works. Grading and exam-results changes are refused too.
 - It's **left out of the live site right away**: quiz and vote pages return not found, the results button and its API go, buttons that opened a removed form fall back to WhatsApp. Switching it back on brings everything back.
 - The analytics and requests pages show a "not in your plan" message instead of the data. The teacher's dashboard lists what's not included.

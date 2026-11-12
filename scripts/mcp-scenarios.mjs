@@ -69,7 +69,7 @@ try {
 
   /* ---------- a new teacher ---------- */
   const made = await call("create_teacher", { slug, name: "مستر تجربة", copy_from: "mohamed-ali" });
-  check(!made.error && made.data.plan?.off?.includes("exams"), "create_teacher: created, and says the plan has no paid bundles");
+  check(!made.error && made.data.plan?.off?.length === 0, "create_teacher: created, with every plan bundle on");
 
   /* ---------- reading small ---------- */
   const summary = await call("get_teacher", { slug });
@@ -128,10 +128,13 @@ try {
   const q2 = await call("edit_content", { slug, operations: [{ op: "upsert", path: "quizzes", value: quiz("اختبار الباب الأول (معدّل)") }] });
   const quizzes = await call("get_teacher", { slug, env: "preview", path: "quizzes" });
   check(!q2.error && quizzes.data.value.length === 1 && quizzes.data.value[0].title.includes("معدّل") && q2.data.changed.join() === "quizzes[path=chem-1].title", "upsert again: replaces the same quiz, and reports only the title changed");
+  // Every bundle is on by default: switch «exams» off by hand to see what a refusal looks like.
+  const off = await call("manage_plan", { slug, disable: ["exams"] });
+  check(off.data?.off?.join() === "exams" && off.data.on.includes("library"), "manage_plan: only the bundle switched off is off");
   const blocked = await call("publish_preview", { slug, action: "publish" });
   check(blocked.error?.code === "PLAN_FEATURE_OFF" && blocked.error.features.includes("exams") && blocked.error.fix.includes("manage_plan") && blocked.error.message_ar, "publishing a quiz without the bundle → PLAN_FEATURE_OFF, naming the bundle and the fix");
   const plan = await call("manage_plan", { slug, enable: ["exams"] });
-  check(plan.data?.on?.includes("exams"), "manage_plan turns the bundle on");
+  check(plan.data?.on?.includes("exams"), "manage_plan turns the bundle back on");
   const published = await call("publish_preview", { slug, action: "publish" });
   check(published.data?.live === true && published.data.saved === "production", "publish: now live");
 
