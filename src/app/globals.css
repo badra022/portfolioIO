@@ -232,6 +232,7 @@ select { font: 15px var(--f-body); color: var(--text); background: var(--surface
 .q-lvl { font-size: 13px; font-weight: 700; color: var(--accent-hot); }
 .q h3 { font-family: var(--f-body); font-weight: 700; font-size: 19px; line-height: 1.7; }
 .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.answers.stack { grid-template-columns: 1fr; }
 .ans { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: var(--r-control); padding: 10px 14px; background: var(--raised); cursor: pointer; font-size: 17px; }
 .ans:has(input:checked) { border-color: var(--accent); background: var(--accent-12); }
 .q .btn { margin-top: auto; }
