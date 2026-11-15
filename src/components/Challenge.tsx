@@ -7,6 +7,9 @@ import { ChatButton } from "./ChatButton";
 import { Rich } from "./Rich";
 import { useUI } from "./UIText";
 
+/** A choice longer than this (characters) makes the question's choices stack instead of sitting in two columns (same as the quizzes). */
+const LONG_OPTION = 16;
+
 type Data = NonNullable<Content["challenge"]>;
 
 function Question({ q, n, data, chat }: { q: Data["questions"][number]; n: number; data: Data; chat: ChatConfig }) {
@@ -17,7 +20,7 @@ function Question({ q, n, data, chat }: { q: Data["questions"][number]; n: numbe
     <div className="q">
       <span className="q-lvl">{q.level}</span>
       <h3>{q.question}</h3>
-      <div className="answers">
+      <div className={`answers${q.options.some((o) => o.length > LONG_OPTION) ? " stack" : ""}`}>
         {q.options.map((o, i) => (
           <label className="ans" key={o}>
             <input type="radio" name={`q${n}`} id={`q${n}-${i}`} value={o} checked={answer === o} onChange={() => setAnswer(o)} />
