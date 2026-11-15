@@ -11,6 +11,9 @@ import { tf } from "@/lib/i18n";
 import { currentRef } from "@/lib/referral";
 import type { SelfResult } from "@/lib/quiz";
 
+/** A choice longer than this (characters) makes the question's choices stack instead of sitting in two columns. */
+const LONG_OPTION = 16;
+
 /** What the page knows about the quiz before it starts (no questions, no answer key). */
 export type QuizSummary = Pick<QuizT, "path" | "title" | "intro" | "image" | "durationMinutes" | "state" | "startsAt" | "endsAt" | "startLabel" | "submitLabel" | "doneMessage"> & { count: number };
 
@@ -261,7 +264,8 @@ export function QuizApp({ slug, base, quiz, form, resultMessage, resultCta }: {
                 {q.image && <img className="quiz-img" src={q.image} alt="" loading="lazy" />}
                 {q.text && <h3>{q.text}</h3>}
                 {q.type === "choice" && q.options.length > 0 ? (
-                  <div className="answers">
+                  // Short choices sit two to a row; as soon as one is long, all of the question's choices stack at full width.
+                  <div className={`answers${q.options.some((o) => o.length > LONG_OPTION) ? " stack" : ""}`}>
                     {q.options.map((o, j) => (
                       <label className="ans" key={j}>
                         <input type="radio" name={`qq${i}`} checked={answers[String(i)] === o} onChange={() => answer(i, o)} disabled={busy} />
